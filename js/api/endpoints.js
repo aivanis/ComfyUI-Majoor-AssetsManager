@@ -41,6 +41,7 @@ export const ENDPOINTS = {
     SETTINGS_OUTPUT_DIRECTORY: "/mjr/am/settings/output-directory",
     SETTINGS_METADATA_FALLBACK: "/mjr/am/settings/metadata-fallback",
     SETTINGS_VECTOR_SEARCH: "/mjr/am/settings/vector-search",
+    SETTINGS_HUGGINGFACE: "/mjr/am/settings/huggingface",
 
     // View (ComfyUI native)
     VIEW: "/view",
@@ -94,6 +95,8 @@ export const ENDPOINTS = {
     VECTOR_INDEX: "/mjr/am/vector/index",
     VECTOR_STATS: "/mjr/am/vector/stats",
     VECTOR_SUGGEST_COLLECTIONS: "/mjr/am/vector/suggest-collections",
+    VECTOR_BACKFILL: "/mjr/am/db/backfill-missing-vectors",
+    VECTOR_BACKFILL_STATUS: "/mjr/am/db/backfill-missing-vectors/status",
 
     // Hybrid search (FTS + semantic)
     HYBRID_SEARCH: "/mjr/am/search/hybrid",

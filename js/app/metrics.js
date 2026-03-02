@@ -79,6 +79,16 @@ export function endTimer(name, category) {
 }
 
 /**
+ * Check whether a timer is currently active.
+ * @param {string} name - Timer name
+ * @returns {boolean}
+ */
+export function hasTimer(name) {
+    if (!METRICS_ENABLED) return false;
+    return _timers.has(name);
+}
+
+/**
  * Mark a point in time for later measurement.
  * @param {string} name - Mark name
  * @returns {void}
@@ -265,6 +275,7 @@ if (typeof window !== 'undefined') {
     window.MajoorMetrics = {
         startTimer,
         endTimer,
+        hasTimer,
         mark,
         measure,
         trackApiCall,

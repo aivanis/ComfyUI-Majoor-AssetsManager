@@ -15,6 +15,7 @@ from mjr_am_backend.config import VECTOR_SIMILAR_TOPK, is_vector_search_enabled
 from mjr_am_backend.shared import Result, get_logger
 
 from ..core import _json_response, _require_services
+from ..core import safe_error_message
 from ..core.security import _check_rate_limit
 
 logger = get_logger(__name__)
@@ -192,13 +193,17 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
             top_k = VECTOR_SIMILAR_TOPK
         top_k = max(1, min(200, top_k))
 
-        result = await searcher.search_by_text(query, top_k=top_k)
+        try:
+            result = await searcher.search_by_text(query, top_k=top_k)
 
-        # Hydrate results with full asset data for grid rendering
-        if result.ok and result.data:
-            result = await _hydrate_vector_results(services_dict, result)
+            # Hydrate results with full asset data for grid rendering
+            if result.ok and result.data:
+                result = await _hydrate_vector_results(services_dict, result)
 
-        return _json_response(result)
+            return _json_response(result)
+        except Exception as exc:
+            logger.warning("Vector text search failed: %s", exc)
+            return _json_response(Result.Err("SERVICE_UNAVAILABLE", safe_error_message(exc, "Vector text search failed")))
 
     # ── Find Similar ───────────────────────────────────────────────────
 

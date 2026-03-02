@@ -182,6 +182,20 @@ def _extract_vector_search_payload(body: dict) -> object | None:
     return None
 
 
+def _extract_huggingface_token_payload(body: dict) -> str | None:
+    if "token" in body:
+        return str(body.get("token") or "")
+    if "huggingface_token" in body:
+        return str(body.get("huggingface_token") or "")
+    prefs = body.get("prefs") if isinstance(body.get("prefs"), dict) else {}
+    if isinstance(prefs, dict):
+        if "token" in prefs:
+            return str(prefs.get("token") or "")
+        if "huggingface_token" in prefs:
+            return str(prefs.get("huggingface_token") or "")
+    return None
+
+
 def _build_security_prefs(body: dict) -> dict[str, object]:
     prefs: dict[str, object] = {}
     for key in SECURITY_PREF_KEYS:
@@ -682,6 +696,50 @@ def register_health_routes(routes: web.RouteTableDef) -> None:
         if not result.ok:
             return _json_response(result)
         return _json_response(Result.Ok({"prefs": {"enabled": bool(result.data)}}))
+
+    @routes.get("/mjr/am/settings/huggingface")
+    async def get_huggingface_settings(request):
+        svc, error_result = await _require_services()
+        if error_result:
+            return _json_response(error_result)
+
+        settings_service = svc.get("settings")
+        if not settings_service:
+            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Settings service unavailable"))
+
+        info = await settings_service.get_huggingface_token_info()
+        return _json_response(Result.Ok({"prefs": info}))
+
+    @routes.post("/mjr/am/settings/huggingface")
+    async def update_huggingface_settings(request):
+        csrf = _csrf_error(request)
+        if csrf:
+            return _json_response(Result.Err(ErrorCode.CSRF, csrf))
+        auth = _require_write_access(request)
+        if not auth.ok:
+            return _json_response(auth)
+
+        svc, error_result = await _require_services()
+        if error_result:
+            return _json_response(error_result)
+
+        settings_service = svc.get("settings")
+        if not settings_service:
+            return _json_response(Result.Err(ErrorCode.SERVICE_UNAVAILABLE, "Settings service unavailable"))
+
+        body_res = await _read_json(request)
+        if not body_res.ok:
+            return _json_response(body_res)
+        body = body_res.data or {}
+
+        token = _extract_huggingface_token_payload(body)
+        if token is None:
+            return _json_response(Result.Err("INVALID_INPUT", "Missing huggingface token value"))
+
+        result = await settings_service.set_huggingface_token(token)
+        if not result.ok:
+            return _json_response(result)
+        return _json_response(Result.Ok({"prefs": result.data or {}}))
 
     @routes.get("/mjr/am/settings/security")
     async def get_security_settings(request):

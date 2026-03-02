@@ -258,14 +258,16 @@ async def _store_embedding(
     return await db.aexecute(
         """
         INSERT INTO asset_embeddings (asset_id, vector, aesthetic_score, model_name, updated_at)
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
+        SELECT ?, ?, ?, ?, CURRENT_TIMESTAMP
+        WHERE EXISTS (SELECT 1 FROM assets WHERE id = ?)
         ON CONFLICT(asset_id) DO UPDATE SET
             vector = excluded.vector,
             aesthetic_score = excluded.aesthetic_score,
             model_name = excluded.model_name,
             updated_at = CURRENT_TIMESTAMP
+        WHERE EXISTS (SELECT 1 FROM assets WHERE id = excluded.asset_id)
         """,
-        (asset_id, blob, aesthetic_score, model_name),
+        (asset_id, blob, aesthetic_score, model_name, asset_id),
     )
 
 

@@ -171,6 +171,8 @@ const DICTIONARY = {
         "setting.language.desc": "Choose the language for the Assets Manager interface. Reload required to fully apply.",
         "setting.search.maxResults.name": "Majoor: Search max results",
         "setting.search.maxResults.desc": "Maximum number of results returned by search endpoints.",
+        "setting.ai.vector.enabled.name": "Enable AI semantic search",
+        "setting.ai.vector.enabled.desc": "Enable CLIP-based semantic search. Disable to use keyword-only search.",
 
         // --- Settings: Security ---
         "setting.sec.safe.name": "Majoor: Safe Mode",
@@ -244,6 +246,8 @@ const DICTIONARY = {
         "label.resolutionPx": "Resolution (px)",
         "label.compare": "Compare",
         "label.resolutionWxHpx": "Resolution WxH (px)",
+        "label.resolutionMinWxH": "Min WxH (px)",
+        "label.resolutionMaxWxH": "Max WxH (px)",
         "label.widthPx": "Width (px)",
         "label.heightPx": "Height (px)",
         "label.day": "Day",
@@ -254,6 +258,8 @@ const DICTIONARY = {
         "label.computer": "Computer",
         "search.placeholder": "Search assets...",
         "search.title": "Search by filename, tags, or attributes (e.g. rating:5, ext:png)",
+        "search.semanticToggle": "Toggle AI semantic search (CLIP-based)",
+        "search.aiSearch": "AI Search",
         "action.copyToClipboard": "Copy to clipboard",
         "action.clickToCopy": "Click to copy",
         "tooltip.copyFieldValue": "Copy value",
@@ -696,6 +702,11 @@ const DICTIONARY = {
 
         "search.placeholder": "Rechercher des assets...",
         "search.title": "Rechercher par nom de fichier, tags ou attributs (ex. rating:5, ext:png)",
+        "search.semanticToggle": "Activer/desactiver la recherche semantique IA (CLIP)",
+        "search.aiSearch": "Recherche IA",
+
+        "setting.ai.vector.enabled.name": "Activer la recherche semantique IA",
+        "setting.ai.vector.enabled.desc": "Active la recherche semantique basee sur CLIP. Desactivez pour une recherche par mots-cles uniquement.",
 
         "runtime.unavailable": "Runtime indisponible",
         "runtime.metricsTitle": "Metriques runtime\nConnexions DB actives : {active}\nFile enrichissement : {enrichQ}\nFichiers watcher en attente : {pending}",
@@ -733,6 +744,8 @@ const DICTIONARY = {
         "toast.folderPinnedAsBrowserRoot": "Dossier epingle comme racine browser",
 
         "label.computer": "Ordinateur",
+        "label.resolutionMinWxH": "Min LxH (px)",
+        "label.resolutionMaxWxH": "Max LxH (px)",
         "msg.noPinnedFolders": "Aucun dossier epingle",
         "sidebar.placeholderSelectAsset": "Selectionnez un asset pour voir les details",
         "msg.noTagsYet": "Aucun tag pour le moment..."

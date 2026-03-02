@@ -174,6 +174,10 @@ async def build_services(db_path: str | None = None) -> Result[dict]:
         await settings_service.apply_vector_search_override_on_startup()
     except Exception as exc:
         logger.warning("Vector search setting restore failed: %s", exc)
+    try:
+        await settings_service.apply_huggingface_token_on_startup()
+    except Exception as exc:
+        logger.warning("HuggingFace token restore failed: %s", exc)
 
     _log_tool_availability(exiftool, ffprobe)
 

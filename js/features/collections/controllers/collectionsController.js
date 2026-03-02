@@ -1,6 +1,6 @@
 import { comfyPrompt, comfyConfirm } from "../../../app/dialogs.js";
 import { comfyToast } from "../../../app/toast.js";
-import { listCollections, createCollection, deleteCollection, vectorStats, vectorSearch, vectorSuggestCollections, addAssetsToCollection } from "../../../api/client.js";
+import { listCollections, createCollection, deleteCollection, vectorStats, vectorSearch, vectorSuggestCollections, addAssetsToCollection, getAssetsBatch } from "../../../api/client.js";
 import { buildAssetViewURL } from "../../../api/endpoints.js";
 import { t } from "../../../app/i18n.js";
 
@@ -84,6 +84,90 @@ function createDivider() {
     const d = document.createElement("div");
     d.style.cssText = "height:1px; background: rgba(120,190,255,0.3); margin: 4px 0;";
     return d;
+}
+
+function _normalizeCollectionAsset(raw) {
+    if (!raw || typeof raw !== "object") return null;
+    const filepath = String(raw.filepath || "").trim();
+    if (!filepath) return null;
+    return {
+        filepath,
+        filename: String(raw.filename || "").trim(),
+        subfolder: String(raw.subfolder || "").trim(),
+        type: String(raw.type || "output").trim().toLowerCase() || "output",
+        kind: String(raw.kind || "").trim().toLowerCase(),
+        root_id: String(raw.root_id || raw.rootId || raw.custom_root_id || "").trim() || undefined,
+    };
+}
+
+function _extractCollectionAssetsFromRows(rows) {
+    const assets = [];
+    const missingIds = [];
+    const seenPaths = new Set();
+    for (const row of (Array.isArray(rows) ? rows : [])) {
+        const item = _normalizeCollectionAsset(row);
+        if (item?.filepath) {
+            const key = item.filepath.toLowerCase();
+            if (seenPaths.has(key)) continue;
+            seenPaths.add(key);
+            assets.push(item);
+            continue;
+        }
+        const id = Number(row?.asset_id ?? row?.id);
+        if (Number.isFinite(id) && id > 0) missingIds.push(id);
+    }
+    return { assets, missingIds };
+}
+
+async function _resolveCollectionAssetsByIds(assetIds) {
+    const ids = Array.from(new Set((Array.isArray(assetIds) ? assetIds : [])
+        .map((id) => Number(id))
+        .filter((id) => Number.isFinite(id) && id > 0)));
+    if (!ids.length) return { ok: true, data: [] };
+    const batchRes = await getAssetsBatch(ids);
+    if (!batchRes?.ok) {
+        return { ok: false, error: String(batchRes?.error || "Failed to fetch assets") };
+    }
+    const rows = Array.isArray(batchRes?.data)
+        ? batchRes.data
+        : (Array.isArray(batchRes?.data?.assets) ? batchRes.data.assets : []);
+    const { assets } = _extractCollectionAssetsFromRows(rows);
+    return { ok: true, data: assets };
+}
+
+function _autoClusterLabel(cluster) {
+    const provided = String(cluster?.label || "").trim();
+    const genericGroup = !provided || /^group\b/i.test(provided);
+    if (!genericGroup) return provided;
+
+    const tags = (Array.isArray(cluster?.dominant_tags) ? cluster.dominant_tags : [])
+        .map((x) => String(x || "").trim())
+        .filter(Boolean);
+    if (tags.length) return tags.slice(0, 2).join(" / ");
+
+    const samples = Array.isArray(cluster?.sample_assets) ? cluster.sample_assets : [];
+    const folder = String(samples.find((s) => String(s?.subfolder || "").trim())?.subfolder || "").trim();
+    const lastFolder = folder ? folder.split(/[\\/]/).filter(Boolean).pop() : "";
+
+    const kindCount = { image: 0, video: 0, audio: 0, other: 0 };
+    for (const s of samples) {
+        const kind = String(s?.kind || "").toLowerCase();
+        if (kind in kindCount) kindCount[kind] += 1;
+        else kindCount.other += 1;
+    }
+    const dominantKind = Object.entries(kindCount).sort((a, b) => b[1] - a[1])[0]?.[0] || "other";
+    const kindLabel = dominantKind === "image"
+        ? "Images"
+        : dominantKind === "video"
+            ? "Videos"
+            : dominantKind === "audio"
+                ? "Audio"
+                : "Media";
+
+    const idx = Number(cluster?.cluster_id);
+    const suffix = Number.isFinite(idx) ? ` ${idx + 1}` : "";
+    if (lastFolder) return `${lastFolder} · ${kindLabel}`;
+    return `${kindLabel} Cluster${suffix}`;
 }
 
 const SMART_COLLECTION_IDEAS = [
@@ -202,10 +286,30 @@ async function _appendSmartSuggestions(menu, state, popovers, collectionsPopover
                 const vecRes = await vectorSearch(idea.query, 50);
                 if (vecRes?.ok && Array.isArray(vecRes.data) && vecRes.data.length > 0) {
                     // 3. Add found assets to collection
-                    const assets = vecRes.data.map(r => ({ asset_id: r.asset_id }));
-                    await addAssetsToCollection(colId, assets);
+                    const extracted = _extractCollectionAssetsFromRows(vecRes.data);
+                    let assets = extracted.assets;
+                    if (extracted.missingIds.length) {
+                        const hydrated = await _resolveCollectionAssetsByIds(extracted.missingIds);
+                        if (hydrated.ok && Array.isArray(hydrated.data)) {
+                            assets = assets.concat(hydrated.data);
+                        }
+                    }
+                    if (!assets.length) {
+                        comfyToast(
+                            t("toast.smartCollectionEmpty", `Collection "${idea.label}" created but no matching assets found. Index more assets first.`, { name: idea.label }),
+                            "info",
+                            3000
+                        );
+                        return;
+                    }
+                    const addRes = await addAssetsToCollection(colId, assets);
+                    if (!addRes?.ok) {
+                        comfyToast(addRes?.error || "Failed to add assets to smart collection", "error");
+                        return;
+                    }
+                    const addedCount = Number(addRes?.data?.added || assets.length || 0);
                     comfyToast(
-                        t("toast.smartCollectionCreated", `Smart collection "${idea.label}" created with ${assets.length} assets!`, { name: idea.label, count: assets.length }),
+                        t("toast.smartCollectionCreated", `Smart collection "${idea.label}" created with ${addedCount} assets!`, { name: idea.label, count: addedCount }),
                         "success",
                         3000
                     );
@@ -316,7 +420,7 @@ async function _appendDiscoverGroups(menu, state, popovers, collectionsPopover, 
             discoverBtn.style.display = "none";
 
             for (const cluster of res.data) {
-                const label = String(cluster.label || `Group ${cluster.cluster_id}`);
+                const label = _autoClusterLabel(cluster);
                 const size = Number(cluster.size || 0);
                 const allIds = Array.isArray(cluster.all_asset_ids) ? cluster.all_asset_ids : [];
 
@@ -392,9 +496,25 @@ async function _appendDiscoverGroups(menu, state, popovers, collectionsPopover, 
                         }
                         const colId = String(colRes.data?.id || "");
                         if (colId && allIds.length) {
-                            await addAssetsToCollection(colId, allIds.map(id => ({ asset_id: id })));
+                            const hydrated = await _resolveCollectionAssetsByIds(allIds);
+                            if (!hydrated.ok) {
+                                comfyToast(hydrated.error || "Failed to load cluster assets", "error");
+                                createBtn.disabled = false;
+                                createBtn.textContent = "+ Create";
+                                return;
+                            }
+                            const addRes = await addAssetsToCollection(colId, hydrated.data || []);
+                            if (!addRes?.ok) {
+                                comfyToast(addRes?.error || "Failed to add assets to collection", "error");
+                                createBtn.disabled = false;
+                                createBtn.textContent = "+ Create";
+                                return;
+                            }
+                            const addedCount = Number(addRes?.data?.added || (hydrated.data || []).length || 0);
+                            comfyToast(`Collection "${label}" created with ${addedCount} assets!`, "success", 3000);
+                        } else {
+                            comfyToast(`Collection "${label}" created.`, "success", 2200);
                         }
-                        comfyToast(`Collection "${label}" created with ${allIds.length} assets!`, "success", 3000);
                         state.collectionId = colId;
                         state.collectionName = label;
                         try { onChanged?.(); } catch (e) { console.debug?.(e); }
@@ -478,7 +598,6 @@ export function createCollectionsController({ state, collectionsBtn, collections
             empty.style.cssText = "padding: 10px 12px; opacity: 0.75;";
             empty.textContent = t("msg.noCollections");
             collectionsMenu.appendChild(empty);
-            return;
         }
 
         for (const item of list) {

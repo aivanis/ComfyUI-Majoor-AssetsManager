@@ -21,8 +21,10 @@ Design notes
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import datetime as dt
 import io
+import os
 import struct
 import subprocess
 from collections.abc import Sequence
@@ -61,6 +63,11 @@ def blob_to_vector(blob: bytes, dim: int | None = None) -> list[float]:
     """Unpack a binary BLOB back into a list of floats."""
     dim = dim or VECTOR_EMBEDDING_DIM
     return list(struct.unpack(f"<{dim}{_FLOAT_FMT}", blob))
+
+
+def _encode_quiet(model: Any, payload: Any, **kwargs: Any) -> Any:
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        return model.encode(payload, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -167,11 +174,15 @@ class VectorService:
 
     def _load_model(self) -> SentenceTransformer:
         """Synchronous model loading (called inside a thread)."""
+        os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+        os.environ.setdefault("TQDM_DISABLE", "1")
         from sentence_transformers import SentenceTransformer  # noqa: F811
 
         logger.info("Loading CLIP model '%s' …", self._model_name)
         model = SentenceTransformer(self._model_name, device=self._device)
-        logger.info("CLIP model loaded  (dim=%d)", model.get_sentence_embedding_dimension())
+        dim_value = model.get_sentence_embedding_dimension()
+        effective_dim = int(dim_value) if dim_value is not None else int(VECTOR_EMBEDDING_DIM)
+        logger.info("CLIP model loaded  (dim=%d)", effective_dim)
         return model
 
     async def _ensure_model(self) -> SentenceTransformer:
@@ -243,6 +254,29 @@ class VectorService:
             return " ".join(words[:60])
         return cleaned
 
+    def _text_retry_candidates(self, model: SentenceTransformer, text: str) -> list[str]:
+        base = self._truncate_text_for_model(model, text)
+        if not base:
+            return []
+
+        words = base.split()
+        if not words:
+            return [base]
+
+        ratios = (1.0, 0.85, 0.7, 0.55, 0.4, 0.3, 0.2, 0.12)
+        candidates: list[str] = []
+        seen: set[str] = set()
+        for ratio in ratios:
+            count = max(1, int(len(words) * ratio))
+            candidate = " ".join(words[:count]).strip()
+            if candidate and candidate not in seen:
+                seen.add(candidate)
+                candidates.append(candidate)
+
+        if base not in seen:
+            candidates.insert(0, base)
+        return candidates
+
     # ── Image embeddings ───────────────────────────────────────────────
 
     async def get_image_embedding(self, path: str | Path) -> Result[list[float]]:
@@ -268,7 +302,12 @@ class VectorService:
         try:
             model = await self._ensure_model()
             vec = await asyncio.to_thread(
-                lambda: model.encode(cast(Any, img), convert_to_numpy=True, show_progress_bar=False)
+                lambda: _encode_quiet(
+                    model,
+                    cast(Any, img),
+                    convert_to_numpy=True,
+                    show_progress_bar=False,
+                )
             )
             self._clear_error()
             return Result.Ok(_normalise_vector(vec))
@@ -285,30 +324,36 @@ class VectorService:
             return Result.Err("INVALID_INPUT", "Text query cannot be empty")
         try:
             model = await self._ensure_model()
-            safe_text = self._truncate_text_for_model(model, text)
-            vec = await asyncio.to_thread(
-                lambda: model.encode(safe_text, convert_to_numpy=True, show_progress_bar=False)
-            )
-            self._clear_error()
-            return Result.Ok(_normalise_vector(vec))
         except Exception as exc:
-            message = str(exc)
-            if "max_position_embeddings" in message or "sequence length" in message.lower():
-                try:
-                    model = await self._ensure_model()
-                    shorter = " ".join(str(text or "").split()[:40]).strip()
-                    vec_retry = await asyncio.to_thread(
-                        lambda: model.encode(shorter, convert_to_numpy=True, show_progress_bar=False)
+            self._record_error(f"Text embedding model unavailable: {exc}")
+            logger.debug("Text embedding model unavailable: %s", exc)
+            return Result.Err("SERVICE_UNAVAILABLE", f"Text embedding model unavailable: {exc}")
+        last_exc: Exception | None = None
+        for candidate in self._text_retry_candidates(model, text):
+            try:
+                vec = await asyncio.to_thread(
+                    lambda q=candidate: _encode_quiet(
+                        model,
+                        q,
+                        convert_to_numpy=True,
+                        show_progress_bar=False,
                     )
-                    self._clear_error()
-                    return Result.Ok(_normalise_vector(vec_retry))
-                except Exception as retry_exc:
-                    self._record_error(f"Text embedding failed: {retry_exc}")
-                    logger.debug("Text embedding failed after truncation retry: %s", retry_exc)
-                    return Result.Err("METADATA_FAILED", f"Text embedding failed: {retry_exc}")
-            self._record_error(f"Text embedding failed: {exc}")
-            logger.debug("Text embedding failed: %s", exc)
-            return Result.Err("METADATA_FAILED", f"Text embedding failed: {exc}")
+                )
+                self._clear_error()
+                return Result.Ok(_normalise_vector(vec))
+            except Exception as exc:
+                last_exc = exc
+                msg = str(exc).lower()
+                if "max_position_embeddings" in msg or "sequence length" in msg:
+                    continue
+                self._record_error(f"Text embedding failed: {exc}")
+                logger.debug("Text embedding failed: %s", exc)
+                return Result.Err("METADATA_FAILED", f"Text embedding failed: {exc}")
+
+        final_exc = last_exc or RuntimeError("Unknown text embedding failure")
+        self._record_error(f"Text embedding failed after truncation retries: {final_exc}")
+        logger.debug("Text embedding failed after all truncation retries: %s", final_exc)
+        return Result.Err("METADATA_FAILED", f"Text embedding failed: {final_exc}")
 
     # ── Batch embeddings ──────────────────────────────────────────────
 
@@ -351,7 +396,8 @@ class VectorService:
             sub_idx = batch_indices[start : start + VECTOR_BATCH_SIZE]
             try:
                 vecs = await asyncio.to_thread(
-                    lambda s=sub: model.encode(
+                    lambda s=sub: _encode_quiet(
+                        model,
                         cast(Any, s),
                         convert_to_numpy=True,
                         batch_size=len(s),
@@ -388,7 +434,8 @@ class VectorService:
 
             model = await self._ensure_model()
             vecs = await asyncio.to_thread(
-                lambda: model.encode(
+                lambda: _encode_quiet(
+                    model,
                     cast(Any, frames),
                     convert_to_numpy=True,
                     batch_size=min(len(frames), VECTOR_BATCH_SIZE),

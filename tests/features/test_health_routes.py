@@ -161,6 +161,7 @@ class _Settings:
         self.probe = "auto"
         self.prefs = {"image": True, "media": True}
         self.sec = {"allow_write": True}
+        self.hf_token = ""
 
     async def get_output_directory(self):
         return self.output
@@ -199,6 +200,17 @@ class _Settings:
 
     async def bootstrap_api_token(self):
         return Result.Ok({"api_token": "boot"})
+
+    async def get_huggingface_token_info(self):
+        token = str(self.hf_token or "").strip()
+        hint = f"...{token[-4:]}" if token else ""
+        return {"has_token": bool(token), "token_hint": hint}
+
+    async def set_huggingface_token(self, token_payload):
+        self.hf_token = str(token_payload or "").strip()
+        token = self.hf_token
+        hint = f"...{token[-4:]}" if token else ""
+        return Result.Ok({"has_token": bool(token), "token_hint": hint})
 
 
 @pytest.mark.asyncio
@@ -370,6 +382,36 @@ async def test_metadata_fallback_and_security_routes(monkeypatch) -> None:
     req4 = make_mocked_request("POST", "/mjr/am/settings/security", app=app)
     resp4 = await (await app.router.resolve(req4)).handler(req4)
     assert json.loads(resp4.text).get("ok") is True
+
+
+@pytest.mark.asyncio
+async def test_huggingface_settings_routes(monkeypatch) -> None:
+    settings = _Settings()
+
+    async def _svc():
+        return {"settings": settings}, None
+
+    async def _read_set(_request):
+        return Result.Ok({"token": "hf_test_token_1234"})
+
+    monkeypatch.setattr(health_mod, "_require_services", _svc)
+    monkeypatch.setattr(health_mod, "_csrf_error", lambda _req: None)
+    monkeypatch.setattr(health_mod, "_require_write_access", lambda _req: Result.Ok({}))
+
+    app = _build_health_app()
+
+    req1 = make_mocked_request("GET", "/mjr/am/settings/huggingface", app=app)
+    resp1 = await (await app.router.resolve(req1)).handler(req1)
+    body1 = json.loads(resp1.text)
+    assert body1.get("ok") is True
+    assert (body1.get("data") or {}).get("prefs", {}).get("has_token") is False
+
+    monkeypatch.setattr(health_mod, "_read_json", _read_set)
+    req2 = make_mocked_request("POST", "/mjr/am/settings/huggingface", app=app)
+    resp2 = await (await app.router.resolve(req2)).handler(req2)
+    body2 = json.loads(resp2.text)
+    assert body2.get("ok") is True
+    assert (body2.get("data") or {}).get("prefs", {}).get("has_token") is True
 
 
 @pytest.mark.asyncio

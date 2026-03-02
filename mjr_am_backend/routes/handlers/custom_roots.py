@@ -31,7 +31,9 @@ from ..core import (
     _normalize_path,
     _read_json,
     _require_authenticated_user,
+    _require_operation_enabled,
     _require_services,
+    _resolve_security_prefs,
     _require_write_access,
     _safe_rel_path,
 )
@@ -590,6 +592,21 @@ def register_custom_roots_routes(routes: web.RouteTableDef) -> None:
         body = body_res.data or {}
 
         op = str(body.get("op") or "").strip().lower()
+        if op in {"delete", "rename", "move"}:
+            prefs = None
+            try:
+                svc, _ = await _require_services()
+                if isinstance(svc, dict):
+                    prefs = await _resolve_security_prefs(svc)
+            except Exception:
+                prefs = None
+            if prefs is not None:
+                gate_op = "delete" if op == "delete" else "rename"
+                op_res = _require_operation_enabled(gate_op, prefs=prefs)
+                if not op_res.ok:
+                    return _json_response(op_res)
+            else:
+                logger.warning("browser/folder-op(%s): security prefs unavailable, skipping operation gate", op)
         source_raw = str(body.get("path") or body.get("filepath") or "").strip()
         source = _normalize_path(source_raw)
         if not source:

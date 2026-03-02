@@ -1,4 +1,4 @@
-import { vectorSearch, hybridSearch, getAuditAssets } from "../../../api/client.js";
+import { vectorSearch, hybridSearch } from "../../../api/client.js";
 
 export function createGridController({ gridContainer, loadAssets, loadAssetsFromList, getCollectionAssets, disposeGrid, getQuery, state }) {
     let _isReloading = false;
@@ -29,16 +29,6 @@ export function createGridController({ gridContainer, loadAssets, loadAssetsFrom
         try {
             const input = gridContainer?.closest?.(".mjr-am-panel")?.querySelector?.("#mjr-search-input");
             return input?.dataset?.mjrSemanticMode === "1";
-        } catch { return false; }
-    };
-
-    /**
-     * Check if audit mode is active on the search input.
-     */
-    const _isAuditMode = () => {
-        try {
-            const input = gridContainer?.closest?.(".mjr-am-panel")?.querySelector?.("#mjr-search-input");
-            return input?.dataset?.mjrAuditMode === "1";
         } catch { return false; }
     };
 
@@ -189,38 +179,14 @@ export function createGridController({ gridContainer, loadAssets, loadAssetsFrom
             state.collectionName = "";
         }
 
-        // Audit mode: show incomplete/low-quality assets
-        if (_isAuditMode()) {
-            try {
-                const auditRes = await getAuditAssets({
-                    filter: "incomplete",
-                    sort: "alignment_asc",
-                    scope: state.scope || "output",
-                    customRootId: state.customRootId || "",
-                    limit: 200,
-                });
-                if (auditRes?.ok && Array.isArray(auditRes.data)) {
-                    const result = await loadAssetsFromList(gridContainer, auditRes.data, {
-                        title: `Library Audit — ${auditRes.data.length} assets need attention`,
-                        reset: true,
-                    });
-                    try {
-                        state.lastGridCount = Number(result?.count || 0) || 0;
-                        state.lastGridTotal = Number(result?.total || 0) || 0;
-                        gridContainer.dispatchEvent?.(new CustomEvent("mjr:grid-stats", { detail: result || {} }));
-                    } catch (e) { console.debug?.(e); }
-                    return;
-                }
-            } catch (err) {
-                console.debug?.("[Majoor] Audit load failed, falling back to normal search", err);
-            }
-        }
-
         const result = await _loadWithSemanticFallback(getQuery());
         
         // Track search query timing if timer was started
         try {
-            const searchDuration = window.MajoorMetrics?.endTimer?.('searchQuery', 'searchQuery');
+            const hasSearchTimer = !!window.MajoorMetrics?.hasTimer?.('searchQuery');
+            const searchDuration = hasSearchTimer
+                ? window.MajoorMetrics?.endTimer?.('searchQuery', 'searchQuery')
+                : 0;
             if (typeof searchDuration === 'number' && searchDuration > 0) {
                 window.MajoorMetrics?.trackSearchQuery?.(searchDuration);
             }

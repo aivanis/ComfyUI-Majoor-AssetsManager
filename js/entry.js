@@ -147,7 +147,7 @@ app.registerExtension({
 
     async setup() {
         installEntryRuntimeController();
-        const runtimeApp = (await waitForComfyApp({ timeoutMs: 6000 })) || app;
+        const runtimeApp = (await waitForComfyApp({ timeoutMs: 12000 })) || app;
         setComfyApp(runtimeApp);
         // Store app reference for teardown use in subsequent hot-reloads.
         try { if (typeof window !== "undefined") window.__MJR_RUNTIME_APP__ = runtimeApp; } catch (e) { console.debug?.(e); }

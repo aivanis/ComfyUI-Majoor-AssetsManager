@@ -47,7 +47,7 @@ const MAX_BATCH_ASSET_IDS = 200;
 const WRITE_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
 const BOOTSTRAP_TOKEN_PATH = "/mjr/am/settings/security/bootstrap-token";
 const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
-const MAX_FETCH_TIMEOUT_MS = 120_000;
+const MAX_FETCH_TIMEOUT_MS = 300_000;
 let _authTokenRefreshInFlight = null;
 
 function _methodIsWrite(method) {
@@ -786,6 +786,14 @@ export async function setVectorSearchSettings(enabled = true) {
     return post(ENDPOINTS.SETTINGS_VECTOR_SEARCH, { enabled: !!enabled });
 }
 
+export async function getHuggingFaceSettings() {
+    return get(ENDPOINTS.SETTINGS_HUGGINGFACE);
+}
+
+export async function setHuggingFaceSettings(token = "") {
+    return post(ENDPOINTS.SETTINGS_HUGGINGFACE, { token: String(token ?? "").trim() });
+}
+
 export async function getOutputDirectorySetting() {
     return get(ENDPOINTS.SETTINGS_OUTPUT_DIRECTORY);
 }
@@ -1115,6 +1123,75 @@ export async function vectorIndexAsset(assetId) {
  */
 export async function vectorStats() {
     return get(ENDPOINTS.VECTOR_STATS);
+}
+
+/**
+ * Backfill missing vector embeddings for already indexed assets.
+ * @param {number} [batchSize=64]  Batch size (1-200)
+ * @param {{onProgress?:(status:Object)=>void}} [options]
+ * @returns {Promise<ApiResult<{processed:number, indexed:number, skipped:number}>>}
+ */
+export async function vectorBackfill(batchSize = 64, options = {}) {
+    const batch = Math.max(1, Math.min(200, batchSize));
+    const onProgress = typeof options?.onProgress === "function" ? options.onProgress : null;
+    const startRes = await post(`${ENDPOINTS.VECTOR_BACKFILL}?batch_size=${batch}&async=1`, {}, { timeoutMs: 30_000 });
+    if (!startRes?.ok) return startRes;
+
+    const startData = startRes?.data || {};
+    const status = String(startData?.status || "").toLowerCase();
+    const jobId = String(startData?.job_id || "").trim();
+    try { onProgress?.(startData); } catch (e) { console.debug?.(e); }
+
+    // Backward compatibility with older backend behavior (sync payload).
+    if (!jobId || !["queued", "running", "pending"].includes(status)) {
+        return startRes;
+    }
+
+    const pollIntervalMs = 1000;
+    const pollTimeoutMs = 30 * 60_000;
+    const startedAt = Date.now();
+    let lastStatus = null;
+
+    while (Date.now() - startedAt < pollTimeoutMs) {
+        await _delay(pollIntervalMs);
+        const pollRes = await get(`${ENDPOINTS.VECTOR_BACKFILL_STATUS}?job_id=${encodeURIComponent(jobId)}`, { timeoutMs: 30_000 });
+        if (!pollRes?.ok) {
+            lastStatus = pollRes;
+            continue;
+        }
+
+        const data = pollRes?.data || {};
+        const st = String(data?.status || "").toLowerCase();
+        lastStatus = pollRes;
+        try { onProgress?.(data); } catch (e) { console.debug?.(e); }
+
+        if (st === "succeeded") {
+            return {
+                ok: true,
+                data: data?.result || {},
+                code: null,
+                status: 200,
+            };
+        }
+
+        if (st === "failed") {
+            return {
+                ok: false,
+                error: String(data?.error || "Vector backfill failed"),
+                code: String(data?.code || "DB_ERROR"),
+                data,
+                status: 500,
+            };
+        }
+    }
+
+    return {
+        ok: false,
+        error: `Vector backfill polling timed out after ${pollTimeoutMs}ms`,
+        code: "TIMEOUT",
+        data: lastStatus?.data || null,
+        status: 408,
+    };
 }
 
 /**

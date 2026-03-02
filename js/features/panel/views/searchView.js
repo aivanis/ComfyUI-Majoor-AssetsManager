@@ -103,75 +103,9 @@ export function createSearchView({ filterBtn, sortBtn, collectionsBtn, pinnedFol
         }
     });
 
-    // ── Audit Mode Toggle ───────────────────────────────────────────
-    let auditMode = false;
-    const auditBtn = document.createElement("button");
-    auditBtn.type = "button";
-    auditBtn.title = t("search.auditToggle", "Library Audit — show assets missing tags, ratings or with low alignment score");
-    auditBtn.style.cssText = `
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 28px;
-        height: 28px;
-        border-radius: 6px;
-        border: 1px solid rgba(255, 152, 0, 0.25);
-        background: transparent;
-        color: rgba(255, 152, 0, 0.5);
-        cursor: pointer;
-        font-size: 13px;
-        transition: all 0.15s ease;
-        flex-shrink: 0;
-        margin-left: 4px;
-    `;
-    auditBtn.textContent = "⚠";
-
-    const updateAuditStyle = () => {
-        if (auditMode) {
-            auditBtn.style.background = "rgba(255, 152, 0, 0.18)";
-            auditBtn.style.borderColor = "rgba(255, 152, 0, 0.65)";
-            auditBtn.style.color = "#FF9800";
-            auditBtn.style.boxShadow = "0 0 6px rgba(255, 152, 0, 0.3)";
-        } else {
-            auditBtn.style.background = "transparent";
-            auditBtn.style.borderColor = "rgba(255, 152, 0, 0.25)";
-            auditBtn.style.color = "rgba(255, 152, 0, 0.5)";
-            auditBtn.style.boxShadow = "none";
-        }
-    };
-
-    auditBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        auditMode = !auditMode;
-        updateAuditStyle();
-        try {
-            searchInputEl.dataset.mjrAuditMode = auditMode ? "1" : "0";
-            searchInputEl.dispatchEvent(new Event("input", { bubbles: true }));
-        } catch (err) { console.debug?.(err); }
-    });
-
-    auditBtn.addEventListener("mouseenter", () => {
-        if (!auditMode) {
-            auditBtn.style.borderColor = "rgba(255, 152, 0, 0.5)";
-            auditBtn.style.color = "#FF9800";
-        }
-    });
-    auditBtn.addEventListener("mouseleave", () => {
-        if (!auditMode) {
-            auditBtn.style.borderColor = "rgba(255, 152, 0, 0.25)";
-            auditBtn.style.color = "rgba(255, 152, 0, 0.5)";
-        }
-    });
-
     // Autocomplete handler
     const handleAutocomplete = debounce(async (e) => {
         const val = (e.target.value || "").trim();
-        // Typing a new query deactivates audit mode
-        if (auditMode && val && val !== "*") {
-            auditMode = false;
-            searchInputEl.dataset.mjrAuditMode = "0";
-            updateAuditStyle();
-        }
         // Skip autocomplete in semantic mode
         if (semanticMode) return;
         // Trigger only if generic search (not attribute search like rating:5)
@@ -198,7 +132,6 @@ export function createSearchView({ filterBtn, sortBtn, collectionsBtn, pinnedFol
     searchInner.appendChild(searchIcon);
     searchInner.appendChild(searchInputEl);
     searchInner.appendChild(semanticBtn);
-    searchInner.appendChild(auditBtn);
     searchInner.appendChild(dataList);
     searchSection.appendChild(searchInner);
 

@@ -22,6 +22,7 @@ _OUTPUT_DIRECTORY_KEY = "output_directory_override"
 _METADATA_FALLBACK_IMAGE_KEY = "metadata_fallback_image"
 _METADATA_FALLBACK_MEDIA_KEY = "metadata_fallback_media"
 _VECTOR_SEARCH_ENABLED_KEY = "vector_search_enabled"
+_HUGGINGFACE_TOKEN_KEY = "huggingface_token"
 _SETTINGS_VERSION_KEY = "__settings_version"
 _SECURITY_API_TOKEN_KEY = "security_api_token"
 _SECURITY_API_TOKEN_HASH_KEY = "security_api_token_hash"
@@ -153,6 +154,46 @@ class AppSettings:
             return (os.environ.get("MAJOOR_API_TOKEN") or os.environ.get("MJR_API_TOKEN") or "").strip()
         except Exception:
             return ""
+
+    def _env_huggingface_token(self) -> str:
+        try:
+            return (
+                os.environ.get("HF_TOKEN")
+                or os.environ.get("HUGGING_FACE_HUB_TOKEN")
+                or os.environ.get("HUGGINGFACEHUB_API_TOKEN")
+                or os.environ.get("MAJOOR_HF_TOKEN")
+                or os.environ.get("MJR_AM_HF_TOKEN")
+                or ""
+            ).strip()
+        except Exception:
+            return ""
+
+    @staticmethod
+    def _set_huggingface_token_env(token: str) -> None:
+        normalized = str(token or "").strip()
+        try:
+            if normalized:
+                os.environ["HF_TOKEN"] = normalized
+                os.environ["HUGGING_FACE_HUB_TOKEN"] = normalized
+                os.environ["HUGGINGFACEHUB_API_TOKEN"] = normalized
+                os.environ["MAJOOR_HF_TOKEN"] = normalized
+                os.environ["MJR_AM_HF_TOKEN"] = normalized
+            else:
+                os.environ.pop("HF_TOKEN", None)
+                os.environ.pop("HUGGING_FACE_HUB_TOKEN", None)
+                os.environ.pop("HUGGINGFACEHUB_API_TOKEN", None)
+                os.environ.pop("MAJOOR_HF_TOKEN", None)
+                os.environ.pop("MJR_AM_HF_TOKEN", None)
+        except Exception:
+            return
+
+    @staticmethod
+    def _token_hint(token: str) -> str:
+        normalized = str(token or "").strip()
+        if not normalized:
+            return ""
+        tail = normalized[-4:] if len(normalized) >= 4 else normalized
+        return f"...{tail}"
 
     async def _persist_api_token_hash_with_warning(self, token: str, warning_message: str) -> str:
         token_hash = self._hash_api_token(token)
@@ -587,6 +628,44 @@ class AppSettings:
             self._cache_version[_VECTOR_SEARCH_ENABLED_KEY] = current_version
             return Result.Ok(normalized)
 
+    async def get_huggingface_token_info(self) -> dict[str, Any]:
+        async with self._lock:
+            token = self._env_huggingface_token()
+            if not token:
+                token = str(await self._read_setting(_HUGGINGFACE_TOKEN_KEY) or "").strip()
+                if token:
+                    self._set_huggingface_token_env(token)
+            return {
+                "has_token": bool(token),
+                "token_hint": self._token_hint(token),
+            }
+
+    async def set_huggingface_token(self, token_payload: Any) -> Result[dict[str, Any]]:
+        token = str(token_payload or "").strip()
+        async with self._lock:
+            if token:
+                write_res = await self._write_setting(_HUGGINGFACE_TOKEN_KEY, token)
+                if not write_res.ok:
+                    return Result.Err("DB_ERROR", write_res.error or "Failed to persist huggingface_token")
+                self._set_huggingface_token_env(token)
+            else:
+                delete_res = await self._delete_setting(_HUGGINGFACE_TOKEN_KEY)
+                if not delete_res.ok:
+                    return Result.Err("DB_ERROR", delete_res.error or "Failed to clear huggingface_token")
+                self._set_huggingface_token_env("")
+
+            bump = await self._bump_settings_version_locked()
+            if not bump.ok:
+                try:
+                    logger.warning("Failed to bump settings version: %s", bump.error)
+                except Exception:
+                    pass
+
+            return Result.Ok({
+                "has_token": bool(token),
+                "token_hint": self._token_hint(token),
+            })
+
     def _set_vector_search_env_vars(self, enabled: bool) -> None:
         value = "1" if enabled else "0"
         try:
@@ -775,3 +854,15 @@ class AppSettings:
                 logger.info("Restored vector search setting on startup: %s", "enabled" if enabled else "disabled")
         except Exception as exc:
             logger.warning("Failed to restore vector search setting on startup: %s", exc)
+
+    async def apply_huggingface_token_on_startup(self) -> None:
+        try:
+            async with self._lock:
+                token = self._env_huggingface_token()
+                if not token:
+                    token = str(await self._read_setting(_HUGGINGFACE_TOKEN_KEY) or "").strip()
+                if token:
+                    self._set_huggingface_token_env(token)
+                    logger.info("Restored HuggingFace token on startup: %s", self._token_hint(token))
+        except Exception as exc:
+            logger.warning("Failed to restore HuggingFace token on startup: %s", exc)

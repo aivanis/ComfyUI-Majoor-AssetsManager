@@ -2,7 +2,7 @@
  * Status Dot Feature - Health indicator
  */
 
-import { get, getToolsStatus, post, resetIndex, getWatcherStatus, forceDeleteDb, listDbBackups, saveDbBackup, restoreDbBackup } from "../../api/client.js";
+import { get, getToolsStatus, post, resetIndex, getWatcherStatus, forceDeleteDb, listDbBackups, saveDbBackup, restoreDbBackup, vectorBackfill } from "../../api/client.js";
 import { ENDPOINTS } from "../../api/endpoints.js";
 import { APP_CONFIG } from "../../app/config.js";
 import { comfyToast } from "../../app/toast.js";
@@ -387,6 +387,37 @@ export function createStatusIndicator(options = {}) {
     const actionsRow = document.createElement("div");
     actionsRow.style.cssText = "margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px;";
 
+    const actionLog = document.createElement("div");
+    actionLog.style.cssText = "margin-top: 8px; font-size: 11px; opacity: 0.9; line-height: 1.35; white-space: pre-wrap;";
+    actionLog.textContent = "";
+
+    const setActionLog = (message, tone = "neutral") => {
+        const text = String(message || "").trim();
+        actionLog.textContent = text;
+        if (!text) {
+            actionLog.style.color = "inherit";
+            actionLog.style.opacity = "0.9";
+            return;
+        }
+        if (tone === "error") {
+            actionLog.style.color = "var(--error-text-color, #ff8a80)";
+            actionLog.style.opacity = "1";
+            return;
+        }
+        if (tone === "success") {
+            actionLog.style.color = "var(--success-text-color, #a5d6a7)";
+            actionLog.style.opacity = "1";
+            return;
+        }
+        if (tone === "info") {
+            actionLog.style.color = "var(--input-text, #cfd8dc)";
+            actionLog.style.opacity = "0.95";
+            return;
+        }
+        actionLog.style.color = "inherit";
+        actionLog.style.opacity = "0.9";
+    };
+
     const resetBtn = document.createElement("button");
     resetBtn.type = "button";
     resetBtn.textContent = t("btn.resetIndex");
@@ -463,7 +494,106 @@ export function createStatusIndicator(options = {}) {
         }
     };
 
+    const backfillBtn = document.createElement("button");
+    backfillBtn.type = "button";
+    backfillBtn.textContent = "Backfill vectors";
+    backfillBtn.title = "Compute missing AI vector embeddings for existing assets.";
+    backfillBtn.style.cssText = `
+        padding: 5px 12px;
+        font-size: 11px;
+        border-radius: 6px;
+        border: 1px solid rgba(0, 188, 212, 0.45);
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        transition: border 0.2s, background 0.2s;
+    `;
+    backfillBtn.onmouseenter = () => {
+        backfillBtn.style.borderColor = "rgba(0, 188, 212, 0.8)";
+        backfillBtn.style.background = "rgba(0, 188, 212, 0.12)";
+    };
+    backfillBtn.onmouseleave = () => {
+        backfillBtn.style.borderColor = "rgba(0, 188, 212, 0.45)";
+        backfillBtn.style.background = "transparent";
+    };
+    backfillBtn.onclick = async (event) => {
+        event.stopPropagation();
+        _maintenanceActive = true;
+
+        const originalBackfillText = backfillBtn.textContent;
+        const originalResetText = resetBtn.textContent;
+        backfillBtn.disabled = true;
+        resetBtn.disabled = true;
+        backfillBtn.textContent = "Backfilling...";
+        setActionLog("Backfill started…", "info");
+
+        statusDot.style.background = "var(--mjr-status-info, #64B5F6)";
+        applyStatusHighlight(section, "info");
+        try {
+            const res = await vectorBackfill(64, {
+                onProgress: (payload) => {
+                    const status = String(payload?.status || "").toLowerCase();
+                    const progress = payload?.progress || payload?.result || {};
+                    const candidates = Number(progress?.candidates || progress?.processed || 0);
+                    const indexed = Number(progress?.indexed || 0);
+                    const skipped = Number(progress?.skipped || 0);
+                    const errors = Number(progress?.errors || 0);
+                    if (status === "queued") {
+                        setActionLog("Backfill queued…", "info");
+                        return;
+                    }
+                    if (status === "running" || candidates > 0 || indexed > 0 || skipped > 0 || errors > 0) {
+                        setActionLog(`Backfill running — candidates ${candidates}, indexed ${indexed}, skipped ${skipped}, errors ${errors}`, "info");
+                    }
+                },
+            });
+            if (res?.ok) {
+                const processed = Number(res?.data?.processed || 0);
+                const indexed = Number(res?.data?.indexed || 0);
+                const skipped = Number(res?.data?.skipped || 0);
+                comfyToast(`Vector backfill done — processed ${processed}, indexed ${indexed}, skipped ${skipped}`, "success", 3000);
+                setActionLog(`Backfill OK — processed ${processed}, indexed ${indexed}, skipped ${skipped}`, "success");
+                statusDot.style.background = "var(--mjr-status-success, #4CAF50)";
+                applyStatusHighlight(section, "success");
+            } else {
+                const err = String(res?.error || "Backfill failed");
+                const code = String(res?.code || "").trim();
+                const status = Number(res?.status || 0) || 0;
+                const detail = [
+                    code ? `code=${code}` : "",
+                    status ? `status=${status}` : "",
+                    err,
+                ].filter(Boolean).join(" | ");
+                comfyToast(detail, "error", 4500);
+                setActionLog(`Backfill ERROR — ${detail}\nSee console for full payload.`, "error");
+                console.error("[Majoor] Vector backfill failed response", res);
+                statusDot.style.background = "var(--mjr-status-error, #f44336)";
+                applyStatusHighlight(section, "error");
+            }
+        } catch (error) {
+            const errText = String(error?.message || error || "Backfill failed");
+            comfyToast(errText, "error", 4500);
+            setActionLog(`Backfill EXCEPTION — ${errText}\nSee console for stack trace.`, "error");
+            console.error("[Majoor] Vector backfill exception", error);
+            statusDot.style.background = "var(--mjr-status-error, #f44336)";
+            applyStatusHighlight(section, "error");
+        } finally {
+            _maintenanceActive = false;
+            backfillBtn.disabled = false;
+            resetBtn.disabled = false;
+            backfillBtn.textContent = originalBackfillText;
+            resetBtn.textContent = originalResetText;
+            emitGlobalGridReload("vector-backfill");
+            try {
+                const target = getScanContext ? getScanContext() : null;
+                await updateStatus(statusDot, statusText, capabilities, target, null, { force: true });
+            } catch (e) { console.debug?.(e); }
+        }
+    };
+
+    actionsRow.appendChild(backfillBtn);
     actionsRow.appendChild(resetBtn);
+    body.appendChild(actionLog);
 
     const deleteDbBtn = document.createElement("button");
     deleteDbBtn.type = "button";
@@ -1015,6 +1145,18 @@ export async function updateStatus(statusDot, statusText, capabilitiesSection = 
         const dbSizeLine = t("status.dbSize", "Database size: {size}", {
             size: formatBytes(counters.db_size_bytes || 0),
         });
+        const vectorDiag = healthResult?.ok && healthResult?.data ? (healthResult.data.vector || {}) : {};
+        const vectorEnabled = vectorDiag?.enabled !== false;
+        const vectorLoaded = !!vectorDiag?.loaded;
+        const vectorDegraded = !!vectorDiag?.degraded;
+        const vectorLastError = String(vectorDiag?.last_error || "").trim();
+        const vectorLine = !vectorEnabled
+            ? "AI vector: disabled"
+            : vectorDegraded
+                ? `AI vector: degraded${vectorLastError ? ` (${vectorLastError})` : ""}`
+                : vectorLoaded
+                    ? "AI vector: loaded"
+                    : "AI vector: initializing";
         const dbHealthLine = buildDbHealthLine(healthResult?.data || null, dbDiagResult?.data || null);
         const indexHealthLine = buildIndexHealthLine(counters, isCustomBrowserMode ? "all" : desiredScope);
         const dbAvailable = Boolean(healthResult?.ok && healthResult?.data?.database?.available);
@@ -1036,6 +1178,8 @@ export async function updateStatus(statusDot, statusText, capabilitiesSection = 
         } else if (!dbAvailable || dbMalformed) {
             healthTone = "error";
         } else if (dbLocked || !indexHealthy) {
+            healthTone = "warning";
+        } else if (vectorDegraded) {
             healthTone = "warning";
         }
         const displayTone = isCustomBrowserMode && healthTone !== "error" ? "browser" : healthTone;
@@ -1106,7 +1250,7 @@ export async function updateStatus(statusDot, statusText, capabilitiesSection = 
             setStatusWithHint(
                 statusText,
                 t("status.noAssets", `No assets indexed yet (${scopeLabel})`, { scope: scopeLabel }),
-                [t("status.clickToScan", "Click the dot to start a scan"), dbHealthLine, indexHealthLine, dbSizeLine, watcherLine].filter(Boolean).join("  |  ")
+                [t("status.clickToScan", "Click the dot to start a scan"), vectorLine, dbHealthLine, indexHealthLine, dbSizeLine, watcherLine].filter(Boolean).join("  |  ")
             );
         } else {
             statusDot.style.background =
@@ -1125,6 +1269,7 @@ export async function updateStatus(statusDot, statusText, capabilitiesSection = 
                     t("status.imagesVideos", `Images: ${counters.images || 0}  -  Videos: ${counters.videos || 0}`, { images: counters.images || 0, videos: counters.videos || 0 }),
                     t("status.withWorkflows", `With workflows: ${withWorkflows}  -  Generation data: ${withGenerationData}`, { workflows: withWorkflows, gendata: withGenerationData }),
                     enrichmentLine,
+                    vectorLine,
                     dbHealthLine,
                     indexHealthLine,
                     dbSizeLine,

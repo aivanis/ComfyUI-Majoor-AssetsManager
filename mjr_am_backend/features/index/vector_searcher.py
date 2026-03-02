@@ -129,8 +129,16 @@ class VectorSearcher:
 
         top_k = top_k or VECTOR_SIMILAR_TOPK
 
-        emb = await self.vs.get_text_embedding(query)
+        try:
+            emb = await self.vs.get_text_embedding(query)
+        except ModuleNotFoundError as exc:
+            return Result.Err("SERVICE_UNAVAILABLE", f"Missing dependency: {exc}")
+        except Exception as exc:
+            return Result.Err("SERVICE_UNAVAILABLE", f"Text embedding unavailable: {exc}")
         if not emb.ok or not emb.data:
+            code = str(emb.code or "") if hasattr(emb, "code") else ""
+            if code == "SERVICE_UNAVAILABLE":
+                return Result.Err("SERVICE_UNAVAILABLE", emb.error or "Text embedding unavailable")
             return Result.Err("METADATA_FAILED", emb.error or "Text embedding failed")
 
         return await self._query_index(emb.data, top_k=top_k, exclude_ids=set())

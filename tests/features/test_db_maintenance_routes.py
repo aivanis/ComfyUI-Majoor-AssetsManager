@@ -249,6 +249,33 @@ async def test_db_force_delete_adapter_reset_success(monkeypatch, tmp_path: Path
 
 
 @pytest.mark.asyncio
+async def test_db_force_delete_blocked_by_operation_gate(monkeypatch):
+    async def _require_services():
+        return {"settings": object(), "db": object()}, None
+
+    app = _app()
+    monkeypatch.setattr(m, "_csrf_error", lambda _request: None)
+    monkeypatch.setattr(m, "_require_write_access", lambda _request: Result.Ok({}))
+    monkeypatch.setattr(m, "_require_services", _require_services)
+    async def _prefs(_svc):
+        return {"allow_reset_index": False}
+
+    monkeypatch.setattr(m, "_resolve_security_prefs", _prefs)
+    monkeypatch.setattr(
+        m,
+        "_require_operation_enabled",
+        lambda *_args, **_kwargs: Result.Err("FORBIDDEN", "blocked by policy"),
+    )
+
+    req = make_mocked_request("POST", "/mjr/am/db/force-delete", app=app)
+    match = await app.router.resolve(req)
+    resp = await match.handler(req)
+    payload = json.loads(resp.text)
+    assert payload.get("ok") is False
+    assert payload.get("code") == "FORBIDDEN"
+
+
+@pytest.mark.asyncio
 async def test_db_backup_save_success(monkeypatch, tmp_path: Path):
     class _DB:
         async def aquery(self, *_args, **_kwargs):

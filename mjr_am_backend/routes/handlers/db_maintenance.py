@@ -12,6 +12,7 @@ import os
 import shutil
 import sqlite3
 import threading
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -23,7 +24,9 @@ from ..core import (
     _csrf_error,
     _json_response,
     _read_json,
+    _require_operation_enabled,
     _require_services,
+    _resolve_security_prefs,
     _require_write_access,
     safe_error_message,
 )
@@ -33,6 +36,207 @@ logger = get_logger(__name__)
 _DB_ARCHIVE_DIR = INDEX_DB_PATH.parent / "archive"
 _DB_MAINTENANCE_ACTIVE = False
 _DB_MAINT_LOCK = threading.Lock()
+_VECTOR_BACKFILL_LOCK = threading.Lock()
+_VECTOR_BACKFILL_JOBS: dict[str, dict[str, Any]] = {}
+_VECTOR_BACKFILL_ACTIVE_JOB_ID: str | None = None
+_VECTOR_BACKFILL_HISTORY_LIMIT = 20
+
+
+def _parse_bool_flag(value: Any, default: bool = False) -> bool:
+    try:
+        if value is None:
+            return bool(default)
+        if isinstance(value, bool):
+            return value
+        s = str(value).strip().lower()
+        if not s:
+            return bool(default)
+        if s in {"1", "true", "yes", "on", "enabled", "enable"}:
+            return True
+        if s in {"0", "false", "no", "off", "disabled", "disable"}:
+            return False
+        return bool(default)
+    except Exception:
+        return bool(default)
+
+
+def _utc_now_iso() -> str:
+    try:
+        return datetime.datetime.now(datetime.timezone.utc).isoformat()
+    except Exception:
+        return ""
+
+
+def _vector_backfill_job_public(job: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(job, dict):
+        return {
+            "job_id": "",
+            "status": "idle",
+            "async": True,
+        }
+    return {
+        "job_id": str(job.get("job_id") or ""),
+        "status": str(job.get("status") or "unknown"),
+        "async": True,
+        "batch_size": int(job.get("batch_size") or 64),
+        "created_at": str(job.get("created_at") or ""),
+        "updated_at": str(job.get("updated_at") or ""),
+        "started_at": str(job.get("started_at") or ""),
+        "finished_at": str(job.get("finished_at") or ""),
+        "progress": job.get("progress") if isinstance(job.get("progress"), dict) else None,
+        "result": job.get("result") if isinstance(job.get("result"), dict) else None,
+        "code": str(job.get("code") or "") or None,
+        "error": str(job.get("error") or "") or None,
+    }
+
+
+def _vector_backfill_get_job(job_id: str) -> dict[str, Any] | None:
+    with _VECTOR_BACKFILL_LOCK:
+        return _VECTOR_BACKFILL_JOBS.get(str(job_id or ""))
+
+
+def _vector_backfill_get_active_or_latest_job() -> dict[str, Any] | None:
+    with _VECTOR_BACKFILL_LOCK:
+        if _VECTOR_BACKFILL_ACTIVE_JOB_ID:
+            active = _VECTOR_BACKFILL_JOBS.get(_VECTOR_BACKFILL_ACTIVE_JOB_ID)
+            if isinstance(active, dict):
+                return active
+        if not _VECTOR_BACKFILL_JOBS:
+            return None
+        ordered = sorted(
+            _VECTOR_BACKFILL_JOBS.values(),
+            key=lambda j: str(j.get("created_at") or ""),
+            reverse=True,
+        )
+        return ordered[0] if ordered else None
+
+
+def _vector_backfill_register_job(*, batch_size: int) -> dict[str, Any]:
+    job_id = uuid.uuid4().hex
+    job = {
+        "job_id": job_id,
+        "status": "queued",
+        "batch_size": int(max(1, min(200, batch_size))),
+        "created_at": _utc_now_iso(),
+        "updated_at": _utc_now_iso(),
+        "started_at": "",
+        "finished_at": "",
+        "progress": {
+            "candidates": 0,
+            "indexed": 0,
+            "skipped": 0,
+            "errors": 0,
+            "batch_size": int(max(1, min(200, batch_size))),
+        },
+        "result": None,
+        "code": None,
+        "error": None,
+    }
+    with _VECTOR_BACKFILL_LOCK:
+        _VECTOR_BACKFILL_JOBS[job_id] = job
+        global _VECTOR_BACKFILL_ACTIVE_JOB_ID
+        _VECTOR_BACKFILL_ACTIVE_JOB_ID = job_id
+    return job
+
+
+def _vector_backfill_prune_history() -> None:
+    with _VECTOR_BACKFILL_LOCK:
+        if len(_VECTOR_BACKFILL_JOBS) <= _VECTOR_BACKFILL_HISTORY_LIMIT:
+            return
+        keep_ids = set()
+        if _VECTOR_BACKFILL_ACTIVE_JOB_ID:
+            keep_ids.add(_VECTOR_BACKFILL_ACTIVE_JOB_ID)
+        ordered = sorted(
+            _VECTOR_BACKFILL_JOBS.values(),
+            key=lambda j: str(j.get("created_at") or ""),
+            reverse=True,
+        )
+        for item in ordered[:_VECTOR_BACKFILL_HISTORY_LIMIT]:
+            keep_ids.add(str(item.get("job_id") or ""))
+        for key in list(_VECTOR_BACKFILL_JOBS.keys()):
+            if key not in keep_ids:
+                _VECTOR_BACKFILL_JOBS.pop(key, None)
+
+
+def _vector_backfill_update_job(job_id: str, **updates: Any) -> None:
+    with _VECTOR_BACKFILL_LOCK:
+        job = _VECTOR_BACKFILL_JOBS.get(str(job_id or ""))
+        if not isinstance(job, dict):
+            return
+        job["updated_at"] = _utc_now_iso()
+        job.update(updates)
+
+
+async def _run_vector_backfill_job(*, job_id: str, svc: dict[str, Any], db: Any, vector_service: Any, batch_size: int) -> None:
+    _vector_backfill_update_job(job_id, status="running", started_at=_utc_now_iso(), code=None, error=None)
+    set_db_maintenance_active(True)
+    watcher_was_running = False
+    try:
+        watcher_was_running = await _stop_watcher_if_running(svc if isinstance(svc, dict) else None)
+        index_service = svc.get("index") if isinstance(svc, dict) else None
+        if index_service and hasattr(index_service, "stop_enrichment"):
+            try:
+                await index_service.stop_enrichment(clear_queue=True)
+            except Exception:
+                pass
+
+        def _on_progress(progress: dict[str, int]) -> None:
+            _vector_backfill_update_job(job_id, progress=dict(progress or {}))
+
+        backfill_res = await _backfill_missing_asset_vectors(
+            db,
+            vector_service,
+            batch_size=batch_size,
+            on_progress=_on_progress,
+        )
+        if not backfill_res.ok:
+            _vector_backfill_update_job(
+                job_id,
+                status="failed",
+                finished_at=_utc_now_iso(),
+                code=str(backfill_res.code or "DB_ERROR"),
+                error=str(backfill_res.error or "Vector backfill failed"),
+            )
+            return
+
+        searcher = svc.get("vector_searcher") if isinstance(svc, dict) else None
+        if searcher and hasattr(searcher, "invalidate"):
+            try:
+                searcher.invalidate()
+            except Exception:
+                pass
+
+        payload = {
+            "ran": True,
+            **(backfill_res.data or {}),
+        }
+        _vector_backfill_update_job(
+            job_id,
+            status="succeeded",
+            finished_at=_utc_now_iso(),
+            result=payload,
+            code=None,
+            error=None,
+        )
+    except Exception as exc:
+        _vector_backfill_update_job(
+            job_id,
+            status="failed",
+            finished_at=_utc_now_iso(),
+            code="DB_ERROR",
+            error=safe_error_message(exc, "Vector backfill failed"),
+        )
+    finally:
+        try:
+            await _restart_watcher_if_needed(svc if isinstance(svc, dict) else None, watcher_was_running)
+        except Exception:
+            pass
+        set_db_maintenance_active(False)
+        with _VECTOR_BACKFILL_LOCK:
+            global _VECTOR_BACKFILL_ACTIVE_JOB_ID
+            if _VECTOR_BACKFILL_ACTIVE_JOB_ID == job_id:
+                _VECTOR_BACKFILL_ACTIVE_JOB_ID = None
+        _vector_backfill_prune_history()
 
 
 def _archive_root_resolved() -> Path:
@@ -284,6 +488,7 @@ async def _backfill_missing_asset_vectors(
     vector_service: Any,
     *,
     batch_size: int = 64,
+    on_progress: Any | None = None,
 ) -> Result[dict[str, int]]:
     """
     Generate embeddings for existing assets that currently have no vector.
@@ -301,6 +506,24 @@ async def _backfill_missing_asset_vectors(
     indexed = 0
     skipped = 0
     errors = 0
+
+    def _emit_progress() -> None:
+        if not callable(on_progress):
+            return
+        try:
+            on_progress(
+                {
+                    "candidates": int(candidates),
+                    "indexed": int(indexed),
+                    "skipped": int(skipped),
+                    "errors": int(errors),
+                    "batch_size": int(size),
+                }
+            )
+        except Exception:
+            return
+
+    _emit_progress()
 
     while True:
         rows_res = await db.aquery(
@@ -362,8 +585,14 @@ async def _backfill_missing_asset_vectors(
             else:
                 errors += 1
 
+            _emit_progress()
+
         if len(rows) < size:
             break
+
+        _emit_progress()
+
+    _emit_progress()
 
     return Result.Ok(
         {
@@ -442,6 +671,19 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+
+        try:
+            svc_gate, err_gate = await _require_services()
+        except Exception:
+            svc_gate, err_gate = None, None
+        if not err_gate and isinstance(svc_gate, dict):
+            prefs = await _resolve_security_prefs(svc_gate)
+            if prefs is not None:
+                op = _require_operation_enabled("reset_index", prefs=prefs)
+                if not op.ok:
+                    return _json_response(op)
+            else:
+                logger.warning("Force-delete DB: security prefs unavailable, skipping reset_index gate")
 
         set_db_maintenance_active(True)
         _emit_restore_status("started", "info", operation="delete_db")
@@ -627,6 +869,13 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         svc, error_result = await _require_services()
         if error_result:
             return _json_response(error_result)
+        prefs = await _resolve_security_prefs(svc if isinstance(svc, dict) else None)
+        if prefs is not None:
+            op = _require_operation_enabled("reset_index", prefs=prefs)
+            if not op.ok:
+                return _json_response(op)
+        else:
+            logger.warning("Cleanup case-duplicates: security prefs unavailable, skipping reset_index gate")
         db = svc.get("db") if isinstance(svc, dict) else None
         if not db:
             return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Database service unavailable"))
@@ -729,6 +978,26 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         except Exception:
             requested_batch = 64
 
+        async_mode = _parse_bool_flag(request.query.get("async"), default=False)
+
+        if async_mode:
+            active = _vector_backfill_get_active_or_latest_job()
+            if isinstance(active, dict) and str(active.get("status") or "") in {"queued", "running"}:
+                return _json_response(Result.Ok(_vector_backfill_job_public(active)))
+
+            job = _vector_backfill_register_job(batch_size=requested_batch)
+            _spawn_background_task(
+                _run_vector_backfill_job(
+                    job_id=str(job.get("job_id") or ""),
+                    svc=svc if isinstance(svc, dict) else {},
+                    db=db,
+                    vector_service=vector_service,
+                    batch_size=int(requested_batch),
+                ),
+                label=f"vector-backfill-{job.get('job_id')}",
+            )
+            return _json_response(Result.Ok(_vector_backfill_job_public(job)))
+
         set_db_maintenance_active(True)
         watcher_was_running = False
         try:
@@ -768,6 +1037,19 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
             except Exception:
                 pass
             set_db_maintenance_active(False)
+
+    @routes.get("/mjr/am/db/backfill-missing-vectors/status")
+    async def db_backfill_missing_vectors_status(request: web.Request):
+        """Return status for async vector backfill jobs."""
+        auth = _require_write_access(request)
+        if not auth.ok:
+            return _json_response(auth)
+
+        job_id = str(request.query.get("job_id") or "").strip()
+        job = _vector_backfill_get_job(job_id) if job_id else _vector_backfill_get_active_or_latest_job()
+        if not isinstance(job, dict):
+            return _json_response(Result.Ok({"status": "idle", "async": True}))
+        return _json_response(Result.Ok(_vector_backfill_job_public(job)))
 
     @routes.get("/mjr/am/db/backups")
     async def db_backups_list(_request: web.Request):

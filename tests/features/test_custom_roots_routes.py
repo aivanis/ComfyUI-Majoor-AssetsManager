@@ -301,6 +301,10 @@ async def test_browser_folder_op_create_rename_delete(monkeypatch, tmp_path: Pat
     monkeypatch.setattr(m, "_require_write_access", lambda _request: Result.Ok({}))
     monkeypatch.setattr(m, "_check_rate_limit", lambda *_args, **_kwargs: (True, None))
     monkeypatch.setattr(m, "_normalize_path", lambda v: Path(v) if v else None)
+    monkeypatch.setattr(m, "_require_services", lambda: ({}, None))
+    async def _prefs(_svc):
+        return None
+    monkeypatch.setattr(m, "_resolve_security_prefs", _prefs)
     monkeypatch.setattr(m, "_is_path_allowed", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(m, "_is_path_allowed_custom", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(m, "_invalidate_fs_list_cache", lambda: asyncio.sleep(0))
@@ -348,6 +352,10 @@ async def test_browser_folder_op_move_and_invalid(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(m, "_require_write_access", lambda _request: Result.Ok({}))
     monkeypatch.setattr(m, "_check_rate_limit", lambda *_args, **_kwargs: (True, None))
     monkeypatch.setattr(m, "_normalize_path", lambda v: Path(v) if v else None)
+    monkeypatch.setattr(m, "_require_services", lambda: ({}, None))
+    async def _prefs(_svc):
+        return None
+    monkeypatch.setattr(m, "_resolve_security_prefs", _prefs)
     monkeypatch.setattr(m, "_is_path_allowed", lambda *_args, **_kwargs: True)
     monkeypatch.setattr(m, "_is_path_allowed_custom", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(m, "_invalidate_fs_list_cache", lambda: asyncio.sleep(0))
@@ -479,6 +487,10 @@ async def test_browser_folder_op_rate_and_forbidden_and_root(monkeypatch, tmp_pa
 
     monkeypatch.setattr(m, "_check_rate_limit", lambda *_args, **_kwargs: (True, None))
     monkeypatch.setattr(m, "_normalize_path", lambda v: Path(v) if v else None)
+    monkeypatch.setattr(m, "_require_services", lambda: ({}, None))
+    async def _prefs(_svc):
+        return None
+    monkeypatch.setattr(m, "_resolve_security_prefs", _prefs)
     monkeypatch.setattr(m, "_is_path_allowed", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(m, "_is_path_allowed_custom", lambda *_args, **_kwargs: False)
 
@@ -494,3 +506,33 @@ async def test_browser_folder_op_rate_and_forbidden_and_root(monkeypatch, tmp_pa
     req2 = make_mocked_request("POST", "/mjr/am/browser/folder-op", app=app)
     resp2 = await (await app.router.resolve(req2)).handler(req2)
     assert _json(resp2).get("ok") is True
+
+
+@pytest.mark.asyncio
+async def test_browser_folder_op_delete_blocked_by_operation_gate(monkeypatch, tmp_path: Path):
+    app = _app()
+    d = tmp_path / "d"
+    d.mkdir()
+
+    monkeypatch.setattr(m, "_csrf_error", lambda _request: None)
+    monkeypatch.setattr(m, "_require_write_access", lambda _request: Result.Ok({}))
+    monkeypatch.setattr(m, "_check_rate_limit", lambda *_args, **_kwargs: (True, None))
+    monkeypatch.setattr(m, "_normalize_path", lambda v: Path(v) if v else None)
+    monkeypatch.setattr(m, "_require_services", lambda: ({"settings": object()}, None))
+    async def _prefs(_svc):
+        return {"allow_delete": False}
+    monkeypatch.setattr(m, "_resolve_security_prefs", _prefs)
+    monkeypatch.setattr(
+        m,
+        "_require_operation_enabled",
+        lambda *_args, **_kwargs: Result.Err("FORBIDDEN", "blocked by policy"),
+    )
+
+    async def _read_json(_request):
+        return Result.Ok({"op": "delete", "path": str(d)})
+
+    monkeypatch.setattr(m, "_read_json", _read_json)
+
+    req = make_mocked_request("POST", "/mjr/am/browser/folder-op", app=app)
+    resp = await (await app.router.resolve(req)).handler(req)
+    assert _json(resp).get("code") == "FORBIDDEN"
