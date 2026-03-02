@@ -129,19 +129,74 @@ class VectorSearcher:
 
         top_k = top_k or VECTOR_SIMILAR_TOPK
 
-        try:
-            emb = await self.vs.get_text_embedding(query)
-        except ModuleNotFoundError as exc:
-            return Result.Err("SERVICE_UNAVAILABLE", f"Missing dependency: {exc}")
-        except Exception as exc:
-            return Result.Err("SERVICE_UNAVAILABLE", f"Text embedding unavailable: {exc}")
-        if not emb.ok or not emb.data:
-            code = str(emb.code or "") if hasattr(emb, "code") else ""
-            if code == "SERVICE_UNAVAILABLE":
-                return Result.Err("SERVICE_UNAVAILABLE", emb.error or "Text embedding unavailable")
-            return Result.Err("METADATA_FAILED", emb.error or "Text embedding failed")
+        variants = self._semantic_query_variants(query)
+        last_error: Result | None = None
 
-        return await self._query_index(emb.data, top_k=top_k, exclude_ids=set())
+        for idx, candidate in enumerate(variants):
+            try:
+                emb = await self.vs.get_text_embedding(candidate)
+            except ModuleNotFoundError as exc:
+                return Result.Err("SERVICE_UNAVAILABLE", f"Missing dependency: {exc}")
+            except Exception as exc:
+                if idx == 0:
+                    return Result.Err("SERVICE_UNAVAILABLE", f"Text embedding unavailable: {exc}")
+                continue
+
+            if not emb.ok or not emb.data:
+                code = str(emb.code or "") if hasattr(emb, "code") else ""
+                if code == "SERVICE_UNAVAILABLE":
+                    if idx == 0:
+                        return Result.Err("SERVICE_UNAVAILABLE", emb.error or "Text embedding unavailable")
+                    continue
+                last_error = Result.Err("METADATA_FAILED", emb.error or "Text embedding failed")
+                continue
+
+            result = await self._query_index(emb.data, top_k=top_k, exclude_ids=set())
+            if result.ok and result.data:
+                return result
+            if not result.ok:
+                last_error = result
+
+        if last_error is not None:
+            return last_error
+        return Result.Ok([])
+
+    @staticmethod
+    def _semantic_query_variants(query: str) -> list[str]:
+        base = str(query or "").strip()
+        if not base:
+            return []
+
+        variants: list[str] = [base]
+        seen = {base.lower()}
+
+        key = base.lower()
+        fr_to_en: dict[str, str] = {
+            "animal": "animals pets dog cat",
+            "animaux": "animals pets dog cat",
+            "chien": "dog puppy canine",
+            "chiens": "dogs puppies canines",
+            "chat": "cat kitten feline",
+            "chats": "cats kittens felines",
+            "oiseau": "bird",
+            "oiseaux": "birds",
+            "cheval": "horse",
+            "chevaux": "horses",
+            "voiture": "car",
+            "voitures": "cars",
+        }
+
+        translated = str(fr_to_en.get(key, "")).strip()
+        if translated and translated.lower() not in seen:
+            variants.append(translated)
+            seen.add(translated.lower())
+
+        if " " not in base and translated:
+            combined = f"{base} {translated}".strip()
+            if combined.lower() not in seen:
+                variants.append(combined)
+
+        return variants
 
     # ── Find Similar ───────────────────────────────────────────────────
 

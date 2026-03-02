@@ -232,16 +232,28 @@ class VectorService:
         except Exception:
             max_len = 77
 
+        tokenizer_max_len: int | None = None
         try:
             first_module_getter = getattr(model, "_first_module", None)
             first_module = first_module_getter() if callable(first_module_getter) else None
             tokenizer = getattr(first_module, "tokenizer", None)
             if tokenizer is not None:
+                try:
+                    raw_tok_max = int(getattr(tokenizer, "model_max_length", 0) or 0)
+                    if 0 < raw_tok_max < 100000:
+                        tokenizer_max_len = raw_tok_max
+                except Exception:
+                    tokenizer_max_len = None
+
+                effective_max_len = max(4, int(max_len or 77))
+                if tokenizer_max_len is not None:
+                    effective_max_len = max(4, min(effective_max_len, int(tokenizer_max_len)))
+
                 token_ids = tokenizer.encode(
                     cleaned,
                     add_special_tokens=True,
                     truncation=True,
-                    max_length=max(4, int(max_len or 77)),
+                    max_length=effective_max_len,
                 )
                 decoded = tokenizer.decode(token_ids, skip_special_tokens=True).strip()
                 if decoded:
@@ -250,8 +262,8 @@ class VectorService:
             pass
 
         words = cleaned.split()
-        if len(words) > 60:
-            return " ".join(words[:60])
+        if len(words) > 40:
+            return " ".join(words[:40])
         return cleaned
 
     def _text_retry_candidates(self, model: SentenceTransformer, text: str) -> list[str]:
