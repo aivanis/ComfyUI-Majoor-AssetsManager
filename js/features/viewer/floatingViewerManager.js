@@ -21,6 +21,7 @@ import { reportError } from "../../utils/logging.js";
 /** @type {FloatingViewer | null} */
 let _instance = null;
 let _liveActive = true;
+let _previewActive = false;
 let _selectionListenerBound = false;
 let _fetchAC = null; // AbortController for the latest in-flight batch fetch
 
@@ -190,6 +191,49 @@ export const floatingViewerManager = {
     getLiveActive() {
         return _liveActive;
     },
+
+    /**
+     * Toggle the viewer between popped-out (separate window) and inline.
+     * When popping out, the viewer is first opened (if not visible) so the
+     * user always sees content in the new window.
+     */
+    popOut() {
+        const inst = _getInstance();
+        if (inst.isPopped) {
+            inst.popIn();
+        } else {
+            // Ensure the viewer is visible and loaded before popping out
+            if (!inst.isVisible) {
+                floatingViewerManager.open();
+            }
+            inst.popOut();
+        }
+    },
+
+    // ── Preview stream (KSampler denoising steps) ─────────────────────────
+
+    setPreviewActive(active) {
+        _previewActive = Boolean(active);
+        _instance?.setPreviewActive(_previewActive);
+    },
+
+    getPreviewActive() {
+        return _previewActive;
+    },
+
+    /**
+     * Feed a preview blob from the KSampler WebSocket into the viewer.
+     * If preview mode is off or the viewer is not visible, the blob is ignored.
+     * @param {Blob} blob  JPEG/PNG Blob from the ComfyUI `b_preview` event.
+     */
+    feedPreviewBlob(blob) {
+        if (!_previewActive) return;
+        const inst = _getInstance();
+        if (!inst.isVisible) {
+            inst.show();
+        }
+        inst.loadPreviewBlob(blob);
+    },
 };
 
 // ── Global event wiring (NM-3: named references so teardown can remove them) ──
@@ -202,14 +246,18 @@ let _globalHandlersInstalled = false;
 const _onMfvOpen       = () => floatingViewerManager.open();
 const _onMfvClose      = () => floatingViewerManager.close();
 const _onMfvToggle     = () => floatingViewerManager.toggle();
-const _onMfvLiveToggle = () => floatingViewerManager.setLiveActive(!_liveActive);
+const _onMfvLiveToggle    = () => floatingViewerManager.setLiveActive(!_liveActive);
+const _onMfvPreviewToggle = () => floatingViewerManager.setPreviewActive(!_previewActive);
+const _onMfvPopout        = () => floatingViewerManager.popOut();
 
 function _installGlobalHandlers() {
     if (_globalHandlersInstalled) return;
-    window.addEventListener(EVENTS.MFV_OPEN,        _onMfvOpen);
-    window.addEventListener(EVENTS.MFV_CLOSE,       _onMfvClose);
-    window.addEventListener(EVENTS.MFV_TOGGLE,      _onMfvToggle);
-    window.addEventListener(EVENTS.MFV_LIVE_TOGGLE, _onMfvLiveToggle);
+    window.addEventListener(EVENTS.MFV_OPEN,           _onMfvOpen);
+    window.addEventListener(EVENTS.MFV_CLOSE,          _onMfvClose);
+    window.addEventListener(EVENTS.MFV_TOGGLE,         _onMfvToggle);
+    window.addEventListener(EVENTS.MFV_LIVE_TOGGLE,    _onMfvLiveToggle);
+    window.addEventListener(EVENTS.MFV_PREVIEW_TOGGLE, _onMfvPreviewToggle);
+    window.addEventListener(EVENTS.MFV_POPOUT,         _onMfvPopout);
     _globalHandlersInstalled = true;
 }
 
@@ -220,12 +268,21 @@ function _installGlobalHandlers() {
  * accumulate on hot-reload (NM-3).
  */
 export function teardownFloatingViewerManager() {
+    // If the viewer is popped out to a separate window, bring it back first
+    try { if (_instance?.isPopped) _instance.popIn(); } catch (e) { console.debug?.(e); }
     window.removeEventListener(EVENTS.MFV_OPEN,        _onMfvOpen);
     window.removeEventListener(EVENTS.MFV_CLOSE,       _onMfvClose);
     window.removeEventListener(EVENTS.MFV_TOGGLE,      _onMfvToggle);
-    window.removeEventListener(EVENTS.MFV_LIVE_TOGGLE, _onMfvLiveToggle);
+    window.removeEventListener(EVENTS.MFV_LIVE_TOGGLE,    _onMfvLiveToggle);
+    window.removeEventListener(EVENTS.MFV_PREVIEW_TOGGLE, _onMfvPreviewToggle);
+    window.removeEventListener(EVENTS.MFV_POPOUT,         _onMfvPopout);
     _globalHandlersInstalled = false;
     _installGlobalHandlers(); // Re-register immediately so handlers are always active
 }
 
 _installGlobalHandlers();
+
+// Close the pop-out window when the main ComfyUI page unloads
+window.addEventListener("beforeunload", () => {
+    try { if (_instance?.isPopped) _instance.popIn(); } catch (e) { /* noop */ }
+});

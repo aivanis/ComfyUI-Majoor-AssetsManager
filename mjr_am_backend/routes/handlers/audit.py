@@ -37,6 +37,7 @@ def register_audit_routes(routes: web.RouteTableDef) -> None:
         services, err = await _require_services()
         if err:
             return _json_response(err)
+        assert services is not None  # guaranteed when err is None
 
         db = services.get("db")
         scope = (request.query.get("scope") or "output").strip()

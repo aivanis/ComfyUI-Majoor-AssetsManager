@@ -223,10 +223,106 @@ class VectorService:
             model.max_seq_length = clip_max
             logger.debug("Capped model.max_seq_length %s → %d", current_max, clip_max)
 
+        # ── Diagnostic: discover tokenizer location ─────────────────
+        self._cached_tokenizer = self._discover_tokenizer(model)
+
         dim_value = model.get_sentence_embedding_dimension()
         effective_dim = int(dim_value) if dim_value is not None else int(VECTOR_EMBEDDING_DIM)
-        logger.info("CLIP model loaded  (dim=%d, max_seq=%d)", effective_dim, model.max_seq_length)
+        logger.info(
+            "CLIP model loaded  (dim=%d, max_seq=%d, tokenizer=%s)",
+            effective_dim,
+            model.max_seq_length,
+            type(self._cached_tokenizer).__name__ if self._cached_tokenizer else "NOT_FOUND",
+        )
         return model
+
+    def _discover_tokenizer(self, model: SentenceTransformer) -> Any | None:
+        """Walk the model structure to find a usable HF tokenizer and cache it.
+
+        A usable tokenizer must have ``.tokenize()``, ``.encode()``, and
+        ``.decode()`` methods.  ``CLIPProcessor`` objects are automatically
+        unwrapped to their inner ``.tokenizer``.
+        """
+        tokenizer: Any | None = None
+
+        def _unwrap(obj: Any) -> Any | None:
+            """If *obj* is a processor wrapping a real tokenizer, return the inner tokenizer."""
+            if obj is None:
+                return None
+            # Already a real tokenizer?
+            if hasattr(obj, "tokenize") and hasattr(obj, "encode") and hasattr(obj, "decode"):
+                return obj
+            # Processor wrapping a tokenizer (e.g. CLIPProcessor)?
+            inner = getattr(obj, "tokenizer", None)
+            if inner is not None and hasattr(inner, "tokenize") and hasattr(inner, "encode"):
+                logger.debug("Unwrapped %s → %s", type(obj).__name__, type(inner).__name__)
+                return inner
+            return None
+
+        # 1) _first_module().tokenizer / .processor.tokenizer
+        try:
+            first_module_getter = getattr(model, "_first_module", None)
+            first_module = first_module_getter() if callable(first_module_getter) else None
+            if first_module is not None:
+                tokenizer = _unwrap(getattr(first_module, "tokenizer", None))
+                if tokenizer is None:
+                    proc = getattr(first_module, "processor", None)
+                    tokenizer = _unwrap(proc)
+        except Exception:
+            pass
+
+        # 2) model.tokenizer (newer SentenceTransformer versions)
+        if tokenizer is None:
+            tokenizer = _unwrap(getattr(model, "tokenizer", None))
+
+        # 3) Walk _modules OrderedDict
+        if tokenizer is None:
+            try:
+                modules_obj = getattr(model, "_modules", None)
+                if isinstance(modules_obj, dict):
+                    for _name, module in modules_obj.items():
+                        tokenizer = _unwrap(getattr(module, "tokenizer", None))
+                        if tokenizer is not None:
+                            logger.debug("Found tokenizer in _modules['%s']", _name)
+                            break
+                        proc = getattr(module, "processor", None)
+                        tokenizer = _unwrap(proc)
+                        if tokenizer is not None:
+                            logger.debug("Found tokenizer in _modules['%s'].processor", _name)
+                            break
+            except Exception:
+                pass
+
+        # 4) Deep walk: any public attribute that looks like a tokenizer
+        if tokenizer is None:
+            try:
+                for attr_name in dir(model):
+                    if attr_name.startswith("_"):
+                        continue
+                    candidate = _unwrap(getattr(model, attr_name, None))
+                    if candidate is not None:
+                        tokenizer = candidate
+                        logger.debug("Found tokenizer via deep walk: model.%s", attr_name)
+                        break
+            except Exception:
+                pass
+
+        if tokenizer is None:
+            # Log model structure for future debugging
+            try:
+                module_names = list(getattr(model, "_modules", {}).keys())
+                first_module_getter = getattr(model, "_first_module", None)
+                fm = first_module_getter() if callable(first_module_getter) else None
+                fm_attrs = [a for a in dir(fm) if not a.startswith("_")] if fm else []
+                logger.warning(
+                    "CLIP tokenizer NOT FOUND. Model modules: %s  First module attrs: %s",
+                    module_names,
+                    fm_attrs[:30],
+                )
+            except Exception:
+                logger.warning("CLIP tokenizer NOT FOUND and model introspection failed")
+
+        return tokenizer
 
     async def _ensure_model(self) -> SentenceTransformer:
         """Thread-safe lazy initialisation of the model."""
@@ -274,18 +370,16 @@ class VectorService:
         if (now - self._truncation_log_window_start) > 10.0:
             self._truncation_log_window_start = now
             self._truncation_log_count = 0
-        if self._truncation_log_count >= 8:
+        if self._truncation_log_count >= 5:
             return
         self._truncation_log_count += 1
 
-        preview = " ".join(str(original).split())[:180]
-        logger.warning(
-            "CLIP text truncated (%s): chars %d→%d, words %d→%d, preview='%s'",
+        preview = " ".join(str(original).split())[:120]
+        logger.debug(
+            "CLIP text truncated (%s): %d→%d chars, preview='%s…'",
             str(reason or "unknown"),
             len(original),
             len(truncated),
-            len(original.split()),
-            len(truncated.split()),
             preview,
         )
 
@@ -300,44 +394,17 @@ class VectorService:
         except Exception:
             max_len = 77
 
-        tokenizer_max_len: int | None = None
-        tokenizer: Any | None = None
-        try:
-            # 1) model._first_module().tokenizer (standard SentenceTransformer)
-            first_module_getter = getattr(model, "_first_module", None)
-            first_module = first_module_getter() if callable(first_module_getter) else None
-            tokenizer = getattr(first_module, "tokenizer", None)
-
-            # 2) CLIP-specific: processor.tokenizer lives inside CLIPModel
-            if tokenizer is None and first_module is not None:
-                proc = getattr(first_module, "processor", None)
-                if proc is not None:
-                    tokenizer = getattr(proc, "tokenizer", None)
-
-            # 3) Direct attribute on SentenceTransformer (newer versions)
-            if tokenizer is None:
-                tokenizer = getattr(model, "tokenizer", None)
-
-            # 4) Walk model._modules dict (nn.Module OrderedDict)
-            if tokenizer is None:
-                modules_obj = getattr(model, "_modules", None)
-                if isinstance(modules_obj, dict):
-                    for module in modules_obj.values():
-                        tokenizer = getattr(module, "tokenizer", None)
-                        if tokenizer is not None:
-                            break
-                        proc = getattr(module, "processor", None)
-                        if proc is not None:
-                            tokenizer = getattr(proc, "tokenizer", None)
-                            if tokenizer is not None:
-                                break
-            if tokenizer is not None:
+        # Use cached tokenizer from model load (avoids repeated discovery)
+        tokenizer = getattr(self, "_cached_tokenizer", None)
+        if tokenizer is not None:
+            try:
+                tokenizer_max_len: int | None = None
                 try:
                     raw_tok_max = int(getattr(tokenizer, "model_max_length", 0) or 0)
                     if 0 < raw_tok_max < 100000:
                         tokenizer_max_len = raw_tok_max
                 except Exception:
-                    tokenizer_max_len = None
+                    pass
 
                 effective_max_len = max(4, int(max_len or 77))
                 if tokenizer_max_len is not None:
@@ -348,7 +415,7 @@ class VectorService:
                     token_count = len(tokenizer.tokenize(cleaned))
                     full_token_len = int(token_count) + 2
                 except Exception:
-                    full_token_len = None
+                    pass
 
                 token_ids = tokenizer.encode(
                     cleaned,
@@ -362,26 +429,26 @@ class VectorService:
                         self._log_text_truncation(
                             cleaned,
                             decoded,
-                            f"token_limit {full_token_len}>{effective_max_len}",
+                            f"tokenizer {full_token_len}→{effective_max_len} tokens",
                         )
                     return decoded
-        except Exception:
-            pass
+            except Exception:
+                pass
 
-        # Strong fallback when tokenizer is unavailable: clamp both words and characters.
+        # Fallback when tokenizer is unavailable: clamp both words and characters.
         # CLIP BPE averages ~3.5 tokens/word, so 18 words ≈ 63 tokens (safe under 77).
-        # 140 chars also stays safely within the budget for typical English text.
-        char_budget = 140
         original_for_fallback = cleaned
-        if len(cleaned) > char_budget:
-            cleaned = cleaned[:char_budget].rsplit(" ", 1)[0].strip() or cleaned[:char_budget].strip()
-            self._log_text_truncation(original_for_fallback, cleaned, f"char_budget>{char_budget}")
-
         words = cleaned.split()
         if len(words) > 18:
-            shortened = " ".join(words[:18])
-            self._log_text_truncation(cleaned, shortened, "word_budget>18")
-            return shortened
+            cleaned = " ".join(words[:18])
+        if len(cleaned) > 140:
+            cleaned = cleaned[:140].rsplit(" ", 1)[0].strip() or cleaned[:140].strip()
+        if cleaned != original_for_fallback:
+            self._log_text_truncation(
+                original_for_fallback,
+                cleaned,
+                f"fallback {len(original_for_fallback.split())}→{len(cleaned.split())} words",
+            )
         return cleaned
 
     def _text_retry_candidates(self, model: SentenceTransformer, text: str) -> list[str]:
@@ -461,14 +528,12 @@ class VectorService:
         last_exc: Exception | None = None
         for candidate in self._text_retry_candidates(model, text):
             try:
-                vec = await asyncio.to_thread(
-                    lambda q=candidate: _encode_quiet(
-                        model,
-                        q,
-                        convert_to_numpy=True,
-                        show_progress_bar=False,
+                def _encode_text(q: str = candidate) -> Any:
+                    return _encode_quiet(
+                        model, q, convert_to_numpy=True, show_progress_bar=False,
                     )
-                )
+
+                vec = await asyncio.to_thread(_encode_text)
                 self._clear_error()
                 return Result.Ok(_normalise_vector(vec))
             except Exception as exc:
@@ -525,15 +590,14 @@ class VectorService:
             sub = batch_imgs[start : start + VECTOR_BATCH_SIZE]
             sub_idx = batch_indices[start : start + VECTOR_BATCH_SIZE]
             try:
-                vecs = await asyncio.to_thread(
-                    lambda s=sub: _encode_quiet(
-                        model,
-                        cast(Any, s),
-                        convert_to_numpy=True,
-                        batch_size=len(s),
+                def _encode_batch(s: list[Any] = sub) -> Any:
+                    return _encode_quiet(
+                        model, cast(Any, s),
+                        convert_to_numpy=True, batch_size=len(s),
                         show_progress_bar=False,
                     )
-                )
+
+                vecs = await asyncio.to_thread(_encode_batch)
                 for i, vec in zip(sub_idx, vecs, strict=True):
                     results[i] = Result.Ok(_normalise_vector(vec))
             except Exception as exc:

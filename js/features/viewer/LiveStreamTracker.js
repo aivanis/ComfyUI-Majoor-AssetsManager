@@ -1,10 +1,12 @@
 /**
  * LiveStreamTracker — bridges ComfyUI generation & graph events to the Floating Viewer.
  *
- * Two sources feed the MFV when Live Stream mode is active:
+ * Three sources feed the MFV when Live Stream mode is active:
  *  1. NEW_GENERATION_OUTPUT — fires after a workflow execution, shows the latest output file.
  *  2. Graph node selection — when a LoadImage / LoadVideo / SaveImage / VHS node is selected
  *     in the ComfyUI canvas, the file shown by that node is previewed in the MFV.
+ *  3. b_preview — WebSocket binary preview images sent during KSampler denoising steps
+ *     (requires the Preview toggle to be active in the MFV toolbar).
  *
  * Call initLiveStreamTracker(app) once at startup (entry.js setup()).
  * It is idempotent — safe to call multiple times.
@@ -12,9 +14,12 @@
 
 import { EVENTS } from "../../app/events.js";
 import { floatingViewerManager } from "./floatingViewerManager.js";
+import { getComfyApi, waitForComfyApi } from "../../app/comfyApiBridge.js";
 
 let _initialized = false;
 let _genOutputHandler = null; // Named reference so it can be removed in teardown
+let _previewHandler = null;  // Named reference for the b_preview API listener
+let _apiRef = null;          // Cached reference to the ComfyUI API for cleanup
 
 // WeakMap stores the original canvas methods so we can restore them on teardown (NH-1).
 const _hookedCanvases = new WeakMap();
@@ -278,6 +283,47 @@ function _hookCanvasWhenReady(app) {
     tryHook();
 }
 
+// ── KSampler preview streaming ────────────────────────────────────────────────
+
+/**
+ * Hook the ComfyUI WebSocket API to receive denoising preview images.
+ *
+ * The built-in ComfyUI frontend dispatches a custom event `"b_preview"` on the
+ * API EventTarget every time a binary preview frame arrives from the server
+ * (BinaryEventType 1 = PREVIEW_IMAGE or 4 = PREVIEW_IMAGE_WITH_METADATA).
+ * The event `detail` is a Blob (JPEG or PNG).
+ *
+ * We listen for that event and feed each Blob into the floating viewer via
+ * `floatingViewerManager.feedPreviewBlob(blob)`.
+ *
+ * @param {object} [app]  The ComfyUI app object (carries `app.api`).
+ */
+async function _hookPreviewApi(app) {
+    try {
+        const api = await waitForComfyApi({ app, timeoutMs: 8000 });
+        if (!api) {
+            console.debug("[Majoor] MFV: ComfyUI API not found — preview streaming disabled");
+            return;
+        }
+        _apiRef = api;
+
+        _previewHandler = (e) => {
+            try {
+                const blob = e.detail;
+                if (!blob || !(blob instanceof Blob)) return;
+                floatingViewerManager.feedPreviewBlob(blob);
+            } catch (err) {
+                console.debug?.("[MFV] preview blob error", err);
+            }
+        };
+
+        api.addEventListener("b_preview", _previewHandler);
+        console.debug("[Majoor] MFV preview stream hooked to ComfyUI API");
+    } catch (e) {
+        console.debug?.("[Majoor] MFV preview hook failed — preview streaming disabled", e);
+    }
+}
+
 // ── Generation output tracking ────────────────────────────────────────────────
 
 /**
@@ -323,6 +369,11 @@ export function initLiveStreamTracker(app) {
     // 2. Hook LiteGraph canvas for media node selection
     _hookCanvasWhenReady(app);
 
+    // 3. Listen for KSampler preview images via the ComfyUI WebSocket API.
+    //    The API dispatches "b_preview" with a Blob for each denoising step
+    //    when preview_method in ComfyUI settings is not "none".
+    _hookPreviewApi(app);
+
     console.debug("[Majoor] LiveStreamTracker initialized");
 }
 
@@ -336,6 +387,12 @@ export function teardownLiveStreamTracker(app) {
         window.removeEventListener(EVENTS.NEW_GENERATION_OUTPUT, _genOutputHandler);
         _genOutputHandler = null;
     }
+    // Remove the b_preview listener from the ComfyUI API
+    if (_previewHandler && _apiRef) {
+        try { _apiRef.removeEventListener("b_preview", _previewHandler); } catch (e) { console.debug?.(e); }
+    }
+    _previewHandler = null;
+    _apiRef = null;
     _initialized = false;
     // Unhook the canvas if it is already available.
     try { if (app?.canvas) _unhookCanvas(app.canvas); } catch (e) { console.debug?.(e); }

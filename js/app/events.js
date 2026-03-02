@@ -20,6 +20,8 @@ export const EVENTS = Object.freeze({
     MFV_CLOSE: "mjr:mfv-close",
     MFV_TOGGLE: "mjr:mfv-toggle",
     MFV_LIVE_TOGGLE: "mjr:mfv-live-toggle",
+    MFV_PREVIEW_TOGGLE: "mjr:mfv-preview-toggle",
+    MFV_POPOUT: "mjr:mfv-popout",
     MFV_VISIBILITY_CHANGED: "mjr:mfv-visibility-changed", // detail: { visible: bool }
     NEW_GENERATION_OUTPUT: "mjr:new-generation-output",
 });

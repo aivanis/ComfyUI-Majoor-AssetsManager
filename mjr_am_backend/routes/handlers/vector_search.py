@@ -494,7 +494,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
                     )
                     top3_local = np.argsort(dists)[::-1][:3]
                 else:
-                    top3_local = range(min(3, len(mask)))
+                    top3_local = np.arange(min(3, len(mask)))
 
                 sample_ids = [id_map[mask[i]] for i in top3_local]
 
@@ -527,7 +527,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
                     "all_asset_ids": [id_map[i] for i in mask],
                 })
 
-            clusters.sort(key=lambda c: -c["size"])
+            clusters.sort(key=lambda c: -int(c["size"]))
             return _json_response(Result.Ok(clusters))
 
         except Exception as exc:

@@ -181,6 +181,16 @@ export class FloatingViewer {
         // Generation counter: incremented on every loadMediaA/loadMediaPair call so
         // stale async metadata enrichment results can be discarded (NM-2).
         this._refreshGen = 0;
+
+        // Pop-out state: the external window reference and pop-out button.
+        this._popoutWindow = null;
+        this._popoutBtn    = null;
+        this._isPopped     = false;
+
+        // Preview stream state: button ref + last blob URL for cleanup.
+        this._previewBtn      = null;
+        this._previewBlobUrl  = null;
+        this._previewActive   = false;
     }
 
     // ── Build DOM ─────────────────────────────────────────────────────────────
@@ -256,6 +266,17 @@ export class FloatingViewer {
         }, { signal: this._btnAC.signal });
         bar.appendChild(this._liveBtn);
 
+        // KSampler Preview Stream toggle
+        this._previewBtn = document.createElement("button");
+        this._previewBtn.type = "button";
+        this._previewBtn.className = "mjr-icon-btn";
+        this._previewBtn.title = t("tooltip.previewStreamOff", "KSampler Preview: OFF — click to stream denoising steps");
+        this._previewBtn.innerHTML = '<i class="pi pi-eye" aria-hidden="true"></i>';
+        this._previewBtn.addEventListener("click", () => {
+            window.dispatchEvent(new CustomEvent(EVENTS.MFV_PREVIEW_TOGGLE));
+        }, { signal: this._btnAC.signal });
+        bar.appendChild(this._previewBtn);
+
         // Gen Info button (shows dropdown with checkboxes)
         this._genBtn = document.createElement("button");
         this._genBtn.type = "button";
@@ -274,6 +295,20 @@ export class FloatingViewer {
         }, { signal: this._btnAC.signal });
         bar.appendChild(this._genBtn);
         this._updateGenBtnUI();
+
+        // Pop-out to external window button
+        this._popoutBtn = document.createElement("button");
+        this._popoutBtn.type = "button";
+        this._popoutBtn.className = "mjr-icon-btn";
+        this._popoutBtn.title = t("tooltip.popOutViewer", "Pop out to separate window (can move to 2nd monitor)");
+        const _popoutIcon = document.createElement("i");
+        _popoutIcon.className = "pi pi-external-link";
+        _popoutIcon.setAttribute("aria-hidden", "true");
+        this._popoutBtn.appendChild(_popoutIcon);
+        this._popoutBtn.addEventListener("click", () => {
+            window.dispatchEvent(new CustomEvent(EVENTS.MFV_POPOUT));
+        }, { signal: this._btnAC.signal });
+        bar.appendChild(this._popoutBtn);
 
         // Download / capture button
         this._captureBtn = document.createElement("button");
@@ -514,6 +549,60 @@ export class FloatingViewer {
             _liveIconInactive.setAttribute("aria-hidden", "true");
             this._liveBtn.replaceChildren(_liveIconInactive);
             this._liveBtn.title = t("tooltip.liveStreamOff", "Live Stream: OFF — click to follow");
+        }
+    }
+
+    // ── KSampler Preview Stream UI ─────────────────────────────────────────────
+
+    setPreviewActive(active) {
+        this._previewActive = Boolean(active);
+        if (!this._previewBtn) return;
+        this._previewBtn.classList.toggle("mjr-live-active", this._previewActive);
+        if (this._previewActive) {
+            const icon = document.createElement("i");
+            icon.className = "pi pi-eye";
+            icon.setAttribute("aria-hidden", "true");
+            this._previewBtn.replaceChildren(icon);
+            this._previewBtn.title = t("tooltip.previewStreamOn", "KSampler Preview: ON — streaming denoising steps");
+        } else {
+            const icon = document.createElement("i");
+            icon.className = "pi pi-eye-slash";
+            icon.setAttribute("aria-hidden", "true");
+            this._previewBtn.replaceChildren(icon);
+            this._previewBtn.title = t("tooltip.previewStreamOff", "KSampler Preview: OFF — click to stream denoising steps");
+            // Revoke last blob URL when turning off
+            this._revokePreviewBlob();
+        }
+    }
+
+    /**
+     * Display a preview blob (JPEG/PNG from KSampler denoising steps).
+     * Uses a blob: URL and shows it in Simple mode without metadata enrichment.
+     * @param {Blob} blob  Image blob received from ComfyUI WebSocket.
+     */
+    loadPreviewBlob(blob) {
+        if (!blob || !(blob instanceof Blob)) return;
+        // Revoke previous blob URL to prevent memory leaks
+        this._revokePreviewBlob();
+        const url = URL.createObjectURL(blob);
+        this._previewBlobUrl = url;
+        // Build a minimal fileData that _resolveUrl can handle
+        const fileData = { url, filename: "preview.jpg", kind: "image", _isPreview: true };
+        this._mediaA = fileData;
+        this._resetMfvZoom();
+        // Force simple mode for preview — don't trigger metadata enrichment
+        if (this._mode !== MFV_MODES.SIMPLE) {
+            this._mode = MFV_MODES.SIMPLE;
+            this._updateModeBtnUI();
+        }
+        ++this._refreshGen;
+        this._refresh();
+    }
+
+    _revokePreviewBlob() {
+        if (this._previewBlobUrl) {
+            try { URL.revokeObjectURL(this._previewBlobUrl); } catch (e) { /* noop */ }
+            this._previewBlobUrl = null;
         }
     }
 
@@ -898,6 +987,129 @@ export class FloatingViewer {
         this.isVisible = false;
     }
 
+    // ── Pop-out / Pop-in (external window) ──────────────────────────────────
+
+    /**
+     * Move the viewer into a separate browser window so it can be
+     * dragged onto a second monitor.  Uses adoptNode() to transfer
+     * the live DOM tree — all JS references and listeners stay valid.
+     */
+    popOut() {
+        if (this._isPopped || !this.element) return;
+        const el = this.element;
+
+        // Remember size for the popup
+        const w = Math.max(el.offsetWidth  || 520, 400);
+        const h = Math.max(el.offsetHeight || 420, 300);
+
+        // Open a blank popup centred on the current screen
+        const left = (window.screenX || window.screenLeft) + Math.round((window.outerWidth  - w) / 2);
+        const top  = (window.screenY || window.screenTop)  + Math.round((window.outerHeight - h) / 2);
+        const features = `width=${w},height=${h},left=${left},top=${top},resizable=yes,scrollbars=no,toolbar=no,menubar=no,location=no,status=no`;
+        const popup = window.open("", "_mjr_viewer", features);
+        if (!popup) {
+            console.warn("[MFV] Pop-out blocked — allow popups for this site.");
+            return;
+        }
+        this._popoutWindow = popup;
+        this._isPopped = true;
+
+        // ----- Build the popup document -----
+        const doc = popup.document;
+        doc.title = "Majoor Viewer";
+
+        // Copy ALL stylesheets from the parent page so themes, PrimeIcons,
+        // and MFV-specific CSS are available in the popup.
+        for (const ss of document.querySelectorAll('link[rel="stylesheet"], style')) {
+            doc.head.appendChild(doc.importNode(ss, true));
+        }
+
+        // Override styles for the popped-out viewer (fill window, no fixed position)
+        const overrideStyle = doc.createElement("style");
+        overrideStyle.textContent = `
+            html, body {
+                margin: 0; padding: 0;
+                width: 100%; height: 100%;
+                overflow: hidden;
+                background: #1e1e1e;
+                color: #ddd;
+            }
+            .mjr-mfv {
+                position: static !important;
+                width: 100% !important;
+                height: 100% !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                resize: none !important;
+                border: none !important;
+                border-radius: 0 !important;
+                box-shadow: none !important;
+                display: flex !important;
+            }
+        `;
+        doc.head.appendChild(overrideStyle);
+
+        // Adopt the existing DOM node into the popup document
+        doc.body.appendChild(doc.adoptNode(el));
+
+        // Force visible (it may have been hidden if toggled before pop-out)
+        el.classList.add("is-visible");
+        this.isVisible = true;
+
+        // Update pop-out button to show "pop-in" icon
+        this._updatePopoutBtnUI();
+
+        // When the user closes the popup window, automatically pop the viewer back in.
+        popup.addEventListener("beforeunload", () => this.popIn());
+
+        // Relay keyboard shortcuts from popup back to main window
+        popup.addEventListener("keydown", (e) => {
+            window.dispatchEvent(new KeyboardEvent("keydown", {
+                key: e.key, code: e.code, keyCode: e.keyCode,
+                ctrlKey: e.ctrlKey, shiftKey: e.shiftKey, altKey: e.altKey, metaKey: e.metaKey,
+            }));
+        });
+    }
+
+    /**
+     * Move the viewer back into the main ComfyUI page from the popup window.
+     */
+    popIn() {
+        if (!this._isPopped || !this.element) return;
+        this._isPopped = false;
+
+        // Re-adopt the element into the main document and append to body
+        const adopted = document.adoptNode(this.element);
+        document.body.appendChild(adopted);
+
+        // Restore inline position styles (they were cleared by the popup override)
+        // The viewer will revert to its normal fixed-position CSS.
+        this._updatePopoutBtnUI();
+
+        // Close the popup window if it's still open
+        try { this._popoutWindow?.close(); } catch (e) { console.debug?.(e); }
+        this._popoutWindow = null;
+    }
+
+    /** Toggle pop-out button icon between external-link (pop out) and sign-in (pop in). */
+    _updatePopoutBtnUI() {
+        if (!this._popoutBtn) return;
+        const icon = this._popoutBtn.querySelector("i") || document.createElement("i");
+        if (this._isPopped) {
+            icon.className = "pi pi-sign-in";
+            this._popoutBtn.title = t("tooltip.popInViewer", "Return viewer to ComfyUI window");
+        } else {
+            icon.className = "pi pi-external-link";
+            this._popoutBtn.title = t("tooltip.popOutViewer", "Pop out to separate window (can move to 2nd monitor)");
+        }
+        if (!this._popoutBtn.contains(icon)) {
+            this._popoutBtn.replaceChildren(icon);
+        }
+    }
+
+    /** Whether the viewer is currently in a pop-out window. */
+    get isPopped() { return this._isPopped; }
+
     // ── Drag ──────────────────────────────────────────────────────────────────
 
     _initDrag(handle) {
@@ -1197,11 +1409,15 @@ export class FloatingViewer {
         this._destroyPanZoom();
         // Abort all button click listeners in one call (NM-1).
         try { this._btnAC?.abort(); this._btnAC = null; } catch (e) { console.debug?.(e); }
+        // Pop-in before disposing so the element returns to the main document
+        try { if (this._isPopped) this.popIn(); } catch (e) { console.debug?.(e); }
+        this._revokePreviewBlob();
         try { this.element?.remove(); } catch (e) { console.debug?.(e); }
         this.element     = null;
         this._contentEl  = null;
         this._modeBtn    = null;
         this._liveBtn    = null;
+        this._popoutBtn  = null;
         this._captureBtn = null;
         try { document.removeEventListener("click", this._handleDocClick); } catch (e) { console.debug?.(e); }
         try { this._genDropdown?.remove(); } catch (e) { console.debug?.(e); }
