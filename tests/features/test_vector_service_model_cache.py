@@ -22,8 +22,8 @@ def test_vector_service_reuses_shared_model_cache(monkeypatch):
     class _FakeSentenceTransformer:
         init_calls = 0
 
-        def __init__(self, _name, device=None, model_kwargs=None, tokenizer_kwargs=None):
-            _ = (device, model_kwargs, tokenizer_kwargs)
+        def __init__(self, model_name_or_path=None, device=None, model_kwargs=None, tokenizer_kwargs=None):
+            _ = (model_name_or_path, device, model_kwargs, tokenizer_kwargs)
             _FakeSentenceTransformer.init_calls += 1
             self.max_seq_length = 77
 

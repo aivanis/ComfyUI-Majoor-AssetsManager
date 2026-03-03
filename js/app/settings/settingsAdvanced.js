@@ -457,9 +457,9 @@ export function registerAdvancedSettings(safeAddSetting, settings, notifyApplied
 
         safeAddSetting({
             id: `${SETTINGS_PREFIX}.AI.VerboseLogs`,
-            category: cat(t("cat.advanced"), "AI / Vector Search"),
-            name: "Verbose AI logs",
-            tooltip: "Enable detailed HuggingFace/SigLIP2/X-CLIP startup logs for debugging model loading.",
+            category: cat(t("cat.advanced"), hfCategoryLabel),
+            name: "Majoor: Verbose AI logs",
+            tooltip: "Enable detailed HuggingFace/SigLIP2/X-CLIP logs and progress bars during model download/loading.",
             type: "boolean",
             defaultValue: !!(settings.ai?.verboseAiLogs ?? DEFAULT_SETTINGS.ai?.verboseAiLogs ?? false),
             onChange: async (value) => {

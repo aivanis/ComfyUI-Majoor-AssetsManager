@@ -965,7 +965,7 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         vector_service = svc.get("vector_service") if isinstance(svc, dict) else None
         if vector_service is None:
             try:
-                from mjr_am_backend.features.index.vector_service import VectorService
+                from ...features.index.vector_service import VectorService
 
                 vector_service = VectorService()
                 if isinstance(svc, dict):

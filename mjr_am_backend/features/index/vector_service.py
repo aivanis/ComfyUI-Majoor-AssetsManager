@@ -31,6 +31,7 @@ import subprocess
 import threading
 import time
 import warnings
+import hashlib
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -69,7 +70,11 @@ def _ai_verbose_logs_enabled() -> bool:
 
 
 def _configure_hf_quiet_mode() -> None:
-    """Configure HuggingFace/http logging behavior for model bootstrap."""
+    """Configure HuggingFace/http logging behavior for model bootstrap.
+
+    Must be called **after** ``import sentence_transformers`` (the import
+    reconfigures its own loggers, overriding anything set earlier).
+    """
     verbose = _ai_verbose_logs_enabled()
     if verbose:
         for key in (
@@ -87,16 +92,34 @@ def _configure_hf_quiet_mode() -> None:
         logging.getLogger("sentence_transformers").setLevel(logging.INFO)
         return
 
-    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
-    os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
-    os.environ.setdefault("TQDM_DISABLE", "1")
-    os.environ.setdefault("TRANSFORMERS_NO_ADVISORY_WARNINGS", "1")
-    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "error")
-    logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("httpcore").setLevel(logging.WARNING)
-    logging.getLogger("huggingface_hub").setLevel(logging.WARNING)
-    logging.getLogger("transformers").setLevel(logging.ERROR)
-    logging.getLogger("sentence_transformers").setLevel(logging.ERROR)
+    # Force-set (not setdefault) so repeated calls always win.
+    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+    os.environ["TQDM_DISABLE"] = "1"
+    os.environ["TRANSFORMERS_NO_ADVISORY_WARNINGS"] = "1"
+    os.environ["TRANSFORMERS_VERBOSITY"] = "error"
+    for _logger_name in (
+        "httpx", "httpcore", "huggingface_hub",
+        "transformers", "transformers.configuration_utils",
+        "transformers.modeling_utils", "transformers.tokenization_utils",
+        "transformers.tokenization_utils_base",
+        "sentence_transformers", "sentence_transformers.SentenceTransformer",
+    ):
+        logging.getLogger(_logger_name).setLevel(logging.ERROR)
+
+
+def _log_model_loading_once(model_name: str) -> None:
+    """Emit a single INFO line per process/model; subsequent attempts are DEBUG only."""
+    key_hash = hashlib.sha1(str(model_name or "").encode("utf-8", errors="ignore")).hexdigest()[:16]
+    env_key = f"MJR_AM_MODEL_LOAD_LOGGED_{key_hash}"
+    if str(os.environ.get(env_key) or "").strip() == "1":
+        logger.debug("Reusing previously logged model load event for '%s'", model_name)
+        return
+    try:
+        os.environ[env_key] = "1"
+    except Exception:
+        pass
+    logger.info("Loading multimodal embedding model '%s' …", model_name)
 
 # ---------------------------------------------------------------------------
 # Helpers: serialisation
@@ -247,7 +270,13 @@ class VectorService:
     # ── Model lifecycle ────────────────────────────────────────────────
 
     def _load_model(self) -> SentenceTransformer:
-        """Synchronous model loading (called inside a thread)."""
+        """Synchronous model loading (called inside a thread).
+
+        Uses a process-wide ``_MODEL_CACHE`` (guarded by
+        ``_MODEL_CACHE_LOCK``) so that even when multiple
+        ``VectorService`` instances exist the heavy model is loaded
+        at most **once**.
+        """
         cache_key = (str(self._model_name or ""), str(self._device or "auto"))
 
         with _MODEL_CACHE_LOCK:
@@ -257,9 +286,19 @@ class VectorService:
             logger.debug("Reusing cached multimodal model '%s'", self._model_name)
             return cached_model
 
-        _configure_hf_quiet_mode()
+        # Import first, THEN silence — the import itself reconfigures
+        # loggers, which would override earlier settings.
         from sentence_transformers import SentenceTransformer  # noqa: F811
         from transformers.utils import logging as hf_logging
+        _configure_hf_quiet_mode()
+
+        # Pre-check whether SentenceTransformer accepts model_kwargs /
+        # tokenizer_kwargs so we never load the model only to discard
+        # it on TypeError.
+        import inspect as _inspect
+        _st_sig = _inspect.signature(SentenceTransformer.__init__)
+        _accepts_model_kw = "model_kwargs" in _st_sig.parameters
+        _accepts_tok_kw = "tokenizer_kwargs" in _st_sig.parameters
 
         with _MODEL_CACHE_LOCK:
             cached_model = _MODEL_CACHE.get(cache_key)
@@ -268,28 +307,38 @@ class VectorService:
                 logger.debug("Reusing cached multimodal model '%s'", self._model_name)
                 return cached_model
 
-            logger.info("Loading multimodal embedding model '%s' …", self._model_name)
+            _log_model_loading_once(self._model_name)
             previous_hf_verbosity = hf_logging.get_verbosity()
-            if not _ai_verbose_logs_enabled():
+            verbose = _ai_verbose_logs_enabled()
+            if not verbose:
                 hf_logging.set_verbosity_error()
+                _configure_hf_quiet_mode()  # re-apply in case another thread reset loggers
             try:
+                st_kwargs: dict[str, Any] = {
+                    "model_name_or_path": self._model_name,
+                    "device": self._device,
+                }
+                # use_fast only applies to tokenizers/processors, NOT to models.
+                if _accepts_tok_kw:
+                    st_kwargs["tokenizer_kwargs"] = {"use_fast": False}
+
                 with warnings.catch_warnings():
                     warnings.filterwarnings(
                         "ignore",
                         message=r"Using a slow image processor as `use_fast` is unset.*",
                     )
-                    try:
-                        model = SentenceTransformer(
-                            self._model_name,
-                            device=self._device,
-                            model_kwargs={"use_fast": False},
-                            tokenizer_kwargs={"use_fast": False},
-                        )
-                    except TypeError:
-                        model = SentenceTransformer(self._model_name, device=self._device)
+                    if verbose:
+                        model = SentenceTransformer(**st_kwargs)
+                    else:
+                        # Redirect stdout/stderr to suppress native
+                        # ``print()`` statements from transformers internals.
+                        with contextlib.redirect_stdout(io.StringIO()), \
+                             contextlib.redirect_stderr(io.StringIO()):
+                            model = SentenceTransformer(**st_kwargs)
             finally:
                 hf_logging.set_verbosity(previous_hf_verbosity)
             _MODEL_CACHE[cache_key] = model
+            logger.debug("Model cached under key %s", cache_key)
 
         # ── Force CLIP/SigLIP style token limit ─────────────────────
         # SentenceTransformer may default to a higher max_seq_length.
@@ -837,25 +886,39 @@ class VectorService:
 
         async with self._prompt_lock:
             if self._prompt_model is None or self._prompt_processor is None:
-                _configure_hf_quiet_mode()
                 import torch
                 from transformers import AutoModelForCausalLM, AutoProcessor
                 from transformers.utils import logging as hf_logging
+                _configure_hf_quiet_mode()  # apply AFTER imports
 
                 logger.info("Loading Florence prompt model '%s' …", self._prompt_model_name)
                 previous_hf_verbosity = hf_logging.get_verbosity()
-                if not _ai_verbose_logs_enabled():
+                verbose = _ai_verbose_logs_enabled()
+                if not verbose:
                     hf_logging.set_verbosity_error()
                 try:
-                    self._prompt_processor = AutoProcessor.from_pretrained(
-                        self._prompt_model_name,
-                        trust_remote_code=True,
-                        use_fast=False,
-                    )
-                    self._prompt_model = AutoModelForCausalLM.from_pretrained(
-                        self._prompt_model_name,
-                        trust_remote_code=True,
-                    )
+                    if verbose:
+                        self._prompt_processor = AutoProcessor.from_pretrained(
+                            self._prompt_model_name,
+                            trust_remote_code=True,
+                            use_fast=False,
+                        )
+                        self._prompt_model = AutoModelForCausalLM.from_pretrained(
+                            self._prompt_model_name,
+                            trust_remote_code=True,
+                        )
+                    else:
+                        with contextlib.redirect_stdout(io.StringIO()), \
+                             contextlib.redirect_stderr(io.StringIO()):
+                            self._prompt_processor = AutoProcessor.from_pretrained(
+                                self._prompt_model_name,
+                                trust_remote_code=True,
+                                use_fast=False,
+                            )
+                            self._prompt_model = AutoModelForCausalLM.from_pretrained(
+                                self._prompt_model_name,
+                                trust_remote_code=True,
+                            )
                 finally:
                     hf_logging.set_verbosity(previous_hf_verbosity)
                 self._prompt_model.eval()
@@ -869,20 +932,30 @@ class VectorService:
 
         async with self._video_lock:
             if self._video_model is None or self._video_processor is None:
-                _configure_hf_quiet_mode()
                 from transformers import AutoModel, AutoProcessor
                 from transformers.utils import logging as hf_logging
+                _configure_hf_quiet_mode()  # apply AFTER imports
 
                 logger.info("Loading video embedding model '%s' …", self._video_model_name)
                 previous_hf_verbosity = hf_logging.get_verbosity()
-                if not _ai_verbose_logs_enabled():
+                verbose = _ai_verbose_logs_enabled()
+                if not verbose:
                     hf_logging.set_verbosity_error()
                 try:
-                    self._video_processor = AutoProcessor.from_pretrained(
-                        self._video_model_name,
-                        use_fast=False,
-                    )
-                    self._video_model = AutoModel.from_pretrained(self._video_model_name)
+                    if verbose:
+                        self._video_processor = AutoProcessor.from_pretrained(
+                            self._video_model_name,
+                            use_fast=False,
+                        )
+                        self._video_model = AutoModel.from_pretrained(self._video_model_name)
+                    else:
+                        with contextlib.redirect_stdout(io.StringIO()), \
+                             contextlib.redirect_stderr(io.StringIO()):
+                            self._video_processor = AutoProcessor.from_pretrained(
+                                self._video_model_name,
+                                use_fast=False,
+                            )
+                            self._video_model = AutoModel.from_pretrained(self._video_model_name)
                 finally:
                     hf_logging.set_verbosity(previous_hf_verbosity)
                 try:

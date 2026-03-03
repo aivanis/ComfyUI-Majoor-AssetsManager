@@ -449,7 +449,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         try:
             import json as _json
             import numpy as np
-            from mjr_am_backend.features.index.vector_service import blob_to_vector
+            from ...features.index.vector_service import blob_to_vector
 
             DIM = int(getattr(searcher, "_dim", 768) or 768)
             id_map: list[int] = []
