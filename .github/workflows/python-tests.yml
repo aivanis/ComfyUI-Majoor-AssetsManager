@@ -13,8 +13,28 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+    env:
+      GIT_HTTP_LOW_SPEED_LIMIT: "1000"
+      GIT_HTTP_LOW_SPEED_TIME: "60"
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Tune Git HTTP settings
+        run: |
+          git config --global http.lowSpeedLimit "$GIT_HTTP_LOW_SPEED_LIMIT"
+          git config --global http.lowSpeedTime "$GIT_HTTP_LOW_SPEED_TIME"
+          git config --global http.version HTTP/1.1
+
+      - name: Checkout repository
+        id: checkout_primary
+        continue-on-error: true
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Retry checkout after transient failure
+        if: steps.checkout_primary.outcome == 'failure'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
@@ -52,8 +72,28 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+    env:
+      GIT_HTTP_LOW_SPEED_LIMIT: "1000"
+      GIT_HTTP_LOW_SPEED_TIME: "60"
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Tune Git HTTP settings
+        run: |
+          git config --global http.lowSpeedLimit "$GIT_HTTP_LOW_SPEED_LIMIT"
+          git config --global http.lowSpeedTime "$GIT_HTTP_LOW_SPEED_TIME"
+          git config --global http.version HTTP/1.1
+
+      - name: Checkout repository
+        id: checkout_primary
+        continue-on-error: true
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Retry checkout after transient failure
+        if: steps.checkout_primary.outcome == 'failure'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -71,12 +111,32 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+    env:
+      GIT_HTTP_LOW_SPEED_LIMIT: "1000"
+      GIT_HTTP_LOW_SPEED_TIME: "60"
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Tune Git HTTP settings
+        run: |
+          git config --global http.lowSpeedLimit "$GIT_HTTP_LOW_SPEED_LIMIT"
+          git config --global http.lowSpeedTime "$GIT_HTTP_LOW_SPEED_TIME"
+          git config --global http.version HTTP/1.1
+
+      - name: Checkout repository
+        id: checkout_primary
+        continue-on-error: true
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Retry checkout after transient failure
+        if: steps.checkout_primary.outcome == 'failure'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
@@ -116,8 +176,28 @@ jobs:
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+    env:
+      GIT_HTTP_LOW_SPEED_LIMIT: "1000"
+      GIT_HTTP_LOW_SPEED_TIME: "60"
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Tune Git HTTP settings
+        run: |
+          git config --global http.lowSpeedLimit "$GIT_HTTP_LOW_SPEED_LIMIT"
+          git config --global http.lowSpeedTime "$GIT_HTTP_LOW_SPEED_TIME"
+          git config --global http.version HTTP/1.1
+
+      - name: Checkout repository
+        id: checkout_primary
+        continue-on-error: true
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Retry checkout after transient failure
+        if: steps.checkout_primary.outcome == 'failure'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0

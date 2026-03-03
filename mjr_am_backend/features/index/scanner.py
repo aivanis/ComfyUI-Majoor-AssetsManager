@@ -200,7 +200,7 @@ class IndexScanner:
                                 self._vector_service,
                                 asset_id=aid,
                                 filepath=filepath,
-                                kind=str(entry.get("kind") or "image"),
+                                kind="image",
                                 metadata_raw=entry.get("metadata_raw"),
                             ),
                             timeout=_VECTOR_INDEX_PER_ASSET_TIMEOUT_S,

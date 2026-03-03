@@ -1759,7 +1759,10 @@ class Sqlite:
                     ("bRestartable", wintypes.BOOL),
                 ]
 
-            rm = ctypes.WinDLL("Rstrtmgr")
+            win_dll = getattr(ctypes, "WinDLL", None)
+            if win_dll is None:
+                return []
+            rm = win_dll("Rstrtmgr")
             rm.RmStartSession.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD, wintypes.LPWSTR]
             rm.RmStartSession.restype = wintypes.DWORD
             rm.RmRegisterResources.argtypes = [

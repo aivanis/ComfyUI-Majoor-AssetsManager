@@ -139,7 +139,7 @@ def _suppress_stdout_only():
 
 def _log_model_loading_once(model_name: str) -> None:
     """Emit a single INFO line per process/model; subsequent attempts are DEBUG only."""
-    key_hash = hashlib.sha1(str(model_name or "").encode("utf-8", errors="ignore")).hexdigest()[:16]
+    key_hash = hashlib.sha256(str(model_name or "").encode("utf-8", errors="ignore")).hexdigest()[:16]
     env_key = f"MJR_AM_MODEL_LOAD_LOGGED_{key_hash}"
     if str(os.environ.get(env_key) or "").strip() == "1":
         logger.debug("Reusing previously logged model load event for '%s'", model_name)
@@ -585,17 +585,22 @@ class VectorService:
                     hf_logging.set_verbosity_error()
                 try:
                     self._patch_global_siglip_config_hidden_size()
+                    # Model refs are user-configurable and may be local paths.
                     if verbose:
-                        self._siglip_processor = AutoProcessor.from_pretrained(self._model_name, use_fast=False)
-                        self._siglip_model = AutoModel.from_pretrained(self._model_name)
+                        self._siglip_processor = AutoProcessor.from_pretrained(  # nosec B615
+                            self._model_name, use_fast=False
+                        )
+                        self._siglip_model = AutoModel.from_pretrained(self._model_name)  # nosec B615
                     else:
                         with warnings.catch_warnings(), _suppress_stdout_only():
                             warnings.filterwarnings(
                                 "ignore",
                                 message=r".*huggingface_hub.*cache-system uses symlinks.*",
                             )
-                            self._siglip_processor = AutoProcessor.from_pretrained(self._model_name, use_fast=False)
-                            self._siglip_model = AutoModel.from_pretrained(self._model_name)
+                            self._siglip_processor = AutoProcessor.from_pretrained(  # nosec B615
+                                self._model_name, use_fast=False
+                            )
+                            self._siglip_model = AutoModel.from_pretrained(self._model_name)  # nosec B615
                 finally:
                     hf_logging.set_verbosity(previous_hf_verbosity)
 
@@ -1347,11 +1352,11 @@ class VectorService:
                     }
                     if use_fast is not None:
                         kwargs["use_fast"] = use_fast
-                    return AutoProcessor.from_pretrained(prompt_model_name, **kwargs)
+                    return AutoProcessor.from_pretrained(prompt_model_name, **kwargs)  # nosec B615
 
                 def _load_prompt_model_with_compat() -> Any:
                     try:
-                        return AutoModelForCausalLM.from_pretrained(
+                        return AutoModelForCausalLM.from_pretrained(  # nosec B615
                             prompt_model_name,
                             trust_remote_code=True,
                             attn_implementation="eager",
@@ -1377,7 +1382,7 @@ class VectorService:
                                     setattr(cls, "_supports_sdpa", False)
                         except Exception:
                             pass
-                        return AutoModelForCausalLM.from_pretrained(
+                        return AutoModelForCausalLM.from_pretrained(  # nosec B615
                             prompt_model_name,
                             trust_remote_code=True,
                             attn_implementation="eager",
@@ -1451,23 +1456,24 @@ class VectorService:
                 if not verbose:
                     hf_logging.set_verbosity_error()
                 try:
+                    # Model refs are user-configurable and may be local paths.
                     if verbose:
-                        self._video_processor = AutoProcessor.from_pretrained(
+                        self._video_processor = AutoProcessor.from_pretrained(  # nosec B615
                             self._video_model_name,
                             use_fast=False,
                         )
-                        self._video_model = AutoModel.from_pretrained(self._video_model_name)
+                        self._video_model = AutoModel.from_pretrained(self._video_model_name)  # nosec B615
                     else:
                         with warnings.catch_warnings(), _suppress_stdout_only():
                             warnings.filterwarnings(
                                 "ignore",
                                 message=r".*huggingface_hub.*cache-system uses symlinks.*",
                             )
-                            self._video_processor = AutoProcessor.from_pretrained(
+                            self._video_processor = AutoProcessor.from_pretrained(  # nosec B615
                                 self._video_model_name,
                                 use_fast=False,
                             )
-                            self._video_model = AutoModel.from_pretrained(self._video_model_name)
+                            self._video_model = AutoModel.from_pretrained(self._video_model_name)  # nosec B615
                 finally:
                     hf_logging.set_verbosity(previous_hf_verbosity)
                 try:
