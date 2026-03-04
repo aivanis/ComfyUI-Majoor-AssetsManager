@@ -36,11 +36,11 @@ async def test_generate_enhanced_prompt_stores_caption():
     out = await m.generate_enhanced_prompt(db, vs, 7)
 
     assert out.ok
-    assert out.data == "Title: Long enhanced caption\nCaption: long enhanced caption"
+    assert out.data == "long enhanced caption"
     assert db.writes
     sql, params = db.writes[0]
     assert "UPDATE assets" in sql
-    assert params == ("Title: Long enhanced caption\nCaption: long enhanced caption", 7)
+    assert params == ("long enhanced caption", 7)
 
 
 @pytest.mark.asyncio
@@ -64,14 +64,21 @@ async def test_generate_enhanced_prompt_rejects_non_image():
     assert out.code == "INVALID_INPUT"
 
 
-def test_normalise_title_caption_wraps_plain_caption():
+def test_normalise_title_caption_keeps_plain_caption():
     from mjr_am_backend.features.index import vector_indexer as m
 
     out = m._normalise_title_caption("a cinematic robot portrait in neon rain")
-    assert out == (
-        "Title: A cinematic robot portrait in neon rain\n"
-        "Caption: a cinematic robot portrait in neon rain"
+    assert out == "a cinematic robot portrait in neon rain"
+
+
+def test_normalise_title_caption_strips_legacy_labels_and_trailing_delimiters():
+    from mjr_am_backend.features.index import vector_indexer as m
+
+    out = m._normalise_title_caption(
+        "Title: The image is a photograph of a young\n"
+        "Caption: The image is a photograph of a young woman lying on a bed::"
     )
+    assert out == "The image is a photograph of a young woman lying on a bed"
 
 
 def test_extract_prompt_from_metadata_prefers_geninfo_positive_value():

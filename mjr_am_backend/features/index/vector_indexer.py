@@ -35,8 +35,6 @@ from .vector_service import VectorService, vector_to_blob
 
 logger = get_logger(__name__)
 
-_TITLE_LINE_RE = re.compile(r"(?im)^\s*title\s*:\s*(.+)$")
-_CAPTION_LINE_RE = re.compile(r"(?im)^\s*caption\s*:\s*(.+)$")
 _NEG_PROMPT_MARKER_RE = re.compile(r"(?:^|\n)\s*negative prompt:\s*", re.IGNORECASE)
 _STEPS_MARKER_RE = re.compile(r"(?:^|\n)\s*steps\s*:\s*\d+", re.IGNORECASE)
 
@@ -488,59 +486,27 @@ def _sanitize_prompt_text(value: str) -> str:
     return _normalise_whitespace(base).strip(" ,")
 
 
-def _derive_title_from_caption(caption: str) -> str:
-    cleaned = _normalise_whitespace(caption)
-    if not cleaned:
-        return ""
-
-    first_chunk = re.split(r"[.!?;:\n]", cleaned, maxsplit=1)[0].strip()
-    source = first_chunk or cleaned
-    words = [w for w in source.split(" ") if w]
-    if len(words) > 8:
-        source = " ".join(words[:8]).strip()
-    source = source.strip(" ,.-")
-    if not source:
-        return ""
-    if len(source) == 1:
-        return source.upper()
-    return source[0].upper() + source[1:]
-
-
 def _normalise_title_caption(raw_caption: str, *, fallback_title: str = "Untitled") -> str:
+    _ = fallback_title
     raw = str(raw_caption or "").strip()
     if not raw:
         return ""
 
-    title = ""
-    caption = ""
-
-    title_match = _TITLE_LINE_RE.search(raw)
-    if title_match:
-        title = _normalise_whitespace(title_match.group(1))
-
-    caption_match = _CAPTION_LINE_RE.search(raw)
-    if caption_match:
-        caption = _normalise_whitespace(caption_match.group(1))
-
-    if not caption:
-        lines: list[str] = []
-        for line in raw.replace("\r\n", "\n").split("\n"):
-            item = str(line or "").strip()
-            if not item:
-                continue
-            low = item.lower()
-            if low.startswith("title:"):
-                continue
-            if low.startswith("caption:"):
-                item = item.split(":", 1)[1].strip()
+    lines: list[str] = []
+    for line in raw.replace("\r\n", "\n").split("\n"):
+        item = str(line or "").strip()
+        if not item:
+            continue
+        low = item.lower()
+        if low.startswith("title:"):
+            continue
+        if low.startswith("caption:"):
+            item = item.split(":", 1)[1].strip()
+        if item:
             lines.append(item)
-        caption = _normalise_whitespace(" ".join(lines)) or _normalise_whitespace(raw)
 
-    if not title:
-        title = _derive_title_from_caption(caption)
-    if not title:
-        title = _normalise_whitespace(fallback_title) or "Untitled"
-    if not caption:
-        caption = title
-
-    return f"Title: {title}\nCaption: {caption}"
+    caption = _normalise_whitespace(" ".join(lines)) or _normalise_whitespace(raw)
+    caption = re.sub(r"(?i)^\s*(?:title|caption)\s*:\s*", "", caption).strip()
+    # Some truncated generations end with delimiter artifacts such as "::".
+    caption = re.sub(r":{2,}\s*$", "", caption).strip()
+    return caption

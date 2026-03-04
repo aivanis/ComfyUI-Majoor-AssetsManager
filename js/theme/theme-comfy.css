@@ -2397,6 +2397,24 @@
     background: color-mix(in srgb, var(--mjr-surface-2) 80%, var(--mjr-status-success) 12%);
 }
 
+/* Pop-in mode (viewer popped out): raise button contrast/brightness */
+.mjr-mfv.mjr-mfv--popped .mjr-icon-btn {
+    border-color: color-mix(in srgb, var(--mjr-border) 40%, #ffffff 60%);
+    background: color-mix(in srgb, var(--mjr-surface-2) 65%, #ffffff 18%);
+    color: color-mix(in srgb, var(--content-fg, #ddd) 75%, #ffffff 25%);
+}
+
+.mjr-mfv.mjr-mfv--popped .mjr-icon-btn:hover {
+    border-color: color-mix(in srgb, var(--mjr-accent) 50%, #ffffff 50%);
+    background: color-mix(in srgb, var(--mjr-surface-2) 55%, #ffffff 30%);
+}
+
+.mjr-mfv .mjr-icon-btn.mjr-popin-active {
+    border-color: color-mix(in srgb, var(--mjr-accent) 58%, #ffffff 42%);
+    background: color-mix(in srgb, var(--mjr-surface-2) 45%, var(--mjr-accent) 55%);
+    color: #eef7ff;
+}
+
 /* ── Content area ────────────────────────────────────────────────────── */
 .mjr-mfv-content {
     flex: 1;
@@ -2475,6 +2493,10 @@
     resize: both;
     overflow: hidden;
     z-index: 10000;
+}
+
+.mjr-mfv.mjr-mfv--resizing {
+    user-select: none;
 }
 
 .mjr-mfv.is-visible {

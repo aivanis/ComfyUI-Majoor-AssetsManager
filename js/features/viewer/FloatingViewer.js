@@ -23,6 +23,7 @@ export const MFV_MODES = Object.freeze({
 const MFV_ZOOM_MIN    = 0.25;
 const MFV_ZOOM_MAX    = 8;
 const MFV_ZOOM_FACTOR = 0.0008; // multiplied by deltaY per wheel tick
+const MFV_RESIZE_EDGE_HIT_PX = 8;
 
 // Media extensions for explicit kind detection.
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".mov", ".avi", ".mkv"]);
@@ -220,6 +221,10 @@ export class FloatingViewer {
         this._previewBtn      = null;
         this._previewBlobUrl  = null;
         this._previewActive   = false;
+
+        // Panel-level listeners and edge-resize state.
+        this._panelAC      = new AbortController();
+        this._resizeState  = null;
     }
 
     // ── Build DOM ─────────────────────────────────────────────────────────────
@@ -236,6 +241,7 @@ export class FloatingViewer {
         this._contentEl.className = "mjr-mfv-content";
         el.appendChild(this._contentEl);
 
+        this._initEdgeResize(el);
         this._initDrag(el.querySelector(".mjr-mfv-header"));
         this._refresh();
         return el;
@@ -1027,6 +1033,7 @@ export class FloatingViewer {
         // Destroy pan/zoom so _dragging and pointer-capture state are reset cleanly
         // even if hide() is called mid-drag (NM-5).
         this._destroyPanZoom();
+        this._stopEdgeResize();
         this.element.classList.remove("is-visible");
         this.isVisible = false;
     }
@@ -1041,6 +1048,7 @@ export class FloatingViewer {
     popOut() {
         if (this._isPopped || !this.element) return;
         const el = this.element;
+        this._stopEdgeResize();
 
         // Remember size for the popup
         const w = Math.max(el.offsetWidth  || 520, 400);
@@ -1138,6 +1146,10 @@ export class FloatingViewer {
     /** Toggle pop-out button icon between external-link (pop out) and sign-in (pop in). */
     _updatePopoutBtnUI() {
         if (!this._popoutBtn) return;
+        if (this.element) {
+            this.element.classList.toggle("mjr-mfv--popped", this._isPopped);
+        }
+        this._popoutBtn.classList.toggle("mjr-popin-active", this._isPopped);
         const icon = this._popoutBtn.querySelector("i") || document.createElement("i");
         if (this._isPopped) {
             icon.className = "pi pi-sign-in";
@@ -1154,6 +1166,155 @@ export class FloatingViewer {
     /** Whether the viewer is currently in a pop-out window. */
     get isPopped() { return this._isPopped; }
 
+    _resizeCursorForDirection(dir) {
+        const map = {
+            n: "ns-resize",
+            s: "ns-resize",
+            e: "ew-resize",
+            w: "ew-resize",
+            ne: "nesw-resize",
+            nw: "nwse-resize",
+            se: "nwse-resize",
+            sw: "nesw-resize",
+        };
+        return map[dir] || "";
+    }
+
+    _getResizeDirectionFromPoint(clientX, clientY, rect) {
+        if (!rect) return "";
+        const nearLeft = clientX <= rect.left + MFV_RESIZE_EDGE_HIT_PX;
+        const nearRight = clientX >= rect.right - MFV_RESIZE_EDGE_HIT_PX;
+        const nearTop = clientY <= rect.top + MFV_RESIZE_EDGE_HIT_PX;
+        const nearBottom = clientY >= rect.bottom - MFV_RESIZE_EDGE_HIT_PX;
+        if (nearTop && nearLeft) return "nw";
+        if (nearTop && nearRight) return "ne";
+        if (nearBottom && nearLeft) return "sw";
+        if (nearBottom && nearRight) return "se";
+        if (nearTop) return "n";
+        if (nearBottom) return "s";
+        if (nearLeft) return "w";
+        if (nearRight) return "e";
+        return "";
+    }
+
+    _stopEdgeResize() {
+        if (!this.element) return;
+        if (this._resizeState?.pointerId != null) {
+            try { this.element.releasePointerCapture(this._resizeState.pointerId); } catch (e) { console.debug?.(e); }
+        }
+        this._resizeState = null;
+        this.element.classList.remove("mjr-mfv--resizing");
+        this.element.style.cursor = "";
+    }
+
+    _initEdgeResize(el) {
+        if (!el) return;
+        const resolveDir = (e) => {
+            if (!this.element || this._isPopped) return "";
+            const rect = this.element.getBoundingClientRect();
+            return this._getResizeDirectionFromPoint(e.clientX, e.clientY, rect);
+        };
+        const signal = this._panelAC?.signal;
+
+        const onPointerDown = (e) => {
+            if (e.button !== 0 || !this.element || this._isPopped) return;
+            const dir = resolveDir(e);
+            if (!dir) return;
+            // Edge resize takes priority over drag interactions.
+            e.preventDefault();
+            e.stopPropagation();
+            const rect = this.element.getBoundingClientRect();
+            const style = window.getComputedStyle(this.element);
+            const minWidth = Math.max(120, Number.parseFloat(style.minWidth) || 0);
+            const minHeight = Math.max(100, Number.parseFloat(style.minHeight) || 0);
+            this._resizeState = {
+                pointerId: e.pointerId,
+                dir,
+                startX: e.clientX,
+                startY: e.clientY,
+                startLeft: rect.left,
+                startTop: rect.top,
+                startWidth: rect.width,
+                startHeight: rect.height,
+                minWidth,
+                minHeight,
+            };
+            this.element.style.left = `${Math.round(rect.left)}px`;
+            this.element.style.top = `${Math.round(rect.top)}px`;
+            this.element.style.right = "auto";
+            this.element.style.bottom = "auto";
+            this.element.classList.add("mjr-mfv--resizing");
+            this.element.style.cursor = this._resizeCursorForDirection(dir);
+            try { this.element.setPointerCapture(e.pointerId); } catch (err) { console.debug?.(err); }
+        };
+
+        const onPointerMove = (e) => {
+            if (!this.element || this._isPopped) return;
+            const state = this._resizeState;
+            if (!state) {
+                const dir = resolveDir(e);
+                this.element.style.cursor = dir ? this._resizeCursorForDirection(dir) : "";
+                return;
+            }
+            if (state.pointerId !== e.pointerId) return;
+
+            const dx = e.clientX - state.startX;
+            const dy = e.clientY - state.startY;
+            let width = state.startWidth;
+            let height = state.startHeight;
+            let left = state.startLeft;
+            let top = state.startTop;
+
+            if (state.dir.includes("e")) width = state.startWidth + dx;
+            if (state.dir.includes("s")) height = state.startHeight + dy;
+            if (state.dir.includes("w")) {
+                width = state.startWidth - dx;
+                left = state.startLeft + dx;
+            }
+            if (state.dir.includes("n")) {
+                height = state.startHeight - dy;
+                top = state.startTop + dy;
+            }
+
+            if (width < state.minWidth) {
+                if (state.dir.includes("w")) left -= (state.minWidth - width);
+                width = state.minWidth;
+            }
+            if (height < state.minHeight) {
+                if (state.dir.includes("n")) top -= (state.minHeight - height);
+                height = state.minHeight;
+            }
+
+            width = Math.min(width, Math.max(state.minWidth, window.innerWidth));
+            height = Math.min(height, Math.max(state.minHeight, window.innerHeight));
+            left = Math.min(Math.max(0, left), Math.max(0, window.innerWidth - width));
+            top = Math.min(Math.max(0, top), Math.max(0, window.innerHeight - height));
+
+            this.element.style.width = `${Math.round(width)}px`;
+            this.element.style.height = `${Math.round(height)}px`;
+            this.element.style.left = `${Math.round(left)}px`;
+            this.element.style.top = `${Math.round(top)}px`;
+            this.element.style.right = "auto";
+            this.element.style.bottom = "auto";
+        };
+
+        const onPointerEnd = (e) => {
+            if (!this.element || !this._resizeState) return;
+            if (this._resizeState.pointerId !== e.pointerId) return;
+            const dir = resolveDir(e);
+            this._stopEdgeResize();
+            if (dir) this.element.style.cursor = this._resizeCursorForDirection(dir);
+        };
+
+        el.addEventListener("pointerdown", onPointerDown, { capture: true, signal });
+        el.addEventListener("pointermove", onPointerMove, { signal });
+        el.addEventListener("pointerup", onPointerEnd, { signal });
+        el.addEventListener("pointercancel", onPointerEnd, { signal });
+        el.addEventListener("pointerleave", () => {
+            if (!this._resizeState && this.element) this.element.style.cursor = "";
+        }, { signal });
+    }
+
     // ── Drag ──────────────────────────────────────────────────────────────────
 
     _initDrag(handle) {
@@ -1161,6 +1322,14 @@ export class FloatingViewer {
         handle.addEventListener("pointerdown", (e) => {
             if (e.button !== 0) return;
             if (e.target.closest("button")) return; // Don't drag when clicking buttons
+            if (this._isPopped || !this.element) return;
+            // Let edge-resize take precedence when pointer is near panel borders.
+            const edgeDir = this._getResizeDirectionFromPoint(
+                e.clientX,
+                e.clientY,
+                this.element.getBoundingClientRect()
+            );
+            if (edgeDir) return;
             e.preventDefault();
             handle.setPointerCapture(e.pointerId);
 
@@ -1451,6 +1620,8 @@ export class FloatingViewer {
 
     dispose() {
         this._destroyPanZoom();
+        this._stopEdgeResize();
+        try { this._panelAC?.abort(); this._panelAC = null; } catch (e) { console.debug?.(e); }
         // Abort all button click listeners in one call (NM-1).
         try { this._btnAC?.abort(); this._btnAC = null; } catch (e) { console.debug?.(e); }
         // Pop-in before disposing so the element returns to the main document

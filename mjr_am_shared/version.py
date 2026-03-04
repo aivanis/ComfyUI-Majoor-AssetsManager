@@ -14,11 +14,16 @@ class VersionInfo(TypedDict):
 
 
 _NIGHTLY_KEYWORDS = ("nightly", "dev", "alpha", "experimental")
+_CHANNEL_MARKER_FILES = (".mjr_channel", ".majoor_channel", ".mjr_release_channel")
+
+
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parent.parent
 
 
 def _find_pyproject_version() -> str:
     try:
-        root = Path(__file__).resolve().parent.parent
+        root = _repo_root()
         pyproject_path = root / "pyproject.toml"
         if not pyproject_path.exists():
             return "0.0.0"
@@ -47,7 +52,7 @@ def _resolve_branch_from_env() -> str:
 @lru_cache(maxsize=16)
 def _run_git(*args: str) -> str:
     try:
-        root = Path(__file__).resolve().parent.parent
+        root = _repo_root()
         result = subprocess.run(
             ["git", "-C", str(root), *args],
             capture_output=True,
@@ -75,6 +80,43 @@ def _looks_nightly(value: str) -> bool:
     return any(k in lowered for k in _NIGHTLY_KEYWORDS)
 
 
+def _normalize_channel(channel: str) -> str:
+    value = str(channel or "").strip().lower()
+    if not value:
+        return ""
+    if _looks_nightly(value):
+        return "nightly"
+    if value in {"stable", "latest", "release", "main", "master"}:
+        return "main"
+    return value
+
+
+def _resolve_branch_from_channel_marker() -> str:
+    root = _repo_root()
+    for marker_name in _CHANNEL_MARKER_FILES:
+        try:
+            marker_path = root / marker_name
+            if not marker_path.exists():
+                continue
+            raw = marker_path.read_text(encoding="utf-8").strip()
+            normalized = _normalize_channel(raw)
+            if normalized:
+                return normalized
+        except Exception:
+            continue
+    return ""
+
+
+def _resolve_branch_from_path() -> str:
+    try:
+        root_name = _repo_root().name
+        if _looks_nightly(root_name):
+            return "nightly"
+    except Exception:
+        pass
+    return ""
+
+
 def _is_nightly_checkout(version: str, branch: str) -> bool:
     if _looks_nightly(branch) or _looks_nightly(version):
         return True
@@ -93,11 +135,19 @@ def _is_nightly_checkout(version: str, branch: str) -> bool:
 def _resolve_branch(version: str) -> str:
     env_branch = _resolve_branch_from_env()
     if env_branch:
-        return env_branch
+        return _normalize_channel(env_branch)
+
+    marker_branch = _resolve_branch_from_channel_marker()
+    if marker_branch:
+        return marker_branch
 
     git_branch = _resolve_branch_from_git()
     if git_branch:
-        return git_branch
+        return _normalize_channel(git_branch)
+
+    path_branch = _resolve_branch_from_path()
+    if path_branch:
+        return path_branch
 
     if _is_nightly_checkout(version, ""):
         return "nightly"

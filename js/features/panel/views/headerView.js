@@ -10,6 +10,7 @@ import {
 import { EVENTS } from "../../../app/events.js";
 
 let _extensionMetadataPromise = null;
+const VERSION_BADGE_LABEL_CLASS = "mjr-am-version-badge-label";
 
 function getExtensionMetadata() {
     if (!_extensionMetadataPromise) {
@@ -22,12 +23,52 @@ function getExtensionMetadata() {
     return _extensionMetadataPromise;
 }
 
+function getVersionBadgeLabelEl(badge) {
+    try {
+        return badge?.querySelector?.(`.${VERSION_BADGE_LABEL_CLASS}`) || null;
+    } catch {
+        return null;
+    }
+}
+
+function readVersionBadgeText(badge) {
+    const label = getVersionBadgeLabelEl(badge);
+    return String(label?.textContent || badge?.textContent || "").trim();
+}
+
+function setVersionBadgeText(badge, text, { channel = "" } = {}) {
+    const label = getVersionBadgeLabelEl(badge);
+    if (label) {
+        label.textContent = String(text || "");
+    } else if (badge) {
+        badge.textContent = String(text || "");
+    }
+    if (badge) {
+        try {
+            if (channel) {
+                badge.dataset.mjrVersionChannel = channel;
+            }
+        } catch (e) { console.debug?.(e); }
+    }
+}
+
+function isNightlyVersion(version, branch = "") {
+    const v = String(version || "").trim().toLowerCase();
+    const b = String(branch || "").trim().toLowerCase();
+    const nightlyKeywords = ["nightly", "dev", "alpha", "experimental"];
+    const hasNightlyKeyword = nightlyKeywords.some((kw) => v.includes(kw) || b.includes(kw));
+    const hasCommitHash = v.includes("+") || (v.length > 10 && /^[a-f0-9]+$/i.test(v));
+    return hasNightlyKeyword || hasCommitHash;
+}
+
 function applyExtensionMetadata(badge, isNightly) {
     getExtensionMetadata().then((info) => {
-        if (!isNightly) {
+        const alreadyNightly = String(badge?.dataset?.mjrVersionChannel || "").trim().toLowerCase() === "nightly"
+            || readVersionBadgeText(badge).toLowerCase() === "nightly";
+        if (!isNightly && !alreadyNightly) {
             const version = (typeof info?.version === "string" ? info.version.trim() : "") || "";
             if (version) {
-                badge.textContent = `v${version}`;
+                setVersionBadgeText(badge, `v${version}`, { channel: "stable" });
             }
         }
     }).catch(() => {
@@ -43,12 +84,12 @@ async function hydrateBackendVersionBadge(badge, isNightly) {
         }
         const version = String(result.data?.version || "").trim();
         const branch = String(result.data?.branch || "").trim().toLowerCase();
-        if (branch === "nightly" || version.toLowerCase() === "nightly" || isNightly) {
-            badge.textContent = "nightly";
+        if (isNightlyVersion(version, branch) || isNightly) {
+            setVersionBadgeText(badge, "nightly", { channel: "nightly" });
             return;
         }
         if (version) {
-            badge.textContent = version.startsWith("v") ? version : `v${version}`;
+            setVersionBadgeText(badge, version.startsWith("v") ? version : `v${version}`, { channel: "stable" });
         }
     } catch {
         // ignore
@@ -89,7 +130,7 @@ function resolveRuntimeBranch() {
             return String(process.env.MAJOR_ASSETS_MANAGER_BRANCH);
         }
     } catch (e) { console.debug?.(e); }
-    return "main";
+    return "";
 }
 
 export function createHeaderView() {
@@ -122,7 +163,7 @@ export function createHeaderView() {
     versionBadge.rel = "noopener noreferrer";
     versionBadge.className = "mjr-am-version-badge";
     versionBadge.style.position = "relative";
-    versionBadge.textContent = isNightly ? "nightly" : `v${version}`;
+    versionBadge.dataset.mjrVersionChannel = isNightly ? "nightly" : "stable";
     versionBadge.title = t("tooltip.supportKofi");
     versionBadge.style.cssText = `
         font-size: 10px;
@@ -146,7 +187,12 @@ export function createHeaderView() {
         versionBadge.style.background = "rgba(255, 255, 255, 0.08)";
     };
 
+    const versionLabel = document.createElement("span");
+    versionLabel.className = VERSION_BADGE_LABEL_CLASS;
+    versionLabel.textContent = isNightly ? "nightly" : `v${version}`;
+
     const versionDot = createVersionDot();
+    versionBadge.appendChild(versionLabel);
     versionBadge.appendChild(versionDot);
 
     headerLeft.appendChild(headerIcon);
@@ -195,6 +241,12 @@ export function createHeaderView() {
     header.appendChild(headerRow);
 
     const applyDotState = (state) => {
+        const stateChannel = String(state?.channel || "").trim().toLowerCase();
+        const stateCurrent = String(state?.current || "").trim().toLowerCase();
+        const stateLatest = String(state?.latest || "").trim().toLowerCase();
+        if (stateChannel === "nightly" || stateCurrent === "nightly" || stateLatest === "nightly") {
+            setVersionBadgeText(versionBadge, "nightly", { channel: "nightly" });
+        }
         updateVersionDot(versionDot, Boolean(state?.available));
     };
     try {

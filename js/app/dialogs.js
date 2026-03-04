@@ -14,6 +14,43 @@ const getComfyUi = () => {
     }
 };
 
+const getExtensionManagerDialog = () => {
+    try {
+        const app = getComfyApp();
+        const dlg = app?.extensionManager?.dialog || app?.ui?.extensionManager?.dialog || null;
+        if (dlg && typeof dlg.confirm === "function" && typeof dlg.prompt === "function") {
+            return dlg;
+        }
+    } catch (e) { console.debug?.(e); }
+    try {
+        const app = typeof window !== "undefined" ? window?.app : null;
+        const dlg = app?.extensionManager?.dialog || null;
+        if (dlg && typeof dlg.confirm === "function" && typeof dlg.prompt === "function") {
+            return dlg;
+        }
+    } catch (e) { console.debug?.(e); }
+    return null;
+};
+
+const getNativeDialog = () => {
+    try {
+        const ui = getComfyUi();
+        if (ui?.dialog && typeof ui.dialog.show === "function") {
+            return ui.dialog;
+        }
+    } catch (e) { console.debug?.(e); }
+    return null;
+};
+
+const toNativeDialogMessage = (message, title = "Majoor") => {
+    const msg = String(message ?? "");
+    const ttl = String(title ?? "").trim();
+    if (!ttl || ttl.toLowerCase() === "majoor") {
+        return msg;
+    }
+    return `${ttl}<br><br>${msg}`;
+};
+
 const BLOCKED_PROP_KEYS = new Set(["__proto__", "constructor", "prototype", "innerHTML", "outerHTML", "srcdoc"]);
 const ALLOWED_DIRECT_PROPS = new Set([
     "id",
@@ -123,7 +160,21 @@ const hideDialogNativeClose = (dialog) => {
     } catch (e) { console.debug?.(e); }
 };
 
-export const comfyAlert = async (message, title = "Majoor") => {
+export const comfyAlert = async (message, title = "Majoor", options = {}) => {
+    const forceNative = options?.native !== false;
+    if (forceNative) {
+        const nativeDialog = getNativeDialog();
+        if (nativeDialog) {
+            try {
+                nativeDialog.show(toNativeDialogMessage(message, title));
+                try {
+                    nativeDialog.element.style.zIndex = "1100";
+                } catch (e) { console.debug?.(e); }
+                return;
+            } catch (e) { console.debug?.(e); }
+        }
+    }
+
     const Dialog = getComfyDialogCtor();
     if (!Dialog) {
         try {
@@ -209,6 +260,17 @@ export const comfyAlert = async (message, title = "Majoor") => {
 };
 
 export const comfyConfirm = async (message, title = "Majoor") => {
+    const extensionDialog = getExtensionManagerDialog();
+    if (extensionDialog) {
+        try {
+            const result = await extensionDialog.confirm({
+                title: String(title || "Confirm"),
+                message: String(message || ""),
+            });
+            return !!result;
+        } catch (e) { console.debug?.(e); }
+    }
+
     const Dialog = getComfyDialogCtor();
     if (!Dialog) {
         try {
@@ -309,6 +371,19 @@ export const comfyConfirm = async (message, title = "Majoor") => {
 };
 
 export const comfyPrompt = async (message, defaultValue = "", title = "Majoor") => {
+    const extensionDialog = getExtensionManagerDialog();
+    if (extensionDialog) {
+        try {
+            const result = await extensionDialog.prompt({
+                title: String(title || "Prompt"),
+                message: String(message || ""),
+                defaultValue: String(defaultValue ?? ""),
+            });
+            if (result === null || result === undefined) return null;
+            return String(result);
+        } catch (e) { console.debug?.(e); }
+    }
+
     const Dialog = getComfyDialogCtor();
     if (!Dialog) {
         try {

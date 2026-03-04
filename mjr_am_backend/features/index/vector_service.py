@@ -34,7 +34,7 @@ import threading
 import time
 import warnings
 import hashlib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -1267,7 +1267,9 @@ class VectorService:
                     generate_kwargs: dict[str, Any] = {
                         "input_ids": input_ids,
                         "pixel_values": pixel_values,
-                        "max_new_tokens": 64,
+                        # Keep enough room for long descriptive outputs to avoid
+                        # truncation in the middle of a sentence.
+                        "max_new_tokens": 256,
                         "num_beams": 1,
                         "do_sample": False,
                         "use_cache": False,
@@ -1499,12 +1501,70 @@ class VectorService:
                 import torch
 
                 rgb_frames = [f.convert("RGB") for f in frames]
+                if not rgb_frames:
+                    raise RuntimeError("No RGB frames available for X-CLIP embedding")
+
+                def _get_field(container: Any, field: str) -> Any:
+                    try:
+                        getter = getattr(container, "get", None)
+                        if callable(getter):
+                            return getter(field)
+                    except Exception:
+                        pass
+                    try:
+                        return container[field]
+                    except Exception:
+                        pass
+                    try:
+                        return getattr(container, field)
+                    except Exception:
+                        return None
+
+                def _try_processor(**kwargs: Any) -> Any:
+                    try:
+                        return processor(**kwargs)
+                    except Exception:
+                        return None
+
                 with torch.inference_mode():
-                    inputs = processor(images=rgb_frames, return_tensors="pt", padding=True)
+                    inputs: Any | None = None
+                    pixel_values: Any | None = None
+                    # Some processor/model combos return non-mapping values for
+                    # `images=[...]` (seen in the field). Probe fallback signatures
+                    # and extract `pixel_values` defensively.
+                    processor_calls: list[dict[str, Any]] = [
+                        {"images": rgb_frames, "return_tensors": "pt", "padding": True},
+                        {"videos": [rgb_frames], "return_tensors": "pt", "padding": True},
+                        {"videos": rgb_frames, "return_tensors": "pt", "padding": True},
+                        {"images": rgb_frames[0], "return_tensors": "pt"},
+                    ]
+                    for kwargs in processor_calls:
+                        out = _try_processor(**kwargs)
+                        if out is None:
+                            continue
+                        inputs = out
+                        pixel_values = _get_field(out, "pixel_values")
+                        if pixel_values is None and hasattr(out, "shape") and hasattr(out, "dtype"):
+                            pixel_values = out
+                        if pixel_values is not None:
+                            break
+
                     if hasattr(model, "get_image_features"):
-                        feats = model.get_image_features(pixel_values=inputs["pixel_values"])
+                        if pixel_values is None:
+                            raise RuntimeError("X-CLIP processor returned no pixel_values")
+                        feats = model.get_image_features(pixel_values=pixel_values)
                     else:
-                        out = model(**inputs)
+                        model_inputs: dict[str, Any] = {}
+                        if isinstance(inputs, Mapping):
+                            try:
+                                model_inputs = dict(inputs)
+                            except Exception:
+                                model_inputs = {}
+                        if not model_inputs and pixel_values is not None:
+                            model_inputs = {"pixel_values": pixel_values}
+                        if not model_inputs:
+                            raise RuntimeError("X-CLIP processor returned no usable model inputs")
+                        out = model(**model_inputs)
                         feats = getattr(out, "pooler_output", None)
                         if feats is None:
                             feats = getattr(out, "last_hidden_state", None)
@@ -1533,11 +1593,11 @@ def _normalise_vector(vec: Any) -> list[float]:
     try:
         import numpy as np  # noqa: F811
 
-        arr = np.asarray(vec, dtype=np.float32).flatten()
-        norm = np.linalg.norm(arr)
-        if norm > 0:
-            arr = arr / norm
-        return [float(x) for x in arr.tolist()]
+        arr_np = np.asarray(vec, dtype=np.float32).flatten()
+        norm_np = float(np.linalg.norm(arr_np))
+        if norm_np > 0.0:
+            arr_np = arr_np / np.float32(norm_np)
+        return [float(x) for x in arr_np.tolist()]
     except Exception:
         pass
 
@@ -1554,13 +1614,13 @@ def _normalise_vector(vec: Any) -> list[float]:
         except Exception:
             return []
 
-    arr = _flatten_floats(vec)
-    if not arr:
+    arr_list = _flatten_floats(vec)
+    if not arr_list:
         return []
-    norm = math.sqrt(sum(v * v for v in arr))
-    if norm > 0:
-        arr = [v / norm for v in arr]
-    return arr
+    norm_list = math.sqrt(sum(v * v for v in arr_list))
+    if norm_list > 0.0:
+        arr_list = [v / norm_list for v in arr_list]
+    return arr_list
 
 
 def _coerce_vector_dim(vec: list[float], dim: int) -> list[float]:

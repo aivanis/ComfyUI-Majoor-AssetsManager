@@ -22,6 +22,7 @@ jobs:
       - name: Create Archive
         # Réutilisation de la logique d'exclusion du ps1
         run: |
+          rm -f .mjr_channel .majoor_channel .mjr_release_channel
           zip -r ComfyUI-Majoor-AssetsManager_release.zip . \
           -x "*.git/*" \
           -x ".github/*" \

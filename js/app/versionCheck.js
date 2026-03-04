@@ -8,9 +8,12 @@ import { SettingsStore } from "./settings/SettingsStore.js";
 export const VERSION_UPDATE_EVENT = "mjr:version-update-available";
 const VERSION_UPDATE_STATE_KEY = "__MJR_VERSION_UPDATE_STATE__";
 const LATEST_RELEASE_URL = "https://api.github.com/repos/MajoorWaldi/ComfyUI-Majoor-AssetsManager/releases/latest";
+const NIGHTLY_RELEASE_URL = "https://api.github.com/repos/MajoorWaldi/ComfyUI-Majoor-AssetsManager/releases/tags/nightly";
 const LAST_CHECK_KEY = "majoor_last_update_check";
 const VERSION_TOAST_NOTICE_VERSION_KEY = "majoor_version_toast_notice_version";
 const DB_RESET_NOTICE_VERSION_KEY = "majoor_db_reset_notice_version";
+const AI_FEATURES_NOTICE_LOCAL_BUILD_KEY = "majoor_ai_features_notice_local_build";
+const NIGHTLY_RELEASE_MARKER_KEY = "majoor_nightly_release_marker";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
 let _versionUpdateState = { available: false, timestamp: Date.now() };
@@ -87,9 +90,9 @@ function createFetchTimeoutSignal(timeoutMs) {
     return { signal: undefined, cleanup: () => {} };
 }
 
-async function fetchLatestReleaseVersion() {
+async function fetchReleasePayload(url) {
     const { signal, cleanup } = createFetchTimeoutSignal(10_000);
-    const response = await fetch(LATEST_RELEASE_URL, {
+    const response = await fetch(url, {
         cache: "no-cache",
         signal,
         headers: {
@@ -103,7 +106,25 @@ async function fetchLatestReleaseVersion() {
     if (!payload || typeof payload !== "object") {
         throw new Error("GitHub release returned invalid payload");
     }
+    return payload;
+}
+
+async function fetchLatestReleaseVersion() {
+    const payload = await fetchReleasePayload(LATEST_RELEASE_URL);
     return normalizeVersion(payload.tag_name);
+}
+
+async function fetchNightlyReleaseMarker() {
+    const payload = await fetchReleasePayload(NIGHTLY_RELEASE_URL);
+    const marker = String(
+        payload.published_at
+        || payload.created_at
+        || payload.updated_at
+        || payload.target_commitish
+        || payload.tag_name
+        || ""
+    ).trim();
+    return marker;
 }
 
 function emitVersionUpdateState(state) {
@@ -123,20 +144,38 @@ export function getStoredVersionUpdateState() {
     return _versionUpdateState;
 }
 
+function buildLocalNoticeKey(localVersion, branch) {
+    const v = String(localVersion || "unknown").trim().toLowerCase();
+    const b = String(branch || "unknown").trim().toLowerCase();
+    return `${v}::${b}`;
+}
+
+function showAiFeaturesNoticeOnce(localVersion, branch) {
+    try {
+        const buildKey = buildLocalNoticeKey(localVersion, branch);
+        const alreadyShownFor = String(SettingsStore.get(AI_FEATURES_NOTICE_LOCAL_BUILD_KEY) || "").trim();
+        if (alreadyShownFor === buildKey) return;
+
+        setTimeout(() => {
+            comfyAlert(
+                t(
+                    "msg.aiFeaturesNotice",
+                    "Avertissement / Warning:\n\nAssets Manager now includes AI features like auto captions, AI search, smart collections, etc.\nThese features are still WIP.\n\nIf you already had Assets Manager installed, delete the DB first.\nWhen enrich is finished, run Vector Backfill for your existing assets."
+                ),
+                "Majoor",
+                { native: true }
+            );
+        }, 700);
+
+        try {
+            SettingsStore.set(AI_FEATURES_NOTICE_LOCAL_BUILD_KEY, buildKey);
+        } catch (e) { console.debug?.(e); }
+    } catch (e) { console.debug?.(e); }
+}
+
 export async function checkMajoorVersion({ force = false } = {}) {
     if (typeof window === "undefined") {
         return null;
-    }
-
-    try {
-        if (!force) {
-            const lastCheck = Number(SettingsStore.get(LAST_CHECK_KEY) || 0);
-            if (Number.isFinite(lastCheck) && Date.now() - lastCheck < CHECK_INTERVAL_MS) {
-                return null;
-            }
-        }
-    } catch {
-        // localStorage might be disabled; continue without caching
     }
 
     let localVersion = "";
@@ -154,9 +193,71 @@ export async function checkMajoorVersion({ force = false } = {}) {
         return null;
     }
 
+    showAiFeaturesNoticeOnce(localVersion, branch);
+    let skipRemoteCheck = false;
+    try {
+        if (!force) {
+            const lastCheck = Number(SettingsStore.get(LAST_CHECK_KEY) || 0);
+            if (Number.isFinite(lastCheck) && Date.now() - lastCheck < CHECK_INTERVAL_MS) {
+                skipRemoteCheck = true;
+            }
+        }
+    } catch {
+        // localStorage might be disabled; continue without caching
+    }
+
     if (!localVersion || isNightly(localVersion, branch)) {
-        console.log("Majoor: Nightly/development build detected. Skipping update check.");
-        emitVersionUpdateState({ available: false });
+        if (skipRemoteCheck) {
+            emitVersionUpdateState({ available: false });
+            return null;
+        }
+
+        let nightlyMarker = "";
+        try {
+            nightlyMarker = await fetchNightlyReleaseMarker();
+            const previousMarker = String(SettingsStore.get(NIGHTLY_RELEASE_MARKER_KEY) || "").trim();
+            const updateAvailable = Boolean(previousMarker && nightlyMarker && previousMarker !== nightlyMarker);
+
+            emitVersionUpdateState({
+                available: updateAvailable,
+                current: localVersion || "nightly",
+                latest: "nightly",
+                channel: "nightly",
+            });
+
+            if (updateAvailable) {
+                comfyToast(
+                    {
+                        summary: t("msg.nightlyUpdateTitle", "Majoor Assets Manager"),
+                        detail: t(
+                            "msg.nightlyUpdateDetail",
+                            "A newer nightly build is available: https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/releases/tag/nightly"
+                        ),
+                    },
+                    "info",
+                    0
+                );
+            }
+
+            if (nightlyMarker) {
+                try {
+                    SettingsStore.set(NIGHTLY_RELEASE_MARKER_KEY, nightlyMarker);
+                } catch (e) { console.debug?.(e); }
+            }
+        } catch (error) {
+            console.warn("Unable to check Majoor nightly updates:", error);
+            emitVersionUpdateState({ available: false });
+        } finally {
+            try {
+                SettingsStore.set(LAST_CHECK_KEY, String(Date.now()));
+            } catch {
+                // ignore
+            }
+        }
+        return null;
+    }
+
+    if (skipRemoteCheck) {
         return null;
     }
 
@@ -214,7 +315,9 @@ export async function checkMajoorVersion({ force = false } = {}) {
                     t(
                         "msg.dbResetNotice",
                         "Majoor Update Notice:\n\nTo avoid database errors with this new version, please delete your existing index. Click the 'Delete DB' button in the Index Status panel to reset it."
-                    )
+                    ),
+                    "Majoor",
+                    { native: true }
                 );
             }, 1000);
             try {
