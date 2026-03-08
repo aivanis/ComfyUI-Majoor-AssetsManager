@@ -979,13 +979,15 @@ def _collect_sampler_pipeline_from_sink(
             sampler_pass["steps"] = previous_steps
 
         try:
-            if sampler_pass.get("seed_val") is not None:
-                previous_seed = int(sampler_pass.get("seed_val"))
+            _seed_val = sampler_pass.get("seed_val")
+            if _seed_val is not None:
+                previous_seed = int(_seed_val)
         except Exception:
             pass
         try:
-            if sampler_pass.get("steps") is not None:
-                previous_steps = int(sampler_pass.get("steps"))
+            _steps_val = sampler_pass.get("steps")
+            if _steps_val is not None:
+                previous_steps = int(_steps_val)
         except Exception:
             pass
 

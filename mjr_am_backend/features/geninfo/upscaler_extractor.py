@@ -37,6 +37,29 @@ def _find_upscaler_node(nodes_by_id: dict[str, Any]) -> tuple[str | None, dict[s
     return None, None
 
 
+def _linked_model_entry(
+    nodes_by_id: dict[str, Any], link: Any
+) -> tuple[str, str] | None:
+    """Walk a model-loader link and return (cleaned_name, source_str), or None."""
+    if not _is_link(link):
+        return None
+    src_id = _walk_passthrough(nodes_by_id, link)
+    if not src_id:
+        return None
+    src_node = nodes_by_id.get(src_id)
+    if not isinstance(src_node, dict):
+        return None
+    src_ins = _inputs(src_node)
+    raw = src_ins.get("model") or src_ins.get("model_name") or src_ins.get("ckpt_name")
+    model_name = _scalar(raw)
+    if not isinstance(model_name, str) or not model_name.strip():
+        return None
+    cleaned = _clean_model_id(model_name)
+    if not cleaned:
+        return None
+    return cleaned, f"{_node_type(src_node)}:{src_id}"
+
+
 def _extract_upscaler_primary_model(nodes_by_id: dict[str, Any], ins: dict[str, Any]) -> dict[str, Any] | None:
     """
     Extract the primary upscaler model (DIT, diffusion, or generic model) from
@@ -44,23 +67,10 @@ def _extract_upscaler_primary_model(nodes_by_id: dict[str, Any], ins: dict[str, 
     Checks the 'dit', 'model', 'unet', 'diffusion_model' input keys in order.
     """
     for key in ("dit", "model", "unet", "diffusion_model"):
-        link = ins.get(key)
-        if not _is_link(link):
-            continue
-        src_id = _walk_passthrough(nodes_by_id, link)
-        if not src_id:
-            continue
-        src_node = nodes_by_id.get(src_id)
-        if not isinstance(src_node, dict):
-            continue
-        src_ins = _inputs(src_node)
-        model_name = _scalar(
-            src_ins.get("model") or src_ins.get("model_name") or src_ins.get("ckpt_name")
-        )
-        if isinstance(model_name, str) and model_name.strip():
-            cleaned = _clean_model_id(model_name)
-            if cleaned:
-                return {"name": cleaned, "confidence": "high", "source": f"{_node_type(src_node)}:{src_id}"}
+        entry = _linked_model_entry(nodes_by_id, ins.get(key))
+        if entry:
+            name, source = entry
+            return {"name": name, "confidence": "high", "source": source}
 
     # Direct string model in the upscaler's own inputs
     for key in ("model", "model_name", "ckpt_name"):
@@ -85,11 +95,12 @@ def _extract_upscaler_vae(nodes_by_id: dict[str, Any], ins: dict[str, Any]) -> d
         return None
     src_ins = _inputs(src_node)
     model_name = _scalar(src_ins.get("model") or src_ins.get("vae_name"))
-    if isinstance(model_name, str) and model_name.strip():
-        cleaned = _clean_model_id(model_name)
-        if cleaned:
-            return {"name": cleaned, "confidence": "high", "source": f"{_node_type(src_node)}:{src_id}"}
-    return None
+    if not isinstance(model_name, str) or not model_name.strip():
+        return None
+    cleaned = _clean_model_id(model_name)
+    if not cleaned:
+        return None
+    return {"name": cleaned, "confidence": "high", "source": f"{_node_type(src_node)}:{src_id}"}
 
 
 def _extract_upscaler_size(
@@ -118,6 +129,43 @@ def _extract_upscaler_size(
     return None
 
 
+def _populate_upscaler_output(
+    out: dict[str, Any],
+    nodes_by_id: dict[str, Any],
+    ins: dict[str, Any],
+    upscaler_id: str,
+    upscaler_node: dict[str, Any],
+    source: str,
+) -> None:
+    """Fill optional geninfo fields (model, vae, seed, size, sampler, inputs) into out."""
+    model = _extract_upscaler_primary_model(nodes_by_id, ins)
+    if model:
+        out["checkpoint"] = model
+        out["models"] = {"checkpoint": model}
+
+    vae = _extract_upscaler_vae(nodes_by_id, ins)
+    if vae:
+        out["vae"] = vae
+
+    seed = _scalar(ins.get("seed") or ins.get("noise_seed"))
+    if seed is not None:
+        out["seed"] = {"value": seed, "confidence": "high", "source": source}
+
+    size = _extract_upscaler_size(ins, upscaler_id, upscaler_node)
+    if size:
+        out["size"] = size
+
+    out["sampler"] = {
+        "name": str(_node_type(upscaler_node) or "Upscaler"),
+        "confidence": "high",
+        "source": source,
+    }
+
+    input_files = _extract_input_files(nodes_by_id)
+    if input_files:
+        out["inputs"] = input_files
+
+
 def _extract_upscaler_geninfo_fallback(
     nodes_by_id: dict[str, Any], workflow_meta: dict[str, Any] | None
 ) -> dict[str, Any] | None:
@@ -143,38 +191,7 @@ def _extract_upscaler_geninfo_fallback(
     if workflow_meta:
         out["metadata"] = workflow_meta
 
-    # Primary model (DIT / diffusion upscaler model)
-    model = _extract_upscaler_primary_model(nodes_by_id, ins)
-    if model:
-        out["checkpoint"] = model
-        out["models"] = {"checkpoint": model}
-
-    # VAE
-    vae = _extract_upscaler_vae(nodes_by_id, ins)
-    if vae:
-        out["vae"] = vae
-
-    # Seed
-    seed = _scalar(ins.get("seed") or ins.get("noise_seed"))
-    if seed is not None:
-        out["seed"] = {"value": seed, "confidence": "high", "source": source}
-
-    # Output resolution / size
-    size = _extract_upscaler_size(ins, upscaler_id, upscaler_node)
-    if size:
-        out["size"] = size
-
-    # Use node type as sampler name (shows "SeedVR2TilingUpscaler" etc.)
-    out["sampler"] = {
-        "name": str(_node_type(upscaler_node) or "Upscaler"),
-        "confidence": "high",
-        "source": source,
-    }
-
-    # Input files (LoadImage, etc.)
-    input_files = _extract_input_files(nodes_by_id)
-    if input_files:
-        out["inputs"] = input_files
+    _populate_upscaler_output(out, nodes_by_id, ins, upscaler_id, upscaler_node, source)
 
     # Require at least one meaningful field beyond engine + metadata
     meaningful_keys = {k for k in out if k not in ("engine", "metadata")}
