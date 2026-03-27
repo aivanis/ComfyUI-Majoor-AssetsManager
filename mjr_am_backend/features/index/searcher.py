@@ -1,7 +1,6 @@
 """
 Index searcher - handles asset search and retrieval operations.
 """
-import json
 import os
 import re
 from pathlib import Path
@@ -472,17 +471,33 @@ def _group_assets_by_stack(assets: list[dict[str, Any]]) -> list[dict[str, Any]]
             continue
         stack_id = asset.get("stack_id")
         job_id = str(asset.get("job_id") or "").strip()
-        if stack_id not in (None, "", 0):
-            key = f"stack:{int(stack_id)}"
+        stack_id_int = _safe_positive_int(stack_id)
+        if stack_id_int is not None:
+            key = f"stack:{stack_id_int}"
         elif job_id:
             key = f"job:{job_id}"
         else:
-            key = f"asset:{int(asset.get('id') or 0)}"
+            key = f"asset:{_safe_positive_int(asset.get('id')) or 0}"
         if key in seen:
             continue
         seen.add(key)
         grouped.append(asset)
     return grouped
+
+
+def _safe_positive_int(value: Any) -> int | None:
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            parsed = int(raw)
+        except ValueError:
+            return None
+        return parsed if parsed > 0 else None
+    return None
 
 
 class IndexSearcher:

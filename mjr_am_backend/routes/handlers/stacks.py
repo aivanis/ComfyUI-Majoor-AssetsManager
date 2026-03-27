@@ -13,10 +13,14 @@ Routes:
 """
 
 from aiohttp import web
-
 from mjr_am_backend.shared import Result, get_logger
 
-from ..core import _json_response, _read_json, _require_services, _require_write_access
+from ..core import (
+    _json_response,
+    _read_json,
+    _require_services,
+    _require_write_access,
+)
 
 logger = get_logger(__name__)
 
@@ -36,9 +40,9 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
 
     @routes.get("/mjr/am/stacks")
     async def list_stacks(request: web.Request) -> web.Response:
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         limit = int(request.query.get("limit", "50"))
@@ -50,9 +54,9 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
 
     @routes.get("/mjr/am/stacks/by-job/{job_id}")
     async def get_stack_by_job(request: web.Request) -> web.Response:
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         job_id = request.match_info.get("job_id", "")
@@ -63,9 +67,9 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
 
     @routes.get("/mjr/am/stacks/{stack_id}")
     async def get_stack(request: web.Request) -> web.Response:
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         try:
@@ -80,9 +84,9 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
 
     @routes.get("/mjr/am/stacks/{stack_id}/members")
     async def get_stack_members(request: web.Request) -> web.Response:
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         try:
@@ -97,10 +101,10 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
     async def set_stack_cover(request: web.Request) -> web.Response:
         write_err = _require_write_access(request)
         if write_err:
-            return write_err
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+            return _json_response(write_err, status=403)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         try:
@@ -120,10 +124,10 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
     async def dissolve_stack(request: web.Request) -> web.Response:
         write_err = _require_write_access(request)
         if write_err:
-            return write_err
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+            return _json_response(write_err, status=403)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         body = await _read_json(request)
@@ -138,10 +142,10 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
     async def merge_stacks(request: web.Request) -> web.Response:
         write_err = _require_write_access(request)
         if write_err:
-            return write_err
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+            return _json_response(write_err, status=403)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         body = await _read_json(request)
@@ -163,10 +167,10 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
     async def auto_stack(request: web.Request) -> web.Response:
         write_err = _require_write_access(request)
         if write_err:
-            return write_err
-        services = await _require_services(request)
-        if not services:
-            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
+            return _json_response(write_err, status=403)
+        services, error_result = await _require_services()
+        if error_result is not None or not services:
+            return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)
         svc = _stacks_service(services)
 
         body = await _read_json(request)

@@ -1765,10 +1765,18 @@ class Sqlite:
                 self._resetting = False
 
             # 6. Re-apply schema
-            from .schema import ensure_indexes_and_triggers, ensure_tables_exist
+            from .schema import (
+                ensure_columns_exist,
+                ensure_indexes_and_triggers,
+                ensure_tables_exist,
+            )
             schema_res = await ensure_tables_exist(self)
             if not schema_res.ok:
                 return schema_res
+
+            columns_res = await ensure_columns_exist(self)
+            if not columns_res.ok:
+                return columns_res
 
             indexes_res = await ensure_indexes_and_triggers(self)
             if not indexes_res.ok:

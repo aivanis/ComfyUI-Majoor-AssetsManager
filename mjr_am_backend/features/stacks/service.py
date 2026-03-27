@@ -168,10 +168,12 @@ class StacksService:
         stack_res = await self.create_or_get_stack(job_id)
         if not stack_res.ok:
             return stack_res
-        stack_id = stack_res.data
+        stack_id = _coerce_stack_id(stack_res.data)
+        if stack_id is None:
+            return Result.Err("DB_ERROR", "Stack created but id is invalid")
         assign_res = await self.assign_asset(asset_id, stack_id)
         if not assign_res.ok:
-            return Result.Err(assign_res.code, assign_res.error)
+            return Result.Err(str(assign_res.code or "DB_ERROR"), assign_res.error or "Failed to assign asset")
         return Result.Ok(stack_id)
 
     async def get_members(self, stack_id: int) -> Result[list[dict[str, Any]]]:
@@ -301,7 +303,10 @@ class StacksService:
             if not stack_res.ok:
                 logger.warning("Failed to create stack for job_id=%s: %s", job_id, stack_res.error)
                 continue
-            stack_id = stack_res.data
+            stack_id = _coerce_stack_id(stack_res.data)
+            if stack_id is None:
+                logger.warning("Invalid stack id for job_id=%s", job_id)
+                continue
 
             await self.db.aexecute(
                 "UPDATE assets SET stack_id = ? "
@@ -360,13 +365,16 @@ class StacksService:
         for group in groups:
             # Use workflow_hash + first mtime as synthetic job_id
             wh = str(group[0].get("workflow_hash") or "")
-            mt = str(group[0].get("mtime") or "")
+            mt = int(group[0].get("mtime") or 0)
             synthetic_job_id = f"wfh:{wh}:{mt}"
 
             stack_res = await self.create_or_get_stack(synthetic_job_id)
             if not stack_res.ok:
                 continue
-            stack_id = stack_res.data
+            stack_id = _coerce_stack_id(stack_res.data)
+            if stack_id is None:
+                logger.warning("Invalid synthetic stack id for workflow_hash=%s", wh)
+                continue
 
             for member in group:
                 await self.db.aexecute(
@@ -403,3 +411,18 @@ def _row_to_stack_info(row: dict[str, Any]) -> StackInfo:
         created_at=str(row.get("created_at") or ""),
         updated_at=str(row.get("updated_at") or ""),
     )
+
+
+def _coerce_stack_id(value: object) -> int | None:
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str):
+        raw = value.strip()
+        if not raw:
+            return None
+        try:
+            parsed = int(raw)
+        except ValueError:
+            return None
+        return parsed if parsed > 0 else None
+    return None

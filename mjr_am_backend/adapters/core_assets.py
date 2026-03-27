@@ -123,10 +123,10 @@ async def fetch_by_job_id(job_id: str) -> list[CoreAssetInfo]:
     if not is_available() or not job_id:
         return []
     try:
+        from app.assets.database import get_session
         from app.assets.database.queries.asset_reference import (
             list_references_page,
         )
-        from app.assets.database import get_session
 
         async with get_session() as session:
             rows = await list_references_page(
