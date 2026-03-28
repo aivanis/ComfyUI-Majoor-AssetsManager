@@ -805,31 +805,57 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                             logger.debug("Failed to upsert generation time for asset %s", asset_id)
                 if prompt_lookup or prompt_lookup_by_path:
                     try:
+                        # Build job_id → stack_id lookup from existing stacks
+                        all_prompt_ids = set(
+                            pid for pid in
+                            (list(prompt_lookup_by_path.values()) + list(prompt_lookup.values()))
+                            if pid
+                        )
+                        job_stack_lookup: dict[str, int] = {}
+                        if all_prompt_ids:
+                            for _jstart in range(0, len(all_prompt_ids), _MAX_IN_BATCH):
+                                _jchunk = list(all_prompt_ids)[_jstart:_jstart + _MAX_IN_BATCH]
+                                _jph = ",".join("?" * len(_jchunk))
+                                _jres = await db_adapter.aquery(
+                                    f"SELECT job_id, id FROM asset_stacks WHERE job_id IN ({_jph})",
+                                    tuple(_jchunk),
+                                )
+                                if _jres.ok and _jres.data:
+                                    for _jr in _jres.data:
+                                        job_stack_lookup[str(_jr["job_id"])] = int(_jr["id"])
+                        prompt_affected_stack_ids: set[int] = set()
+
                         if prompt_lookup_by_path:
                             for path_value, row_prompt_id in prompt_lookup_by_path.items():
                                 if not row_prompt_id:
                                     continue
                                 q_res = await db_adapter.aquery(
-                                    "SELECT id FROM assets WHERE filepath = ? OR filepath = ? COLLATE NOCASE",
+                                    "SELECT id, stack_id FROM assets WHERE filepath = ? OR filepath = ? COLLATE NOCASE",
                                     (path_value, path_value),
                                 )
                                 if not (q_res.ok and q_res.data):
                                     continue
+                                new_stack_id = job_stack_lookup.get(row_prompt_id)
                                 for row in q_res.data:
                                     asset_id = int(row.get("id") or 0)
                                     if not asset_id:
                                         continue
+                                    old_stack_id = int(row.get("stack_id") or 0)
+                                    if old_stack_id and old_stack_id != new_stack_id:
+                                        prompt_affected_stack_ids.add(old_stack_id)
                                     await db_adapter.aexecute(
-                                        "UPDATE assets SET job_id = ? WHERE id = ?",
-                                        (row_prompt_id, asset_id),
+                                        "UPDATE assets SET job_id = ?, stack_id = COALESCE(?, stack_id) WHERE id = ?",
+                                        (row_prompt_id, new_stack_id, asset_id),
                                     )
+                                    if new_stack_id:
+                                        prompt_affected_stack_ids.add(new_stack_id)
                         for start in range(0, len(fnames_for_prompt), _MAX_IN_BATCH):
                             chunk = fnames_for_prompt[start:start + _MAX_IN_BATCH]
                             if not chunk:
                                 continue
                             placeholders = ",".join("?" * len(chunk))
                             q_res = await db_adapter.aquery(
-                                f"SELECT id, filename, subfolder, source, root_id FROM assets WHERE lower(filename) IN ({placeholders})",
+                                f"SELECT id, filename, subfolder, source, root_id, stack_id FROM assets WHERE lower(filename) IN ({placeholders})",
                                 tuple(chunk),
                             )
                             if not (q_res.ok and q_res.data):
@@ -847,10 +873,29 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                                 asset_id = int(row.get("id") or 0)
                                 if not asset_id:
                                     continue
+                                new_stack_id = job_stack_lookup.get(row_prompt_id)
+                                old_stack_id = int(row.get("stack_id") or 0)
+                                if old_stack_id and old_stack_id != new_stack_id:
+                                    prompt_affected_stack_ids.add(old_stack_id)
                                 await db_adapter.aexecute(
-                                    "UPDATE assets SET job_id = ? WHERE id = ?",
-                                    (row_prompt_id, asset_id),
+                                    "UPDATE assets SET job_id = ?, stack_id = COALESCE(?, stack_id) WHERE id = ?",
+                                    (row_prompt_id, new_stack_id, asset_id),
                                 )
+                                if new_stack_id:
+                                    prompt_affected_stack_ids.add(new_stack_id)
+                        # Refresh counts for all stacks affected by prompt correlation
+                        for stack_id in prompt_affected_stack_ids:
+                            await db_adapter.aexecute(
+                                "UPDATE asset_stacks SET "
+                                "asset_count = (SELECT COUNT(*) FROM assets WHERE stack_id = ?), "
+                                "cover_asset_id = COALESCE("
+                                "  (SELECT id FROM assets WHERE stack_id = ? AND kind = 'image' ORDER BY size DESC, mtime DESC LIMIT 1), "
+                                "  (SELECT id FROM assets WHERE stack_id = ? ORDER BY mtime DESC LIMIT 1)"
+                                "), "
+                                "updated_at = CURRENT_TIMESTAMP "
+                                "WHERE id = ?",
+                                (stack_id, stack_id, stack_id, stack_id),
+                            )
 
                         sibling_rows: list[dict[str, Any]] = []
                         if all_fnames:

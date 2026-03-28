@@ -709,11 +709,11 @@ export function createStatusIndicator(options = {}) {
                 const skipped = Number(res?.data?.skipped ?? progress?.skipped ?? 0);
                 const errors = Number(res?.data?.errors ?? progress?.errors ?? 0);
                 if (pending) {
-                    const jobId = String(res?.data?.job_id || "").trim();
+                    const backfillId = String(res?.data?.backfill_id || "").trim();
                     const msg = t(
                         "toast.vectorBackfillRunning",
                         "Vector backfill still running in background{job}.",
-                        { job: jobId ? ` (job ${jobId.slice(0, 8)})` : "" },
+                        { job: backfillId ? ` (${backfillId.slice(0, 8)})` : "" },
                     );
                     comfyToast(msg, "info", 4200);
                     setActionLog(

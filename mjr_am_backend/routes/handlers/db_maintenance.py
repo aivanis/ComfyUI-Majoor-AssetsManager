@@ -114,12 +114,12 @@ def _utc_now_iso() -> str:
 def _vector_backfill_job_public(job: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(job, dict):
         return {
-            "job_id": "",
+            "backfill_id": "",
             "status": "idle",
             "async": True,
         }
     return {
-        "job_id": str(job.get("job_id") or ""),
+        "backfill_id": str(job.get("backfill_id") or ""),
         "status": str(job.get("status") or "unknown"),
         "async": True,
         "batch_size": int(job.get("batch_size") or 64),
@@ -136,9 +136,9 @@ def _vector_backfill_job_public(job: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _vector_backfill_get_job(job_id: str) -> dict[str, Any] | None:
+def _vector_backfill_get_job(backfill_id: str) -> dict[str, Any] | None:
     with _VECTOR_BACKFILL_LOCK:
-        return _VECTOR_BACKFILL_JOBS.get(str(job_id or ""))
+        return _VECTOR_BACKFILL_JOBS.get(str(backfill_id or ""))
 
 
 def _vector_backfill_get_active_or_latest_job() -> dict[str, Any] | None:
@@ -220,9 +220,9 @@ async def _vector_backfill_wait_for_priority_window() -> None:
 def _vector_backfill_register_job(*, batch_size: int, scope: str = "output", custom_root_id: str = "") -> dict[str, Any]:
     normalized_scope = _normalize_backfill_scope(scope) or "output"
     normalized_custom_root = str(custom_root_id or "").strip() if normalized_scope == "custom" else ""
-    job_id = uuid.uuid4().hex
+    backfill_id = uuid.uuid4().hex
     job = {
-        "job_id": job_id,
+        "backfill_id": backfill_id,
         "status": "queued",
         "batch_size": int(max(1, min(200, batch_size))),
         "scope": normalized_scope,
@@ -243,9 +243,9 @@ def _vector_backfill_register_job(*, batch_size: int, scope: str = "output", cus
         "error": None,
     }
     with _VECTOR_BACKFILL_LOCK:
-        _VECTOR_BACKFILL_JOBS[job_id] = job
+        _VECTOR_BACKFILL_JOBS[backfill_id] = job
         global _VECTOR_BACKFILL_ACTIVE_JOB_ID
-        _VECTOR_BACKFILL_ACTIVE_JOB_ID = job_id
+        _VECTOR_BACKFILL_ACTIVE_JOB_ID = backfill_id
     return job
 
 
@@ -262,15 +262,15 @@ def _vector_backfill_prune_history() -> None:
             reverse=True,
         )
         for item in ordered[:_VECTOR_BACKFILL_HISTORY_LIMIT]:
-            keep_ids.add(str(item.get("job_id") or ""))
+            keep_ids.add(str(item.get("backfill_id") or ""))
         for key in list(_VECTOR_BACKFILL_JOBS.keys()):
             if key not in keep_ids:
                 _VECTOR_BACKFILL_JOBS.pop(key, None)
 
 
-def _vector_backfill_update_job(job_id: str, **updates: Any) -> None:
+def _vector_backfill_update_job(backfill_id: str, **updates: Any) -> None:
     with _VECTOR_BACKFILL_LOCK:
-        job = _VECTOR_BACKFILL_JOBS.get(str(job_id or ""))
+        job = _VECTOR_BACKFILL_JOBS.get(str(backfill_id or ""))
         if not isinstance(job, dict):
             return
         job["updated_at"] = _utc_now_iso()
@@ -300,7 +300,7 @@ def _invalidate_vector_searcher(svc: Any) -> None:
 
 async def _run_vector_backfill_job(
     *,
-    job_id: str,
+    backfill_id: str,
     svc: dict[str, Any],
     db: Any,
     vector_service: Any,
@@ -308,7 +308,7 @@ async def _run_vector_backfill_job(
     scope: str = "output",
     custom_root_id: str = "",
 ) -> None:
-    _vector_backfill_update_job(job_id, status="running", started_at=_utc_now_iso(), code=None, error=None)
+    _vector_backfill_update_job(backfill_id, status="running", started_at=_utc_now_iso(), code=None, error=None)
     _clear_vector_backfill_priority_window()
     set_db_maintenance_active(True)
     watcher_was_running = False
@@ -318,7 +318,7 @@ async def _run_vector_backfill_job(
         await _stop_index_enrichment(index_service)
 
         def _on_progress(progress: dict[str, int]) -> None:
-            _vector_backfill_update_job(job_id, progress=dict(progress or {}))
+            _vector_backfill_update_job(backfill_id, progress=dict(progress or {}))
 
         backfill_res = await _backfill_missing_asset_vectors(
             db,
@@ -330,7 +330,7 @@ async def _run_vector_backfill_job(
         )
         if not backfill_res.ok:
             _vector_backfill_update_job(
-                job_id,
+                backfill_id,
                 status="failed",
                 finished_at=_utc_now_iso(),
                 code=str(backfill_res.code or "DB_ERROR"),
@@ -347,7 +347,7 @@ async def _run_vector_backfill_job(
             **(backfill_res.data or {}),
         }
         _vector_backfill_update_job(
-            job_id,
+            backfill_id,
             status="succeeded",
             finished_at=_utc_now_iso(),
             result=payload,
@@ -356,7 +356,7 @@ async def _run_vector_backfill_job(
         )
     except Exception as exc:
         _vector_backfill_update_job(
-            job_id,
+            backfill_id,
             status="failed",
             finished_at=_utc_now_iso(),
             code="DB_ERROR",
@@ -371,7 +371,7 @@ async def _run_vector_backfill_job(
         set_db_maintenance_active(False)
         with _VECTOR_BACKFILL_LOCK:
             global _VECTOR_BACKFILL_ACTIVE_JOB_ID
-            if _VECTOR_BACKFILL_ACTIVE_JOB_ID == job_id:
+            if _VECTOR_BACKFILL_ACTIVE_JOB_ID == backfill_id:
                 _VECTOR_BACKFILL_ACTIVE_JOB_ID = None
         _vector_backfill_prune_history()
 
@@ -1364,7 +1364,7 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
             )
             _spawn_background_task(
                 _run_vector_backfill_job(
-                    job_id=str(job.get("job_id") or ""),
+                    backfill_id=str(job.get("backfill_id") or ""),
                     svc=svc if isinstance(svc, dict) else {},
                     db=db,
                     vector_service=vector_service,
@@ -1372,7 +1372,7 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
                     scope=scope,
                     custom_root_id=custom_root_id,
                 ),
-                label=f"vector-backfill-{job.get('job_id')}",
+                label=f"vector-backfill-{job.get('backfill_id')}",
             )
             result = Result.Ok(_vector_backfill_job_public(job))
             await _audit_db_maintenance_write(
@@ -1463,8 +1463,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         if not auth.ok:
             return _json_response(auth)
 
-        job_id = str(request.query.get("job_id") or "").strip()
-        job = _vector_backfill_get_job(job_id) if job_id else _vector_backfill_get_active_or_latest_job()
+        backfill_id = str(request.query.get("backfill_id") or request.query.get("job_id") or "").strip()
+        job = _vector_backfill_get_job(backfill_id) if backfill_id else _vector_backfill_get_active_or_latest_job()
         if not isinstance(job, dict):
             return _json_response(Result.Ok({"status": "idle", "async": True}))
         return _json_response(Result.Ok(_vector_backfill_job_public(job)))

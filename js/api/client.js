@@ -1390,7 +1390,7 @@ export async function vectorBackfill(batchSize = 64, options = {}) {
 
     const startData = startRes?.data || {};
     const status = String(startData?.status || "").toLowerCase();
-    const jobId = String(startData?.job_id || "").trim();
+    const jobId = String(startData?.backfill_id || "").trim();
     try {
         onProgress?.(startData);
     } catch (e) {
@@ -1419,7 +1419,7 @@ export async function vectorBackfill(batchSize = 64, options = {}) {
     while (Date.now() - startedAt < pollTimeoutMs) {
         await _delay(pollIntervalMs);
         const pollRes = await get(
-            `${ENDPOINTS.VECTOR_BACKFILL_STATUS}?job_id=${encodeURIComponent(jobId)}`,
+            `${ENDPOINTS.VECTOR_BACKFILL_STATUS}?backfill_id=${encodeURIComponent(jobId)}`,
             { timeoutMs: 30_000 },
         );
         if (!pollRes?.ok) {
@@ -1457,7 +1457,7 @@ export async function vectorBackfill(batchSize = 64, options = {}) {
     }
 
     const finalStatusRes = await get(
-        `${ENDPOINTS.VECTOR_BACKFILL_STATUS}?job_id=${encodeURIComponent(jobId)}`,
+        `${ENDPOINTS.VECTOR_BACKFILL_STATUS}?backfill_id=${encodeURIComponent(jobId)}`,
         { timeoutMs: 30_000 },
     );
     const finalData = finalStatusRes?.data || lastStatus?.data || {};
@@ -1477,7 +1477,7 @@ export async function vectorBackfill(batchSize = 64, options = {}) {
                 pending: true,
                 timed_out: true,
                 poll_timeout_ms: pollTimeoutMs,
-                job_id: String(finalData?.job_id || jobId),
+                backfill_id: String(finalData?.backfill_id || jobId),
                 status: finalState || "running",
             },
             meta: { pending: true },

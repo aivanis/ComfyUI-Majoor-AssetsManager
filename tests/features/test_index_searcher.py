@@ -292,4 +292,4 @@ async def test_paginate_grouped_assets_prefers_image_cover_over_video_in_same_st
     assert len(assets) == 1
     assert assets[0]["filename"] == "animatediff_00001.png"
     assert assets[0]["kind"] == "image"
-    assert assets[0]["stack_count"] == 2
+    assert assets[0]["stack_asset_count"] == 2

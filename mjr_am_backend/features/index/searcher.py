@@ -563,11 +563,11 @@ async def _paginate_grouped_assets(
         if row_count < raw_chunk:
             exhausted = True
 
-    # Enrich grouped assets with stack_count
+    # Enrich grouped assets with stack_asset_count
     for asset in grouped_assets:
         key = _stack_group_key(asset)
         count = stack_counts.get(key, 1)
-        asset["stack_count"] = count
+        asset["stack_asset_count"] = count
 
     total = len(grouped_assets) if include_total else None
     page_assets = grouped_assets[offset: offset + limit] if limit > 0 else []

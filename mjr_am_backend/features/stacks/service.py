@@ -144,13 +144,28 @@ class StacksService:
     # ── Membership ───────────────────────────────────────────────────────
 
     async def assign_asset(self, asset_id: int, stack_id: int) -> Result[bool]:
-        """Assign an asset to a stack and update the stack's asset_count."""
+        """Assign an asset to a stack and update the stack's asset_count.
+
+        If the asset was previously in a different stack, that stack's count
+        is refreshed as well (cascade on job_id change).
+        """
+        old_res = await self.db.aquery(
+            "SELECT stack_id FROM assets WHERE id = ?", (asset_id,)
+        )
+        old_stack_id = None
+        if old_res.ok and old_res.data:
+            old_stack_id = old_res.data[0].get("stack_id")
+            if old_stack_id is not None:
+                old_stack_id = int(old_stack_id)
+
         res = await self.db.aexecute(
             "UPDATE assets SET stack_id = ? WHERE id = ?", (stack_id, asset_id)
         )
         if not res.ok:
             return Result.Err("DB_ERROR", res.error or "Failed to assign asset to stack")
         await self._refresh_stack_count(stack_id)
+        if old_stack_id and old_stack_id != stack_id:
+            await self._refresh_stack_count(old_stack_id)
         return Result.Ok(True)
 
     async def assign_asset_by_job_id(self, asset_id: int, job_id: str) -> Result[int]:
@@ -416,6 +431,11 @@ class StacksService:
                 logger.warning("Failed to begin stack finalization transaction for job_id=%s: %s", current_job_id, tx.error)
                 return None
 
+            member_count = await self._count_assets_for_job_id(current_job_id)
+            if member_count <= 1:
+                await self._clear_singleton_job_stack(current_job_id)
+                return None
+
             stack_res = await self.create_or_get_stack(current_job_id)
             if not stack_res.ok:
                 logger.warning("Failed to create stack for job_id=%s: %s", current_job_id, stack_res.error)
@@ -434,16 +454,7 @@ class StacksService:
                 logger.warning("Failed to assign assets to stack for job_id=%s: %s", current_job_id, assign_res.error)
                 return None
 
-            count_res = await self.db.aquery(
-                "SELECT COUNT(*) AS total FROM assets WHERE stack_id = ?",
-                (stack_id,),
-            )
-            member_count = 0
-            if count_res.ok and count_res.data:
-                try:
-                    member_count = int(count_res.data[0].get("total") or 0)
-                except Exception:
-                    member_count = 0
+            member_count = await self._count_assets_for_stack_id(stack_id)
 
             await self._refresh_stack_count(stack_id)
             await self.auto_select_cover(stack_id)
@@ -453,6 +464,33 @@ class StacksService:
             "stack_id": stack_id,
             "asset_count": member_count,
         }
+
+    async def _count_assets_for_job_id(self, job_id: str) -> int:
+        count_res = await self.db.aquery(
+            "SELECT COUNT(*) AS total FROM assets WHERE job_id = ?",
+            (job_id,),
+        )
+        return _extract_count(count_res.data if count_res.ok else None)
+
+    async def _count_assets_for_stack_id(self, stack_id: int) -> int:
+        count_res = await self.db.aquery(
+            "SELECT COUNT(*) AS total FROM assets WHERE stack_id = ?",
+            (stack_id,),
+        )
+        return _extract_count(count_res.data if count_res.ok else None)
+
+    async def _clear_singleton_job_stack(self, job_id: str) -> None:
+        stack_id = await self._find_stack_id_by_job_id(job_id)
+        if stack_id is None:
+            return
+        await self.db.aexecute(
+            "UPDATE assets SET stack_id = NULL WHERE job_id = ?",
+            (job_id,),
+        )
+        await self.db.aexecute(
+            "DELETE FROM asset_stacks WHERE id = ?",
+            (stack_id,),
+        )
 
 
 def _row_to_stack_info(row: dict[str, Any]) -> StackInfo:
@@ -539,3 +577,12 @@ def _coerce_stack_id(value: object) -> int | None:
             return None
         return parsed if parsed > 0 else None
     return None
+
+
+def _extract_count(rows: list[dict[str, Any]] | None) -> int:
+    if not rows:
+        return 0
+    try:
+        return int(rows[0].get("total") or 0)
+    except Exception:
+        return 0
