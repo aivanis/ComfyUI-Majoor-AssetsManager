@@ -55,39 +55,23 @@ class StacksService:
 
     async def create_or_get_stack(self, job_id: str, name: str = "") -> Result[int]:
         """Return the stack id for *job_id*, creating a new row if needed."""
-        if not job_id or not str(job_id).strip():
+        normalized_job_id = _normalize_job_id(job_id)
+        if not normalized_job_id:
             return Result.Err("INVALID_INPUT", "job_id is required")
-        job_id = str(job_id).strip()
-        name = str(name or "").strip()[:MAX_STACK_NAME_LEN]
+        normalized_name = _normalize_stack_name(name)
 
-        existing = await self.db.aquery(
-            "SELECT id FROM asset_stacks WHERE job_id = ?", (job_id,)
-        )
-        if existing.ok and existing.data:
-            return Result.Ok(int(existing.data[0]["id"]))
+        existing_stack_id = await self._find_stack_id_by_job_id(normalized_job_id)
+        if existing_stack_id is not None:
+            return Result.Ok(existing_stack_id)
 
-        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-        insert = await self.db.aexecute(
-            "INSERT INTO asset_stacks (job_id, name, asset_count, created_at, updated_at) "
-            "VALUES (?, ?, 0, ?, ?)",
-            (job_id, name, now, now),
-        )
-        if not insert.ok:
-            # Another worker may have created the row after our existence check.
-            existing = await self.db.aquery(
-                "SELECT id FROM asset_stacks WHERE job_id = ?", (job_id,)
-            )
-            if existing.ok and existing.data:
-                return Result.Ok(int(existing.data[0]["id"]))
-            return Result.Err("DB_ERROR", insert.error or "Failed to create stack")
+        inserted = await self._insert_stack_row(normalized_job_id, normalized_name)
+        if inserted.ok:
+            return inserted
 
-        # Fetch the new id
-        row = await self.db.aquery(
-            "SELECT id FROM asset_stacks WHERE job_id = ?", (job_id,)
-        )
-        if row.ok and row.data:
-            return Result.Ok(int(row.data[0]["id"]))
-        return Result.Err("DB_ERROR", "Stack created but id not found")
+        existing_stack_id = await self._find_stack_id_by_job_id(normalized_job_id)
+        if existing_stack_id is not None:
+            return Result.Ok(existing_stack_id)
+        return Result.Err("DB_ERROR", inserted.error or "Failed to create stack")
 
     async def get_stack(self, stack_id: int) -> Result[StackInfo]:
         row = await self.db.aquery(
@@ -355,49 +339,8 @@ class StacksService:
         if not res.ok or not res.data:
             return Result.Ok(0)
 
-        # Group contiguous assets by (workflow_hash, mtime proximity)
-        groups: list[list[dict]] = []
-        current_group: list[dict] = []
-        prev_hash: str = ""
-        prev_mtime: int = 0
-
-        for row in res.data:
-            wh = str(row.get("workflow_hash") or "")
-            mt = int(row.get("mtime") or 0)
-            if wh == prev_hash and abs(mt - prev_mtime) <= mtime_window_s:
-                current_group.append(dict(row))
-            else:
-                if len(current_group) > 1:
-                    groups.append(current_group)
-                current_group = [dict(row)]
-            prev_hash = wh
-            prev_mtime = mt
-        if len(current_group) > 1:
-            groups.append(current_group)
-
-        created = 0
-        for group in groups:
-            # Use workflow_hash + first mtime as synthetic job_id
-            wh = str(group[0].get("workflow_hash") or "")
-            mt = int(group[0].get("mtime") or 0)
-            synthetic_job_id = f"wfh:{wh}:{mt}"
-
-            stack_res = await self.create_or_get_stack(synthetic_job_id)
-            if not stack_res.ok:
-                continue
-            stack_id = _coerce_stack_id(stack_res.data)
-            if stack_id is None:
-                logger.warning("Invalid synthetic stack id for workflow_hash=%s", wh)
-                continue
-
-            for member in group:
-                await self.db.aexecute(
-                    "UPDATE assets SET stack_id = ? WHERE id = ?",
-                    (stack_id, int(member["id"])),
-                )
-            await self._refresh_stack_count(stack_id)
-            await self.auto_select_cover(stack_id)
-            created += 1
+        groups = _group_workflow_hash_rows(res.data, mtime_window_s)
+        created = await self._create_stacks_for_workflow_groups(groups)
 
         logger.info("Heuristic stacking created %d stacks", created)
         return Result.Ok(created)
@@ -413,6 +356,55 @@ class StacksService:
             "WHERE id = ?",
             (stack_id, now, stack_id),
         )
+
+    async def _find_stack_id_by_job_id(self, job_id: str) -> int | None:
+        existing = await self.db.aquery(
+            "SELECT id FROM asset_stacks WHERE job_id = ?", (job_id,)
+        )
+        if existing.ok and existing.data:
+            return int(existing.data[0]["id"])
+        return None
+
+    async def _insert_stack_row(self, job_id: str, name: str) -> Result[int]:
+        now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        insert = await self.db.aexecute(
+            "INSERT INTO asset_stacks (job_id, name, asset_count, created_at, updated_at) "
+            "VALUES (?, ?, 0, ?, ?)",
+            (job_id, name, now, now),
+        )
+        if not insert.ok:
+            return Result.Err("DB_ERROR", insert.error or "Failed to create stack")
+
+        created_stack_id = await self._find_stack_id_by_job_id(job_id)
+        if created_stack_id is not None:
+            return Result.Ok(created_stack_id)
+        return Result.Err("DB_ERROR", "Stack created but id not found")
+
+    async def _create_stacks_for_workflow_groups(self, groups: list[list[dict[str, Any]]]) -> int:
+        created = 0
+        for group in groups:
+            if await self._assign_workflow_group_to_stack(group):
+                created += 1
+        return created
+
+    async def _assign_workflow_group_to_stack(self, group: list[dict[str, Any]]) -> bool:
+        synthetic_job_id, workflow_hash = _workflow_group_identity(group)
+        stack_res = await self.create_or_get_stack(synthetic_job_id)
+        if not stack_res.ok:
+            return False
+        stack_id = _coerce_stack_id(stack_res.data)
+        if stack_id is None:
+            logger.warning("Invalid synthetic stack id for workflow_hash=%s", workflow_hash)
+            return False
+
+        for member in group:
+            await self.db.aexecute(
+                "UPDATE assets SET stack_id = ? WHERE id = ?",
+                (stack_id, int(member["id"])),
+            )
+        await self._refresh_stack_count(stack_id)
+        await self.auto_select_cover(stack_id)
+        return True
 
     async def _finalize_job_stack(self, job_id: str) -> dict[str, Any] | None:
         current_job_id = str(job_id or "").strip()
@@ -473,6 +465,65 @@ def _row_to_stack_info(row: dict[str, Any]) -> StackInfo:
         created_at=str(row.get("created_at") or ""),
         updated_at=str(row.get("updated_at") or ""),
     )
+
+
+def _normalize_job_id(job_id: str | None) -> str:
+    return str(job_id or "").strip()
+
+
+def _normalize_stack_name(name: str | None) -> str:
+    return str(name or "").strip()[:MAX_STACK_NAME_LEN]
+
+
+def _group_workflow_hash_rows(
+    rows: list[dict[str, Any]],
+    mtime_window_s: int,
+) -> list[list[dict[str, Any]]]:
+    groups: list[list[dict[str, Any]]] = []
+    current_group: list[dict[str, Any]] = []
+    previous_hash = ""
+    previous_mtime = 0
+
+    for row in rows:
+        workflow_hash = str(row.get("workflow_hash") or "")
+        mtime = int(row.get("mtime") or 0)
+        if _belongs_to_current_workflow_group(
+            workflow_hash,
+            mtime,
+            previous_hash,
+            previous_mtime,
+            mtime_window_s,
+        ):
+            current_group.append(dict(row))
+        else:
+            _append_if_multi_member(groups, current_group)
+            current_group = [dict(row)]
+        previous_hash = workflow_hash
+        previous_mtime = mtime
+
+    _append_if_multi_member(groups, current_group)
+    return groups
+
+
+def _belongs_to_current_workflow_group(
+    workflow_hash: str,
+    mtime: int,
+    previous_hash: str,
+    previous_mtime: int,
+    mtime_window_s: int,
+) -> bool:
+    return workflow_hash == previous_hash and abs(mtime - previous_mtime) <= mtime_window_s
+
+
+def _append_if_multi_member(groups: list[list[dict[str, Any]]], group: list[dict[str, Any]]) -> None:
+    if len(group) > 1:
+        groups.append(group)
+
+
+def _workflow_group_identity(group: list[dict[str, Any]]) -> tuple[str, str]:
+    workflow_hash = str(group[0].get("workflow_hash") or "")
+    mtime = int(group[0].get("mtime") or 0)
+    return f"wfh:{workflow_hash}:{mtime}", workflow_hash
 
 
 def _coerce_stack_id(value: object) -> int | None:
