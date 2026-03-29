@@ -20,6 +20,7 @@ from .vector_search import register_vector_search_routes
 from .vendor import register_vendor_routes
 from .version import register_version_routes
 from .viewer import register_viewer_routes
+from .plugins import register_plugin_routes
 
 __all__ = [
     "register_health_routes",
@@ -42,4 +43,5 @@ __all__ = [
     "register_audit_routes",
     "register_stacks_routes",
     "register_vendor_routes",
+    "register_plugin_routes",
 ]

@@ -11,6 +11,7 @@ import {
 } from "../status/StatusDot.js";
 import {
     createGridContainer,
+    hydrateGridFromSnapshot,
     loadAssets,
     loadAssetsFromList,
     prepareGridForScopeSwitch,
@@ -2062,6 +2063,25 @@ export async function renderAssetsManager(container, { useComfyThemeUI = true } 
         },
         { signal: panelLifecycleAC?.signal },
     );
+
+    try {
+        await hydrateGridFromSnapshot(
+            gridContainer,
+            {
+                scope: state.scope || "output",
+                query: String(normalizeQuery(state.searchQuery || "*") || "*"),
+                customRootId: state.customRootId || "",
+                subfolder: state.currentFolderRelativePath || "",
+                collectionId: state.collectionId || "",
+                viewScope: state.viewScope || "",
+            },
+            {
+                title: state.collectionName || state.searchQuery || "Cached",
+            },
+        );
+    } catch (e) {
+        console.debug?.(e);
+    }
 
     const initialLoadPromise = gridController.reloadGrid();
     try {

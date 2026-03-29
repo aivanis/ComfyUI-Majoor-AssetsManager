@@ -25,6 +25,7 @@ from mjr_am_backend.config import (
     SCAN_DEFAULT_BACKGROUND_METADATA,
     SCAN_DEFAULT_FAST,
     TO_THREAD_TIMEOUT_S,
+    is_execution_grouping_enabled,
 )
 from mjr_am_backend.custom_roots import resolve_custom_root
 from mjr_am_backend.features.index.metadata_helpers import MetadataHelpers
@@ -109,6 +110,33 @@ def _send_prompt_event(event: str, payload: Any) -> None:
             prompt_server.instance.send_sync(event, payload)
     except Exception:
         pass
+
+
+def _normalize_job_id(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def _normalize_stack_id(value: Any) -> int | None:
+    try:
+        stack_id = int(value)
+    except Exception:
+        return None
+    return stack_id if stack_id > 0 else None
+
+
+def _should_preserve_existing_job(existing_job_id: Any, candidate_job_id: Any) -> bool:
+    existing = _normalize_job_id(existing_job_id)
+    candidate = _normalize_job_id(candidate_job_id)
+    if not existing or not candidate:
+        return False
+    return existing != candidate
+
+
+def _resolve_stack_assignment(existing_stack_id: Any, candidate_stack_id: Any) -> int | None:
+    candidate = _normalize_stack_id(candidate_stack_id)
+    if candidate is not None:
+        return candidate
+    return _normalize_stack_id(existing_stack_id)
 
 
 def _scan_enqueued_from_kickoff(result: Any) -> bool:
@@ -803,34 +831,14 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                             gen_time_by_id[int(asset_id)] = gt
                         except Exception:
                             logger.debug("Failed to upsert generation time for asset %s", asset_id)
-                if prompt_lookup or prompt_lookup_by_path:
+                if is_execution_grouping_enabled() and (prompt_lookup or prompt_lookup_by_path):
                     try:
-                        # Build job_id → stack_id lookup from existing stacks
-                        all_prompt_ids = set(
-                            pid for pid in
-                            (list(prompt_lookup_by_path.values()) + list(prompt_lookup.values()))
-                            if pid
-                        )
-                        job_stack_lookup: dict[str, int] = {}
-                        if all_prompt_ids:
-                            for _jstart in range(0, len(all_prompt_ids), _MAX_IN_BATCH):
-                                _jchunk = list(all_prompt_ids)[_jstart:_jstart + _MAX_IN_BATCH]
-                                _jph = ",".join("?" * len(_jchunk))
-                                _jres = await db_adapter.aquery(
-                                    f"SELECT job_id, id FROM asset_stacks WHERE job_id IN ({_jph})",
-                                    tuple(_jchunk),
-                                )
-                                if _jres.ok and _jres.data:
-                                    for _jr in _jres.data:
-                                        job_stack_lookup[str(_jr["job_id"])] = int(_jr["id"])
-                        prompt_affected_stack_ids: set[int] = set()
-
                         if prompt_lookup_by_path:
                             for path_value, row_prompt_id in prompt_lookup_by_path.items():
                                 if not row_prompt_id:
                                     continue
                                 q_res = await db_adapter.aquery(
-                                    "SELECT id, stack_id FROM assets WHERE filepath = ? OR filepath = ? COLLATE NOCASE",
+                                    "SELECT id, job_id, stack_id FROM assets WHERE filepath = ? OR filepath = ? COLLATE NOCASE",
                                     (path_value, path_value),
                                 )
                                 if not (q_res.ok and q_res.data):
@@ -840,22 +848,26 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                                     asset_id = int(row.get("id") or 0)
                                     if not asset_id:
                                         continue
-                                    old_stack_id = int(row.get("stack_id") or 0)
-                                    if old_stack_id and old_stack_id != new_stack_id:
-                                        prompt_affected_stack_ids.add(old_stack_id)
+                                    existing_job_id = row.get("job_id")
+                                    if _should_preserve_existing_job(existing_job_id, row_prompt_id):
+                                        logger.debug(
+                                            "Skipping prompt correlation overwrite for asset %s: existing job_id=%s candidate=%s",
+                                            asset_id,
+                                            existing_job_id,
+                                            row_prompt_id,
+                                        )
+                                        continue
                                     await db_adapter.aexecute(
-                                        "UPDATE assets SET job_id = ?, stack_id = COALESCE(?, stack_id) WHERE id = ?",
-                                        (row_prompt_id, new_stack_id, asset_id),
+                                        "UPDATE assets SET job_id = ? WHERE id = ?",
+                                        (row_prompt_id, asset_id),
                                     )
-                                    if new_stack_id:
-                                        prompt_affected_stack_ids.add(new_stack_id)
                         for start in range(0, len(fnames_for_prompt), _MAX_IN_BATCH):
                             chunk = fnames_for_prompt[start:start + _MAX_IN_BATCH]
                             if not chunk:
                                 continue
                             placeholders = ",".join("?" * len(chunk))
                             q_res = await db_adapter.aquery(
-                                f"SELECT id, filename, subfolder, source, root_id, stack_id FROM assets WHERE lower(filename) IN ({placeholders})",
+                                f"SELECT id, filename, subfolder, source, root_id, job_id, stack_id FROM assets WHERE lower(filename) IN ({placeholders})",
                                 tuple(chunk),
                             )
                             if not (q_res.ok and q_res.data):
@@ -873,29 +885,19 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                                 asset_id = int(row.get("id") or 0)
                                 if not asset_id:
                                     continue
-                                new_stack_id = job_stack_lookup.get(row_prompt_id)
-                                old_stack_id = int(row.get("stack_id") or 0)
-                                if old_stack_id and old_stack_id != new_stack_id:
-                                    prompt_affected_stack_ids.add(old_stack_id)
+                                existing_job_id = row.get("job_id")
+                                if _should_preserve_existing_job(existing_job_id, row_prompt_id):
+                                    logger.debug(
+                                        "Skipping filename prompt correlation overwrite for asset %s: existing job_id=%s candidate=%s",
+                                        asset_id,
+                                        existing_job_id,
+                                        row_prompt_id,
+                                    )
+                                    continue
                                 await db_adapter.aexecute(
-                                    "UPDATE assets SET job_id = ?, stack_id = COALESCE(?, stack_id) WHERE id = ?",
-                                    (row_prompt_id, new_stack_id, asset_id),
+                                    "UPDATE assets SET job_id = ? WHERE id = ?",
+                                    (row_prompt_id, asset_id),
                                 )
-                                if new_stack_id:
-                                    prompt_affected_stack_ids.add(new_stack_id)
-                        # Refresh counts for all stacks affected by prompt correlation
-                        for stack_id in prompt_affected_stack_ids:
-                            await db_adapter.aexecute(
-                                "UPDATE asset_stacks SET "
-                                "asset_count = (SELECT COUNT(*) FROM assets WHERE stack_id = ?), "
-                                "cover_asset_id = COALESCE("
-                                "  (SELECT id FROM assets WHERE stack_id = ? AND kind = 'image' ORDER BY size DESC, mtime DESC LIMIT 1), "
-                                "  (SELECT id FROM assets WHERE stack_id = ? ORDER BY mtime DESC LIMIT 1)"
-                                "), "
-                                "updated_at = CURRENT_TIMESTAMP "
-                                "WHERE id = ?",
-                                (stack_id, stack_id, stack_id, stack_id),
-                            )
 
                         sibling_rows: list[dict[str, Any]] = []
                         if all_fnames:
@@ -911,7 +913,7 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                                 )
                                 if q_res.ok and q_res.data:
                                     sibling_rows.extend(q_res.data)
-                        sibling_job_lookup: dict[tuple[str, str, str, str], tuple[str, Any]] = {}
+                        sibling_job_lookup: dict[tuple[str, str, str, str], str] = {}
                         for row in sibling_rows:
                             row_job_id = str(row.get("job_id") or "").strip()
                             if not row_job_id:
@@ -923,9 +925,8 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                                     row.get("source") or "output",
                                     row.get("root_id") or "",
                                 ),
-                                (row_job_id, row.get("stack_id")),
+                                row_job_id,
                             )
-                        affected_stack_ids: set[int] = set()
                         for row in sibling_rows:
                             filename_value = row.get("filename") or ""
                             if _filename_ext_upper(filename_value) != "PNG":
@@ -948,28 +949,19 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                             asset_id = int(row.get("id") or 0)
                             if not asset_id:
                                 continue
-                            row_job_id, row_stack_id = sibling_job
+                            row_job_id = sibling_job
+                            existing_job_id = row.get("job_id")
+                            if _should_preserve_existing_job(existing_job_id, row_job_id):
+                                logger.debug(
+                                    "Skipping sibling prompt correlation overwrite for asset %s: existing job_id=%s candidate=%s",
+                                    asset_id,
+                                    existing_job_id,
+                                    row_job_id,
+                                )
+                                continue
                             await db_adapter.aexecute(
-                                "UPDATE assets SET job_id = ?, stack_id = COALESCE(?, stack_id) WHERE id = ?",
-                                (row_job_id, row_stack_id, asset_id),
-                            )
-                            try:
-                                stack_id_int = int(row_stack_id or 0)
-                            except Exception:
-                                stack_id_int = 0
-                            if stack_id_int > 0:
-                                affected_stack_ids.add(stack_id_int)
-                        for stack_id in affected_stack_ids:
-                            await db_adapter.aexecute(
-                                "UPDATE asset_stacks SET "
-                                "asset_count = (SELECT COUNT(*) FROM assets WHERE stack_id = ?), "
-                                "cover_asset_id = COALESCE("
-                                "  (SELECT id FROM assets WHERE stack_id = ? AND kind = 'image' ORDER BY size DESC, mtime DESC LIMIT 1), "
-                                "  (SELECT id FROM assets WHERE stack_id = ? ORDER BY mtime DESC LIMIT 1)"
-                                "), "
-                                "updated_at = CURRENT_TIMESTAMP "
-                                "WHERE id = ?",
-                                (stack_id, stack_id, stack_id, stack_id),
+                                "UPDATE assets SET job_id = ? WHERE id = ?",
+                                (row_job_id, asset_id),
                             )
                     except Exception as ex:
                         logger.debug("Failed to assign prompt/job correlation: %s", ex)
@@ -1029,10 +1021,13 @@ def register_scan_routes(routes: web.RouteTableDef) -> None:
                                         if not item_id or item_id not in gen_time_by_id:
                                             continue
                                         payload = dict(item)
+                                        if not is_execution_grouping_enabled():
+                                            payload.pop("job_id", None)
+                                            payload.pop("stack_id", None)
                                         if item_id in gen_time_by_id:
                                             payload["generation_time_ms"] = gen_time_by_id[item_id]
                                         row_prompt = str(item.get("job_id") or prompt_id or "")
-                                        if row_prompt:
+                                        if is_execution_grouping_enabled() and row_prompt:
                                             payload["job_id"] = row_prompt
                                         payloads_by_id[item_id] = payload
                             except Exception:

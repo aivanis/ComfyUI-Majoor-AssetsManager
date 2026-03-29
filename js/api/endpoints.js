@@ -41,6 +41,7 @@ export const ENDPOINTS = {
     SETTINGS_OUTPUT_DIRECTORY: "/mjr/am/settings/output-directory",
     SETTINGS_METADATA_FALLBACK: "/mjr/am/settings/metadata-fallback",
     SETTINGS_VECTOR_SEARCH: "/mjr/am/settings/vector-search",
+    SETTINGS_EXECUTION_GROUPING: "/mjr/am/settings/execution-grouping",
     SETTINGS_HUGGINGFACE: "/mjr/am/settings/huggingface",
     SETTINGS_AI_LOGGING: "/mjr/am/settings/ai-logging",
 

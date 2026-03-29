@@ -8,15 +8,44 @@ import { APP_CONFIG } from "./config.js";
 
 // Auto-scan state (once per session)
 let startupScanDone = false;
+let startupScanTimer = null;
+
+function isExecutionIdle() {
+    try {
+        const runtime = window?.__MJR_EXECUTION_RUNTIME__;
+        return !String(runtime?.active_prompt_id || "").trim();
+    } catch (error) {
+        console.debug?.(error);
+        return true;
+    }
+}
 
 /**
  * Trigger background scan as soon as the ComfyUI frontend loads (if enabled).
  * This helps warming the DB before the Assets Manager panel is opened.
  */
-export async function triggerStartupScan() {
+export async function triggerStartupScan(options = {}) {
     if (!APP_CONFIG || typeof APP_CONFIG !== "object") return;
     if (!APP_CONFIG.AUTO_SCAN_ON_STARTUP) return;
     if (startupScanDone) return;
+    const delayMs = Math.max(0, Number(options?.delayMs) || 0);
+    const idleOnly = options?.idleOnly !== false;
+    if (delayMs > 0) {
+        if (startupScanTimer) clearTimeout(startupScanTimer);
+        startupScanTimer = setTimeout(() => {
+            startupScanTimer = null;
+            void triggerStartupScan({ ...options, delayMs: 0 });
+        }, delayMs);
+        return;
+    }
+    if (idleOnly && !isExecutionIdle()) {
+        if (startupScanTimer) clearTimeout(startupScanTimer);
+        startupScanTimer = setTimeout(() => {
+            startupScanTimer = null;
+            void triggerStartupScan({ ...options, delayMs: 0 });
+        }, 5000);
+        return;
+    }
     startupScanDone = true;
 
     try {

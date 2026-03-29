@@ -188,6 +188,15 @@ def _extract_vector_search_payload(body: dict) -> object | None:
     return None
 
 
+def _extract_execution_grouping_payload(body: dict) -> object | None:
+    if "enabled" in body:
+        return body.get("enabled")
+    prefs = body.get("prefs") if isinstance(body.get("prefs"), dict) else {}
+    if isinstance(prefs, dict) and "enabled" in prefs:
+        return prefs.get("enabled")
+    return None
+
+
 def _extract_huggingface_token_payload(body: dict) -> str | None:
     if "token" in body:
         return str(body.get("token") or "")
@@ -809,6 +818,67 @@ def register_health_routes(routes: web.RouteTableDef) -> None:
             request,
             "settings_vector_search",
             "settings:vector_search",
+            response_result,
+            enabled=enabled,
+        )
+        return _json_response(response_result)
+
+    @routes.get("/mjr/am/settings/execution-grouping")
+    async def get_execution_grouping_settings(request):
+        svc, error_result = await _require_services()
+        if error_result:
+            return _json_response(error_result)
+
+        settings_service = svc.get("settings")
+        if not settings_service:
+            return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Settings service unavailable"))
+
+        enabled = await settings_service.get_execution_grouping_enabled()
+        return _json_response(Result.Ok({"prefs": {"enabled": bool(enabled)}}))
+
+    @routes.post("/mjr/am/settings/execution-grouping")
+    async def update_execution_grouping_settings(request):
+        csrf = _csrf_error(request)
+        if csrf:
+            return _json_response(Result.Err(ErrorCode.CSRF, csrf))
+        auth = _require_write_access(request)
+        if not auth.ok:
+            return _json_response(auth)
+
+        svc, error_result = await _require_services()
+        if error_result:
+            return _json_response(error_result)
+
+        settings_service = svc.get("settings")
+        if not settings_service:
+            return _json_response(Result.Err(ErrorCode.SERVICE_UNAVAILABLE, "Settings service unavailable"))
+
+        body_res = await _read_json(request)
+        if not body_res.ok:
+            return _json_response(body_res)
+        body = body_res.data or {}
+
+        enabled = _extract_execution_grouping_payload(body)
+        if enabled is None:
+            return _json_response(Result.Err("INVALID_INPUT", "Missing execution-grouping enabled value"))
+
+        result = await settings_service.set_execution_grouping_enabled(enabled)
+        if not result.ok:
+            await _audit_settings_write(
+                svc,
+                request,
+                "settings_execution_grouping",
+                "settings:execution_grouping",
+                result,
+                enabled=enabled,
+            )
+            return _json_response(result)
+        response_result = Result.Ok({"prefs": {"enabled": bool(result.data)}})
+        await _audit_settings_write(
+            svc,
+            request,
+            "settings_execution_grouping",
+            "settings:execution_grouping",
             response_result,
             enabled=enabled,
         )

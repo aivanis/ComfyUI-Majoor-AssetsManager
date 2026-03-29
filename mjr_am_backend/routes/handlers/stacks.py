@@ -13,6 +13,7 @@ Routes:
 """
 
 from aiohttp import web
+from mjr_am_backend.config import is_execution_grouping_enabled
 from mjr_am_backend.shared import Result, get_logger
 
 from ..core import (
@@ -203,6 +204,16 @@ def register_stacks_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if not is_execution_grouping_enabled():
+            return _json_response(
+                Result.Ok(
+                    {
+                        "disabled": True,
+                        "targeted_job_id": None,
+                        "stacks": [],
+                    }
+                )
+            )
         services, error_result = await _require_services()
         if error_result is not None or not services:
             return _json_response(error_result or Result.Err("SERVICE_UNAVAILABLE", "Backend not ready"), status=503)

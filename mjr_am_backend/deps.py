@@ -19,12 +19,14 @@ from .config import (
     INDEX_DB,
     VECTORS_DB,
     WATCHER_ENABLED,
+    WATCHER_START_ON_BOOT,
     initialize_directories,
     is_vector_search_enabled,
 )
 from .features.duplicates import DuplicatesService
 from .features.health import HealthService
 from .features.index import IndexService
+from .features.index.vector_runtime import ensure_vector_runtime
 from .features.index.watcher import OutputWatcher
 from .features.index.watcher_scope import build_watch_paths, load_watcher_scope
 from .features.metadata import MetadataService
@@ -127,13 +129,7 @@ def _build_services_dict(
     # ── Vector / multimodal search (opt-in) ───────────────────────────
     if is_vector_search_enabled():
         try:
-            from .features.index.vector_searcher import VectorSearcher
-            from .features.index.vector_service import VectorService
-
-            vs = VectorService()
-            services["vector_service"] = vs
-            services["vector_searcher"] = VectorSearcher(db, vs)
-            log_success(logger, "SigLIP2/X-CLIP vector search enabled")
+            log_success(logger, "SigLIP2/X-CLIP vector search enabled (lazy init)")
         except Exception as exc:
             logger.warning("Vector search disabled: %s", exc)
     return services
@@ -155,7 +151,7 @@ def _attach_rating_tags_sync_worker(services: dict, exiftool: ExifTool) -> None:
 
 
 async def _attach_watcher_if_enabled(services: dict, index_service: IndexService) -> None:
-    if not WATCHER_ENABLED:
+    if not WATCHER_ENABLED or not WATCHER_START_ON_BOOT:
         return
     try:
         watcher = await _create_watcher(index_service)
@@ -233,11 +229,13 @@ async def build_services(db_path: str | None = None) -> Result[dict]:
         index_service,
         settings_service,
     )
-    # Attach vector services to IndexService for automatic background embedding.
-    if "vector_service" in services and callable(getattr(index_service, "set_vector_services", None)):
-        index_service.set_vector_services(
-            services["vector_service"],
-            services.get("vector_searcher"),
+    if callable(getattr(index_service, "set_vector_services_resolver", None)):
+        index_service.set_vector_services_resolver(
+            lambda: ensure_vector_runtime(
+                services,
+                logger=logger,
+                reason="automatic-indexing",
+            )
         )
     services["watcher_scope"] = await _load_watcher_scope_or_default(db)
     services["watcher_scope_by_user"] = {}

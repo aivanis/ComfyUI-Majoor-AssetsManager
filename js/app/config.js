@@ -73,6 +73,7 @@ export const APP_DEFAULTS = Object.freeze({
 
     // Auto-scan on startup
     AUTO_SCAN_ON_STARTUP: false,
+    EXECUTION_GROUPING_ENABLED: true,
 
     // Rating/tags hydration (grid)
     RT_HYDRATE_CONCURRENCY: 2,

@@ -943,6 +943,14 @@ export async function setVectorSearchSettings(enabled = true) {
     return post(ENDPOINTS.SETTINGS_VECTOR_SEARCH, { enabled: !!enabled });
 }
 
+export async function getExecutionGroupingSettings() {
+    return get(ENDPOINTS.SETTINGS_EXECUTION_GROUPING);
+}
+
+export async function setExecutionGroupingSettings(enabled = true) {
+    return post(ENDPOINTS.SETTINGS_EXECUTION_GROUPING, { enabled: !!enabled });
+}
+
 export async function getHuggingFaceSettings() {
     return get(ENDPOINTS.SETTINGS_HUGGINGFACE);
 }

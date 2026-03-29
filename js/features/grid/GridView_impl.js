@@ -112,6 +112,9 @@ const RT_HYDRATE_STATE = new WeakMap(); // gridContainer -> { queue, inflight, s
 const UPSERT_BATCH_DEBOUNCE_MS = 200; // Debounce window for batch flush
 const UPSERT_BATCH_MAX_SIZE = 50; // Max items before forced flush
 const UPSERT_BATCH_STATE = new WeakMap(); // gridContainer -> { pending: Map<id, asset>, timer: number|null }
+const GRID_SNAPSHOT_CACHE = new Map(); // snapshotKey -> { assets, title, at }
+const GRID_SNAPSHOT_CACHE_MAX = 8;
+const GRID_SNAPSHOT_ASSET_LIMIT = 160;
 
 // Temporary debug logging for grid + infinite scroll.
 // Enable at runtime from the browser console:
@@ -132,6 +135,81 @@ const gridDebug = (...args) => {
         console.debug?.(e);
     }
 };
+
+function _normalizeSnapshotPart(value, fallback = "") {
+    try {
+        return String(value ?? fallback).trim();
+    } catch {
+        return String(fallback);
+    }
+}
+
+export function buildGridSnapshotKey(parts = {}) {
+    return JSON.stringify({
+        scope: _normalizeSnapshotPart(parts.scope || "output", "output"),
+        query: _normalizeSnapshotPart(parts.query || "*", "*"),
+        customRootId: _normalizeSnapshotPart(parts.customRootId || ""),
+        subfolder: _normalizeSnapshotPart(parts.subfolder || ""),
+        collectionId: _normalizeSnapshotPart(parts.collectionId || ""),
+        viewScope: _normalizeSnapshotPart(parts.viewScope || ""),
+    });
+}
+
+function _snapshotKeyFromGrid(gridContainer, state) {
+    try {
+        return buildGridSnapshotKey({
+            scope: gridContainer?.dataset?.mjrScope || state?.scope || "output",
+            query: gridContainer?.dataset?.mjrQuery || state?.query || "*",
+            customRootId: gridContainer?.dataset?.mjrCustomRootId || "",
+            subfolder: gridContainer?.dataset?.mjrSubfolder || "",
+            collectionId: state?.collectionId || "",
+            viewScope: state?.viewScope || "",
+        });
+    } catch (e) {
+        console.debug?.(e);
+        return "";
+    }
+}
+
+function _rememberGridSnapshot(gridContainer, state, title = "") {
+    try {
+        const assets = Array.isArray(state?.assets) ? state.assets : [];
+        if (!assets.length) return;
+        const key = _snapshotKeyFromGrid(gridContainer, state);
+        if (!key) return;
+        GRID_SNAPSHOT_CACHE.delete(key);
+        GRID_SNAPSHOT_CACHE.set(key, {
+            assets: assets.slice(0, GRID_SNAPSHOT_ASSET_LIMIT).map((asset) => ({ ...asset })),
+            title: String(title || "").trim(),
+            at: Date.now(),
+        });
+        while (GRID_SNAPSHOT_CACHE.size > GRID_SNAPSHOT_CACHE_MAX) {
+            const oldestKey = GRID_SNAPSHOT_CACHE.keys().next().value;
+            if (!oldestKey) break;
+            GRID_SNAPSHOT_CACHE.delete(oldestKey);
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+}
+
+export async function hydrateGridFromSnapshot(gridContainer, parts = {}, options = {}) {
+    try {
+        const key = buildGridSnapshotKey(parts);
+        const snapshot = GRID_SNAPSHOT_CACHE.get(key);
+        if (!snapshot || !Array.isArray(snapshot.assets) || !snapshot.assets.length) return false;
+        const state = getOrCreateState(gridContainer);
+        if (Array.isArray(state?.assets) && state.assets.length) return false;
+        await loadAssetsFromList(gridContainer, snapshot.assets, {
+            title: snapshot.title || options.title || "Cached",
+            reset: true,
+        });
+        return true;
+    } catch (e) {
+        console.debug?.(e);
+        return false;
+    }
+}
 
 function _getRenderedCards(gridContainer) {
     if (!gridContainer) return [];
@@ -1273,6 +1351,7 @@ export async function loadAssets(gridContainer, query = "*", options = {}) {
                 setGridMessage(gridContainer, "No assets found", { clear: true });
             } else {
                 startInfiniteScroll(gridContainer, state);
+                _rememberGridSnapshot(gridContainer, state, state.query);
             }
         }
         return { ok: true, count: state.offset, total: state.total || 0 };
@@ -1458,6 +1537,8 @@ export async function loadAssetsFromList(gridContainer, assets, options = {}) {
                     state.virtualGrid = null;
                 }
                 setGridMessage(gridContainer, "No assets found", { clear: true });
+            } else {
+                _rememberGridSnapshot(gridContainer, state, title);
             }
         }
 

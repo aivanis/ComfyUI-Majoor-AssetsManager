@@ -9,7 +9,7 @@
 import { safeDispatchCustomEvent } from "../../utils/events.js";
 import { initI18n, setFollowComfyLanguage, startComfyLanguageSync } from "../i18n.js";
 import { debounce } from "../../utils/debounce.js";
-import { getWatcherStatus, toggleWatcher } from "../../api/client.js";
+import { getWatcherStatus } from "../../api/client.js";
 
 import {
     loadMajoorSettings,
@@ -17,6 +17,7 @@ import {
     applySettingsToConfig,
     syncBackendSecuritySettings,
     syncBackendVectorSearchSettings,
+    syncBackendExecutionGroupingSettings,
 } from "./settingsCore.js";
 import { startRuntimeStatusDashboard } from "./settingsRuntime.js";
 import { registerGridSettings } from "./settingsGrid.js";
@@ -189,15 +190,8 @@ function ensureMajoorSettingsContext(app, onApplied, { initRuntime = false } = {
         startComfyLanguageSync(runtimeApp);
         void syncBackendSecuritySettings();
         void syncBackendVectorSearchSettings();
+        void syncBackendExecutionGroupingSettings();
         startRuntimeStatusDashboard();
-        try {
-            const desired = !!settings?.watcher?.enabled;
-            setTimeout(() => {
-                toggleWatcher(desired).catch(() => {});
-            }, 0);
-        } catch (e) {
-            console.debug?.(e);
-        }
         _settingsRuntimeInitialized = true;
     }
     return _settingsContext;
