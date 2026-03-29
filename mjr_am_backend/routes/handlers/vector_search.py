@@ -21,6 +21,7 @@ from ...config import (
     is_vector_search_enabled,
 )
 from ...features.index.searcher import _build_filter_clauses
+from ...features.index.vector_runtime import ensure_vector_runtime
 from ...shared import Result, get_logger
 from ..core import _json_response, _require_services, safe_error_message
 from ..core.security import _check_rate_limit
@@ -419,22 +420,12 @@ def _require_vector_services(services: dict[str, Any]):
 
     vs = services.get("vector_searcher")
     if vs is None:
-        db = services.get("db")
-        if db is not None:
-            try:
-                from ...features.index.vector_searcher import VectorSearcher
-                from ...features.index.vector_service import VectorService
-
-                vector_service = services.get("vector_service")
-                if vector_service is None:
-                    vector_service = VectorService()
-                    services["vector_service"] = vector_service
-                vs = VectorSearcher(db, vector_service)
-                services["vector_searcher"] = vs
-                logger.info("Vector services initialized lazily")
-            except Exception as exc:
-                logger.warning("Lazy vector service init failed: %s", exc)
-                vs = None
+        return None, _json_response(
+            Result.Err(
+                "SERVICE_UNAVAILABLE",
+                "Vector search is unavailable (dependencies/model not ready).",
+            ),
+        )
 
     if vs is None:
         return None, _json_response(
@@ -444,6 +435,36 @@ def _require_vector_services(services: dict[str, Any]):
             ),
         )
     return vs, None
+
+
+async def _require_vector_services_async(services: dict[str, Any]):
+    if not is_vector_search_enabled():
+        return None, _json_response(
+            Result.Err(
+                "SERVICE_UNAVAILABLE",
+                "Vector search is disabled. Enable it in Majoor settings (AI toggle) or set MJR_AM_ENABLE_VECTOR_SEARCH=1.",
+            ),
+        )
+    existing = services.get("vector_searcher") if isinstance(services, dict) else None
+    if existing is not None:
+        return existing, None
+    try:
+        _vector_service, vector_searcher = await ensure_vector_runtime(
+            services,
+            logger=logger,
+            reason="vector-routes",
+        )
+    except Exception as exc:
+        logger.warning("Lazy vector service init failed: %s", exc)
+        vector_searcher = None
+    if vector_searcher is None:
+        return None, _json_response(
+            Result.Err(
+                "SERVICE_UNAVAILABLE",
+                "Vector search is unavailable (dependencies/model not ready).",
+            ),
+        )
+    return vector_searcher, None
 
 
 async def _hydrate_vector_results(
@@ -517,7 +538,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
             return _json_response(err)
         services_dict = _services_dict(services)
 
-        searcher, verr = _require_vector_services(services_dict)
+        searcher, verr = await _require_vector_services_async(services_dict)
         if verr or searcher is None:
             return verr or _json_response(
                 Result.Err("SERVICE_UNAVAILABLE", "Vector search is unavailable.")
@@ -593,7 +614,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
             return _json_response(err)
         services_dict = _services_dict(services)
 
-        searcher, verr = _require_vector_services(services_dict)
+        searcher, verr = await _require_vector_services_async(services_dict)
         if verr or searcher is None:
             return verr or _json_response(
                 Result.Err("SERVICE_UNAVAILABLE", "Vector search is unavailable.")
@@ -653,7 +674,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
             return _json_response(err)
         services_dict = _services_dict(services)
 
-        searcher, verr = _require_vector_services(services_dict)
+        searcher, verr = await _require_vector_services_async(services_dict)
         if verr or searcher is None:
             return verr or _json_response(
                 Result.Err("SERVICE_UNAVAILABLE", "Vector search is unavailable.")
@@ -807,7 +828,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
             return _json_response(err)
         services_dict = _services_dict(services)
 
-        searcher, verr = _require_vector_services(services_dict)
+        searcher, verr = await _require_vector_services_async(services_dict)
         if verr or searcher is None:
             return verr or _json_response(
                 Result.Err("SERVICE_UNAVAILABLE", "Vector search is unavailable.")
@@ -883,7 +904,7 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
             return _json_response(err)
         services_dict = _services_dict(services)
 
-        searcher, verr = _require_vector_services(services_dict)
+        searcher, verr = await _require_vector_services_async(services_dict)
         if verr or searcher is None:
             return verr or _json_response(
                 Result.Err("SERVICE_UNAVAILABLE", "Vector search is unavailable.")

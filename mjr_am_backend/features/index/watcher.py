@@ -30,6 +30,7 @@ from ...config import (
     WATCHER_DEBOUNCE_MS,
     WATCHER_DEDUPE_TTL_MS,
     WATCHER_FLUSH_MAX_FILES,
+    WATCHER_GENERATED_GRACE_SECONDS,
     WATCHER_MAX_FILE_SIZE_BYTES,
     WATCHER_MAX_FLUSH_CONCURRENCY,
     WATCHER_MIN_FILE_SIZE_BYTES,
@@ -428,10 +429,14 @@ class DebouncedWatchHandler(FileSystemEventHandler):
 
     def _filter_flush_candidates(self, candidates: list[str]) -> list[str]:
         files: list[str] = []
+        deferred_recent: list[str] = []
         for f in candidates:
             if _is_recent_generated(f):
                 continue
             if not self._is_supported_flush_file(f):
+                continue
+            if self._should_defer_recent_file(f):
+                deferred_recent.append(f)
                 continue
             size = self._flush_file_size_if_eligible(f)
             if size is None:
@@ -441,7 +446,35 @@ class DebouncedWatchHandler(FileSystemEventHandler):
                 logger.debug("Watcher skipping oversized file %s (%d bytes > %d)", f, size, max_size)
                 continue
             files.append(f)
+        if deferred_recent:
+            self._requeue_deferred_recent_files(deferred_recent)
         return files
+
+    @staticmethod
+    def _should_defer_recent_file(filepath: str) -> bool:
+        grace_s = max(0.0, float(WATCHER_GENERATED_GRACE_SECONDS or 0.0))
+        if grace_s <= 0.0:
+            return False
+        try:
+            stat = os.stat(filepath)
+        except OSError:
+            return False
+        now = time.time()
+        latest_ts = max(
+            float(getattr(stat, "st_mtime", 0.0) or 0.0),
+            float(getattr(stat, "st_ctime", 0.0) or 0.0),
+        )
+        if latest_ts <= 0.0:
+            return False
+        return (now - latest_ts) < grace_s
+
+    def _requeue_deferred_recent_files(self, files: list[str]) -> None:
+        now = time.time()
+        with self._lock:
+            for f in files:
+                if f not in self._pending and f not in self._overflow:
+                    self._overflow[f] = now
+            self._schedule_flush()
 
     @staticmethod
     def _is_supported_flush_file(filepath: str) -> bool:

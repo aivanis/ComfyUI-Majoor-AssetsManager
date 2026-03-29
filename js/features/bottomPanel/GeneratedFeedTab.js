@@ -12,6 +12,7 @@ import { APP_CONFIG } from "../../app/config.js";
 
 const FEED_FETCH_LIMIT = 240;
 const FEED_PAGE_SIZE = 120;
+const FEED_PUSH_RENDER_DEBOUNCE_MS = 80;
 
 function _getRenderedCards(grid) {
     try {
@@ -122,6 +123,9 @@ const FEED_STATE = {
 };
 
 function _getAssetGroupKey(asset) {
+    if (!APP_CONFIG.EXECUTION_GROUPING_ENABLED) {
+        return _assetKey(asset);
+    }
     const stackId = String(asset?.stack_id || "").trim();
     if (stackId) return `stack:${stackId}`;
     const jobId = String(asset?.job_id || "").trim();
@@ -177,6 +181,15 @@ function _storeHostAsset(host, asset) {
     if (!host.assetsByKey) host.assetsByKey = new Map();
     host.assetsByKey.set(_assetKey(normalized), normalized);
     return normalized;
+}
+
+function _scheduleHostRender(host) {
+    if (!host?.grid || !host.loaded) return;
+    if (host._renderTimer) return;
+    host._renderTimer = setTimeout(() => {
+        host._renderTimer = null;
+        void _renderHostAssets(host);
+    }, FEED_PUSH_RENDER_DEBOUNCE_MS);
 }
 
 function _openGroupViewer(groupedAsset, startIndex = 0) {
@@ -560,7 +573,7 @@ export function pushGeneratedAsset(asset) {
             _storeHostAsset(host, normalized);
             if (!host.loaded) continue;
             host.empty.style.display = "none";
-            void _renderHostAssets(host);
+            _scheduleHostRender(host);
         } catch (e) {
             console.debug?.(e);
         }
@@ -609,6 +622,14 @@ export function disposeGeneratedFeedTab(host) {
     }
     try {
         resolvedHost.popoverManager?.dispose?.();
+    } catch (e) {
+        console.debug?.(e);
+    }
+    try {
+        if (resolvedHost._renderTimer) {
+            clearTimeout(resolvedHost._renderTimer);
+            resolvedHost._renderTimer = null;
+        }
     } catch (e) {
         console.debug?.(e);
     }

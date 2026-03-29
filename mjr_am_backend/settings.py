@@ -12,7 +12,12 @@ import time
 from collections.abc import Mapping
 from typing import Any
 
-from .config import MEDIA_PROBE_BACKEND, OUTPUT_ROOT, is_vector_search_enabled
+from .config import (
+    MEDIA_PROBE_BACKEND,
+    OUTPUT_ROOT,
+    is_execution_grouping_enabled,
+    is_vector_search_enabled,
+)
 from .shared import Result, get_logger
 from .utils import env_bool, parse_bool
 
@@ -23,6 +28,7 @@ _OUTPUT_DIRECTORY_KEY = "output_directory_override"
 _METADATA_FALLBACK_IMAGE_KEY = "metadata_fallback_image"
 _METADATA_FALLBACK_MEDIA_KEY = "metadata_fallback_media"
 _VECTOR_SEARCH_ENABLED_KEY = "vector_search_enabled"
+_EXECUTION_GROUPING_ENABLED_KEY = "execution_grouping_enabled"
 _HUGGINGFACE_TOKEN_KEY = "huggingface_token"
 _AI_VERBOSE_LOGS_KEY = "ai_verbose_logs"
 _SETTINGS_VERSION_KEY = "__settings_version"
@@ -85,6 +91,7 @@ class AppSettings:
         self._default_metadata_fallback_image = True
         self._default_metadata_fallback_media = True
         self._default_vector_search_enabled = bool(is_vector_search_enabled())
+        self._default_execution_grouping_enabled = bool(is_execution_grouping_enabled())
         self._default_ai_verbose_logs = self._env_ai_verbose_logs_enabled()
         self._runtime_api_token: str = ""
         self._runtime_api_token_hash: str = ""
@@ -752,6 +759,21 @@ class AppSettings:
             return None
         return parse_bool(cached, self._default_vector_search_enabled)
 
+    def _cached_execution_grouping_pref(self, current_version: int) -> bool | None:
+        cached = self._cache.get(_EXECUTION_GROUPING_ENABLED_KEY)
+        if cached is None:
+            return None
+        try:
+            ts = float(self._cache_at.get(_EXECUTION_GROUPING_ENABLED_KEY) or 0.0)
+        except Exception:
+            ts = 0.0
+        cached_ver = int(self._cache_version.get(_EXECUTION_GROUPING_ENABLED_KEY) or 0)
+        if cached_ver != int(current_version or 0):
+            return None
+        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
+            return None
+        return parse_bool(cached, self._default_execution_grouping_enabled)
+
     async def set_vector_search_enabled(self, enabled: Any) -> Result[bool]:
         """Persist vector-search enable preference and apply runtime env vars."""
         normalized = parse_bool(enabled, self._default_vector_search_enabled)
@@ -770,6 +792,57 @@ class AppSettings:
             self._cache[_VECTOR_SEARCH_ENABLED_KEY] = "1" if normalized else "0"
             self._cache_at[_VECTOR_SEARCH_ENABLED_KEY] = time.monotonic()
             self._cache_version[_VECTOR_SEARCH_ENABLED_KEY] = current_version
+            return Result.Ok(normalized)
+
+    async def get_execution_grouping_enabled(self) -> bool:
+        """Return persisted execution-grouping enable preference."""
+        async with self._lock:
+            current_version = await self._get_settings_version()
+            cached = self._cached_execution_grouping_pref(current_version)
+            if cached is not None:
+                return cached
+            raw = await self._read_setting(_EXECUTION_GROUPING_ENABLED_KEY)
+            enabled = (
+                parse_bool(raw, self._default_execution_grouping_enabled)
+                if raw is not None
+                else self._default_execution_grouping_enabled
+            )
+            self._cache[_EXECUTION_GROUPING_ENABLED_KEY] = "1" if enabled else "0"
+            self._cache_at[_EXECUTION_GROUPING_ENABLED_KEY] = time.monotonic()
+            self._cache_version[_EXECUTION_GROUPING_ENABLED_KEY] = int(current_version or 0)
+            return enabled
+
+    @staticmethod
+    def _set_execution_grouping_env_vars(enabled: bool) -> None:
+        normalized = "1" if parse_bool(enabled, True) else "0"
+        try:
+            os.environ["MJR_AM_EXECUTION_GROUPING_ENABLED"] = normalized
+            os.environ["MAJOOR_EXECUTION_GROUPING_ENABLED"] = normalized
+        except Exception:
+            pass
+
+    async def set_execution_grouping_enabled(self, enabled: Any) -> Result[bool]:
+        """Persist execution-grouping enable preference and apply runtime env vars."""
+        normalized = parse_bool(enabled, self._default_execution_grouping_enabled)
+        async with self._lock:
+            res = await self._write_setting(
+                _EXECUTION_GROUPING_ENABLED_KEY, "1" if normalized else "0"
+            )
+            if not res.ok:
+                return Result.Err(
+                    "DB_ERROR", res.error or "Failed to persist execution_grouping_enabled"
+                )
+            self._set_execution_grouping_env_vars(normalized)
+            bump = await self._bump_settings_version_locked()
+            if not bump.ok:
+                try:
+                    logger.warning("Failed to bump settings version: %s", bump.error)
+                except Exception:
+                    pass
+            current_version = int(bump.data or await self._get_settings_version() or 0)
+            self._cache[_EXECUTION_GROUPING_ENABLED_KEY] = "1" if normalized else "0"
+            self._cache_at[_EXECUTION_GROUPING_ENABLED_KEY] = time.monotonic()
+            self._cache_version[_EXECUTION_GROUPING_ENABLED_KEY] = current_version
             return Result.Ok(normalized)
 
     async def get_huggingface_token_info(self) -> dict[str, Any]:
@@ -1086,6 +1159,29 @@ class AppSettings:
                 logger.info("Restored vector search setting on startup: %s", "enabled" if enabled else "disabled")
         except Exception as exc:
             logger.warning("Failed to restore vector search setting on startup: %s", exc)
+
+    async def apply_execution_grouping_override_on_startup(self) -> None:
+        """Restore execution-grouping enabled preference into environment on startup."""
+        try:
+            async with self._lock:
+                raw = await self._read_setting(_EXECUTION_GROUPING_ENABLED_KEY)
+                enabled = (
+                    parse_bool(raw, self._default_execution_grouping_enabled)
+                    if raw is not None
+                    else self._default_execution_grouping_enabled
+                )
+                self._set_execution_grouping_env_vars(enabled)
+                self._cache[_EXECUTION_GROUPING_ENABLED_KEY] = "1" if enabled else "0"
+                self._cache_at[_EXECUTION_GROUPING_ENABLED_KEY] = time.monotonic()
+                self._cache_version[_EXECUTION_GROUPING_ENABLED_KEY] = int(
+                    await self._get_settings_version() or 0
+                )
+                logger.info(
+                    "Restored execution grouping setting on startup: %s",
+                    "enabled" if enabled else "disabled",
+                )
+        except Exception as exc:
+            logger.warning("Failed to restore execution grouping setting on startup: %s", exc)
 
     async def apply_huggingface_token_on_startup(self) -> None:
         try:

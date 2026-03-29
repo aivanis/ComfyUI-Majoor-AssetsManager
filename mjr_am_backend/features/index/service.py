@@ -27,6 +27,7 @@ from .scan_batch_utils import compute_state_hash, normalize_filepath_str
 from .scanner import IndexScanner
 from .searcher import IndexSearcher
 from .updater import AssetUpdater
+from .vector_runtime import ensure_vector_runtime
 
 if TYPE_CHECKING:
     from .vector_searcher import VectorSearcher
@@ -131,6 +132,9 @@ async def _update_path_keyed_index_tables(
 
 
 def _build_runtime_vector_services(db: Sqlite) -> tuple[VectorService, VectorSearcher]:
+    """
+    Backward-compatible hook kept for tests and narrow monkeypatching.
+    """
     from .vector_searcher import VectorSearcher as _VS
     from .vector_service import VectorService as _VSvc
 
@@ -159,6 +163,7 @@ class IndexService:
         self._has_tags_text_column = has_tags_text_column
         self._vector_service: VectorService | None = None
         self._vector_searcher: VectorSearcher | None = None
+        self._vector_services_resolver = None
         logger.debug("asset_metadata.tags_text column available: %s", self._has_tags_text_column)
 
         # Initialize specialized components
@@ -179,6 +184,10 @@ class IndexService:
         self._vector_searcher = vector_searcher
         self._scanner.set_vector_services(vector_service, vector_searcher)
 
+    def set_vector_services_resolver(self, resolver) -> None:
+        """Attach a shared lazy resolver so all runtime paths reuse one vector stack."""
+        self._vector_services_resolver = resolver
+
     def _ensure_vector_services(self) -> None:
         if self._vector_service is not None:
             self._scanner.set_vector_services(self._vector_service, self._vector_searcher)
@@ -190,8 +199,26 @@ class IndexService:
         except Exception as exc:
             logger.debug("Runtime vector service initialization skipped: %s", exc)
             return
-        self.set_vector_services(vector_service, vector_searcher)
-        logger.info("Runtime vector services initialized for automatic indexing")
+        if vector_service is not None:
+            self.set_vector_services(vector_service, vector_searcher)
+
+    async def _ensure_vector_services_async(self) -> None:
+        if self._vector_service is not None:
+            self._scanner.set_vector_services(self._vector_service, self._vector_searcher)
+            return
+        if not is_vector_search_enabled():
+            return
+        resolver = self._vector_services_resolver
+        if callable(resolver):
+            try:
+                vector_service, vector_searcher = await resolver()
+            except Exception as exc:
+                logger.debug("Runtime vector service initialization skipped: %s", exc)
+                return
+            if vector_service is not None:
+                self.set_vector_services(vector_service, vector_searcher)
+                return
+        self._ensure_vector_services()
 
     # ==================== Scanning Operations ====================
 
@@ -220,7 +247,7 @@ class IndexService:
         Returns:
             Result with scan statistics
         """
-        self._ensure_vector_services()
+        await self._ensure_vector_services_async()
         self._enricher.begin_scan_pause()
         try:
             result = await self._scanner.scan_directory(

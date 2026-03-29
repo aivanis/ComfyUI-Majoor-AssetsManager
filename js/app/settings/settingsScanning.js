@@ -3,7 +3,12 @@
  */
 
 import { APP_DEFAULTS } from "../config.js";
-import { toggleWatcher, getWatcherSettings, updateWatcherSettings } from "../../api/client.js";
+import {
+    toggleWatcher,
+    getWatcherSettings,
+    updateWatcherSettings,
+    setExecutionGroupingSettings,
+} from "../../api/client.js";
 import { comfyToast } from "../toast.js";
 import { t } from "../i18n.js";
 import { _safeNum } from "./settingsUtils.js";
@@ -21,6 +26,45 @@ const SETTINGS_CATEGORY = "Majoor Assets Manager";
  */
 export function registerScanningSettings(safeAddSetting, settings, notifyApplied) {
     const cat = (section, label) => [SETTINGS_CATEGORY, section, label];
+
+    safeAddSetting({
+        id: `${SETTINGS_PREFIX}.ExecutionGrouping.Enabled`,
+        category: cat(t("cat.scanning"), "Execution grouping"),
+        name: "Execution job/stack grouping",
+        tooltip:
+            "Enable or disable all live job_id / stack_id tracking, grouping, and stack finalization logic.",
+        type: "boolean",
+        defaultValue: !!(
+            settings.executionGrouping?.enabled ?? APP_DEFAULTS.EXECUTION_GROUPING_ENABLED
+        ),
+        onChange: async (value) => {
+            const previous = !!(
+                settings.executionGrouping?.enabled ?? APP_DEFAULTS.EXECUTION_GROUPING_ENABLED
+            );
+            const normalized = !!value;
+            settings.executionGrouping = settings.executionGrouping || {};
+            settings.executionGrouping.enabled = normalized;
+            saveMajoorSettings(settings);
+            applySettingsToConfig(settings);
+            notifyApplied("executionGrouping.enabled");
+            try {
+                const res = await setExecutionGroupingSettings(normalized);
+                if (!res?.ok) {
+                    throw new Error(res?.error || "Failed to update execution grouping setting");
+                }
+                settings.executionGrouping.enabled = !!res?.data?.prefs?.enabled;
+                saveMajoorSettings(settings);
+                applySettingsToConfig(settings);
+                notifyApplied("executionGrouping.enabled");
+            } catch (error) {
+                settings.executionGrouping.enabled = previous;
+                saveMajoorSettings(settings);
+                applySettingsToConfig(settings);
+                notifyApplied("executionGrouping.enabled");
+                comfyToast(error?.message || "Failed to update execution grouping setting", "error");
+            }
+        },
+    });
 
     safeAddSetting({
         id: `${SETTINGS_PREFIX}.AutoScan.OnStartup`,

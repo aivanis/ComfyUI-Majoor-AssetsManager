@@ -22,6 +22,10 @@ async def apply_startup_settings(
             "apply_vector_search_override_on_startup",
         ),
         (
+            "Execution grouping setting restore failed: %s",
+            "apply_execution_grouping_override_on_startup",
+        ),
+        (
             "HuggingFace token restore failed: %s",
             "apply_huggingface_token_on_startup",
         ),

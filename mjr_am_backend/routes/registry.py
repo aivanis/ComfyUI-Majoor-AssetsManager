@@ -38,6 +38,7 @@ from .handlers import (
     register_stacks_routes,
     register_vector_search_routes,
     register_vendor_routes,
+    register_plugin_routes,
     register_version_routes,
     register_viewer_routes,
 )
@@ -357,6 +358,13 @@ def register_all_routes() -> web.RouteTableDef:
         logger.info("  POST /mjr/am/vector/suggest-collections (Added)")
     except Exception as e:
         logger.error(f"Failed to register vector search routes: {e}")
+    try:
+        register_plugin_routes(routes)
+        logger.info("  GET /mjr/am/plugins/list (Added)")
+        logger.info("  POST /mjr/am/plugins/{name}/enable (Added)")
+        logger.info("  POST /mjr/am/plugins/reload (Added)")
+    except Exception as e:
+        logger.error(f"Failed to register plugin routes: {e}")
     try:
         register_hybrid_search_routes(routes)
         logger.info("  GET /mjr/am/search/hybrid (Added)")

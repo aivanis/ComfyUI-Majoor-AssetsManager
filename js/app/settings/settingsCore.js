@@ -8,6 +8,7 @@ import {
     getSecuritySettings,
     bootstrapSecurityToken,
     getVectorSearchSettings,
+    getExecutionGroupingSettings,
 } from "../../api/client.js";
 import { safeDispatchCustomEvent } from "../../utils/events.js";
 import { SettingsStore } from "./SettingsStore.js";
@@ -140,6 +141,9 @@ export const DEFAULT_SETTINGS = {
         vectorSearchEnabled: true,
         verboseAiLogs: false,
     },
+    executionGrouping: {
+        enabled: APP_DEFAULTS.EXECUTION_GROUPING_ENABLED,
+    },
     workflowMinimap: {
         enabled: false,
         nodeColors: true,
@@ -211,6 +215,7 @@ export const loadMajoorSettings = () => {
             "cache",
             "search",
             "ai",
+            "executionGrouping",
             "workflowMinimap",
             "ui",
             "security",
@@ -292,6 +297,9 @@ export const applySettingsToConfig = (settings) => {
     );
     APP_CONFIG.DEFAULT_PAGE_SIZE = pageSize;
     APP_CONFIG.AUTO_SCAN_ON_STARTUP = !!settings.autoScan?.onStartup;
+    APP_CONFIG.EXECUTION_GROUPING_ENABLED = !!(
+        settings.executionGrouping?.enabled ?? APP_DEFAULTS.EXECUTION_GROUPING_ENABLED
+    );
     APP_CONFIG.STATUS_POLL_INTERVAL = Math.max(
         1000,
         Number(settings.status?.pollInterval) || APP_DEFAULTS.STATUS_POLL_INTERVAL,
@@ -650,5 +658,30 @@ export async function syncBackendVectorSearchSettings() {
         );
     } catch (error) {
         console.warn("[Majoor] failed to sync backend vector search settings", error);
+    }
+}
+
+export async function syncBackendExecutionGroupingSettings() {
+    try {
+        const res = await getExecutionGroupingSettings();
+        if (!res?.ok) return;
+        const prefs = res.data?.prefs;
+        if (!prefs || typeof prefs !== "object") return;
+
+        const settings = loadMajoorSettings();
+        settings.executionGrouping = settings.executionGrouping || {};
+        settings.executionGrouping.enabled = _safeBool(
+            prefs.enabled,
+            settings.executionGrouping.enabled ?? APP_DEFAULTS.EXECUTION_GROUPING_ENABLED,
+        );
+        saveMajoorSettings(settings);
+        applySettingsToConfig(settings);
+        safeDispatchCustomEvent(
+            "mjr-settings-changed",
+            { key: "executionGrouping.enabled" },
+            { warnPrefix: "[Majoor]" },
+        );
+    } catch (error) {
+        console.warn("[Majoor] failed to sync backend execution grouping settings", error);
     }
 }

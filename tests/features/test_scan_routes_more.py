@@ -17,6 +17,19 @@ def _app():
     return app
 
 
+def test_should_preserve_existing_job_blocks_conflicting_job_ids() -> None:
+    assert scan_mod._should_preserve_existing_job("core-job-1", "mjr-job-2") is True
+    assert scan_mod._should_preserve_existing_job("core-job-1", "core-job-1") is False
+    assert scan_mod._should_preserve_existing_job("", "mjr-job-2") is False
+
+
+def test_resolve_stack_assignment_prefers_candidate_then_existing() -> None:
+    assert scan_mod._resolve_stack_assignment(12, 34) == 34
+    assert scan_mod._resolve_stack_assignment(12, None) == 12
+    assert scan_mod._resolve_stack_assignment(None, "9") == 9
+    assert scan_mod._resolve_stack_assignment(None, None) is None
+
+
 @pytest.mark.asyncio
 async def test_index_files_rejects_invalid_files_list(monkeypatch) -> None:
     async def _require_services():

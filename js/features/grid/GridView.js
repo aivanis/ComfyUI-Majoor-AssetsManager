@@ -1,7 +1,9 @@
 /** GridView facade preserving public exports. */
 
 export {
+    buildGridSnapshotKey,
     createGridContainer,
+    hydrateGridFromSnapshot,
     loadAssets,
     prepareGridForScopeSwitch,
     loadAssetsFromList,

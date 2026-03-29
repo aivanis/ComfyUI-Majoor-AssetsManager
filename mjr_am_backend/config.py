@@ -315,11 +315,23 @@ INDEX_DEDUPE_MAX = _env_int(5000, "MJR_AM_INDEX_DEDUPE_MAX", "MAJOOR_INDEX_DEDUP
 # File watcher (watches for manual file additions in output/custom directories)
 # Disable with MJR_ENABLE_WATCHER=0
 WATCHER_ENABLED = _env_bool(True, "MJR_AM_ENABLE_WATCHER", "MJR_ENABLE_WATCHER")
+WATCHER_START_ON_BOOT = _env_bool(
+    False,
+    "MJR_AM_WATCHER_START_ON_BOOT",
+    "MJR_WATCHER_START_ON_BOOT",
+)
 # 3000ms absorbs file-write bursts from generators that write temp + final files.
 WATCHER_DEFAULT_DEBOUNCE_MS = _env_int(3000, "MJR_AM_WATCHER_DEBOUNCE_MS", "MJR_WATCHER_DEBOUNCE_MS", min_value=0, max_value=120_000)
 WATCHER_DEFAULT_DEDUPE_TTL_MS = _env_int(3000, "MJR_AM_WATCHER_DEDUPE_TTL_MS", "MJR_WATCHER_DEDUPE_TTL_MS", min_value=0, max_value=120_000)
 WATCHER_DEBOUNCE_MS = WATCHER_DEFAULT_DEBOUNCE_MS
 WATCHER_DEDUPE_TTL_MS = WATCHER_DEFAULT_DEDUPE_TTL_MS
+WATCHER_GENERATED_GRACE_SECONDS = _env_float(
+    15.0,
+    "MJR_AM_WATCHER_GENERATED_GRACE_SECONDS",
+    "MJR_WATCHER_GENERATED_GRACE_SECONDS",
+    min_value=0.0,
+    max_value=300.0,
+)
 # Backward-compatible aliases:
 # - MAJOOR_WATCHER_MAX_PENDING_FILES
 # - MAJOOR_WATCHER_MIN_FILE_SIZE
@@ -441,9 +453,14 @@ VECTOR_SEARCH_ENABLED = _env_bool(
     "MAJOOR_ENABLE_VECTOR_SEARCH",
 )
 VECTOR_INDEX_ON_SCAN = _env_bool(
-    True,
+    False,
     "MJR_AM_VECTOR_INDEX_ON_SCAN",
     "MAJOOR_VECTOR_INDEX_ON_SCAN",
+)
+EXECUTION_GROUPING_ENABLED = _env_bool(
+    True,
+    "MJR_AM_EXECUTION_GROUPING_ENABLED",
+    "MAJOOR_EXECUTION_GROUPING_ENABLED",
 )
 
 
@@ -463,6 +480,15 @@ def is_vector_index_on_scan_enabled() -> bool:
         VECTOR_INDEX_ON_SCAN,
         "MJR_AM_VECTOR_INDEX_ON_SCAN",
         "MAJOOR_VECTOR_INDEX_ON_SCAN",
+    )
+
+
+def is_execution_grouping_enabled() -> bool:
+    """Return runtime toggle for job_id / stack_id execution grouping logic."""
+    return _env_bool(
+        EXECUTION_GROUPING_ENABLED,
+        "MJR_AM_EXECUTION_GROUPING_ENABLED",
+        "MAJOOR_EXECUTION_GROUPING_ENABLED",
     )
 
 # Primary multimodal model name (default: SigLIP2 SO400M).
@@ -514,7 +540,7 @@ VECTOR_EMBEDDING_DIM = _env_int(1152, "MJR_AM_VECTOR_DIM", min_value=64, max_val
 
 # Pre-warm the text-query model path and Faiss index during startup prewarm.
 VECTOR_PREWARM_ON_STARTUP = _env_bool(
-    True,
+    False,
     "MJR_AM_VECTOR_PREWARM_ON_STARTUP",
     "MAJOOR_VECTOR_PREWARM_ON_STARTUP",
 )
