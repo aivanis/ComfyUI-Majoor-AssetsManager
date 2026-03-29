@@ -170,7 +170,6 @@ reports_vulture_backend.txt
 *.orig
 
 # Accidental files that must never reappear in git
-{console.error(e)
 
 # Extra local temp artifacts (pytest/radon scratch)
 .tmp_*
@@ -202,3 +201,4 @@ zz_test.txt
 unsaved_329.txt
 draftindex_329.txt
 draft0348_tail.txt
+.cursor/worktrees.json
