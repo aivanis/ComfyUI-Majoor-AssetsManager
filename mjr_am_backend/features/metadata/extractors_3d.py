@@ -76,38 +76,47 @@ def _read_glb_json_chunk(file_path: str) -> dict[str, Any] | None:
         return None
 
 
+def _resolve_json_value(val: Any) -> dict[str, Any] | None:
+    if isinstance(val, dict):
+        return val
+    if isinstance(val, str):
+        return try_parse_json_text(val)
+    return None
+
+
+def _pick_first_key(source: dict[str, Any], keys: tuple[str, ...]) -> dict[str, Any] | None:
+    for key in keys:
+        val = source.get(key)
+        if val is not None:
+            resolved = _resolve_json_value(val)
+            if resolved:
+                return resolved
+    return None
+
+
+def _extract_workflow_and_prompt(extras_source: dict[str, Any]) -> dict[str, Any] | None:
+    workflow = _pick_first_key(
+        extras_source, ("comfyui_workflow", "workflow", "comfui_workflow")
+    )
+    prompt = _pick_first_key(
+        extras_source, ("comfyui_prompt", "prompt", "comfui_prompt")
+    )
+    if workflow or prompt:
+        return {"workflow": workflow, "prompt": prompt}
+    return None
+
+
 def _extract_extras_from_gltf_json(gltf: dict[str, Any]) -> dict[str, Any] | None:
     """Extract workflow/prompt from the glTF JSON ``extras`` or ``asset.extras`` field."""
     if not isinstance(gltf, dict):
         return None
 
-    # Try top-level extras first, then asset.extras (both are valid per spec)
     for extras_source in [gltf.get("extras"), (gltf.get("asset") or {}).get("extras")]:
         if not isinstance(extras_source, dict):
             continue
-        # ComfyUI-3D-Pack stores under various key conventions
-        workflow = None
-        prompt = None
-        for wf_key in ("comfyui_workflow", "workflow", "comfui_workflow"):
-            val = extras_source.get(wf_key)
-            if val is not None:
-                if isinstance(val, str):
-                    workflow = try_parse_json_text(val)
-                elif isinstance(val, dict):
-                    workflow = val
-                if workflow:
-                    break
-        for pr_key in ("comfyui_prompt", "prompt", "comfui_prompt"):
-            val = extras_source.get(pr_key)
-            if val is not None:
-                if isinstance(val, str):
-                    prompt = try_parse_json_text(val)
-                elif isinstance(val, dict):
-                    prompt = val
-                if prompt:
-                    break
-        if workflow or prompt:
-            return {"workflow": workflow, "prompt": prompt}
+        result = _extract_workflow_and_prompt(extras_source)
+        if result:
+            return result
 
     return None
 
@@ -147,40 +156,71 @@ def _read_sidecar_json(file_path: str) -> dict[str, Any] | None:
         return None
 
 
+def _extract_typed_field(
+    raw: Any,
+    predicate: Any,
+) -> Any | None:
+    if isinstance(raw, dict) and predicate(raw):
+        return raw
+    if isinstance(raw, str):
+        parsed = try_parse_json_text(raw)
+        if parsed and predicate(parsed):
+            return parsed
+    return None
+
+
+def _infer_sidecar_root(
+    data: dict[str, Any],
+) -> tuple[Any | None, Any | None]:
+    if looks_like_comfyui_prompt_graph(data):
+        return None, data
+    if looks_like_comfyui_workflow(data):
+        return data, None
+    return None, None
+
+
 def _classify_sidecar_data(data: dict[str, Any]) -> dict[str, Any]:
     """Classify sidecar JSON content as workflow, prompt, or parameters."""
     result: dict[str, Any] = {"workflow": None, "prompt": None}
 
-    # Direct workflow/prompt keys
-    wf = data.get("workflow")
-    if isinstance(wf, dict) and looks_like_comfyui_workflow(wf):
-        result["workflow"] = wf
-    elif isinstance(wf, str):
-        parsed = try_parse_json_text(wf)
-        if parsed and looks_like_comfyui_workflow(parsed):
-            result["workflow"] = parsed
+    result["workflow"] = _extract_typed_field(
+        data.get("workflow"), looks_like_comfyui_workflow
+    )
+    result["prompt"] = _extract_typed_field(
+        data.get("prompt"), looks_like_comfyui_prompt_graph
+    )
 
-    pr = data.get("prompt")
-    if isinstance(pr, dict) and looks_like_comfyui_prompt_graph(pr):
-        result["prompt"] = pr
-    elif isinstance(pr, str):
-        parsed = try_parse_json_text(pr)
-        if parsed and looks_like_comfyui_prompt_graph(parsed):
-            result["prompt"] = parsed
-
-    # If the sidecar itself IS a prompt graph or workflow
     if not result["workflow"] and not result["prompt"]:
-        if looks_like_comfyui_prompt_graph(data):
-            result["prompt"] = data
-        elif looks_like_comfyui_workflow(data):
-            result["workflow"] = data
+        result["workflow"], result["prompt"] = _infer_sidecar_root(data)
 
-    # Copy through any extra metadata fields
     for key in ("parameters", "geninfo", "generation_time_ms"):
         if key in data and key not in result:
             result[key] = data[key]
 
     return result
+
+
+def _extract_embedded_3d_json(file_path: str, ext: str) -> dict[str, Any] | None:
+    if ext == ".glb":
+        return _read_glb_json_chunk(file_path)
+    if ext == ".gltf":
+        return _read_gltf_file(file_path)
+    return None
+
+
+def _extract_sidecar_metadata(file_path: str) -> dict[str, Any] | None:
+    sidecar = _read_sidecar_json(file_path)
+    if not sidecar:
+        return None
+    return _classify_sidecar_data(sidecar)
+
+
+def _determine_quality(workflow: Any, prompt: Any) -> str:
+    if workflow is not None and bool(workflow):
+        return "full"
+    if prompt is not None and bool(prompt):
+        return "full"
+    return "none"
 
 
 def extract_model3d_metadata(
@@ -197,40 +237,25 @@ def extract_model3d_metadata(
     prompt = None
     extras: dict[str, Any] = {}
 
-    # Strategy 1: Parse embedded data from GLB/GLTF
-    if ext == ".glb":
-        gltf_json = _read_glb_json_chunk(file_path)
-        if gltf_json:
-            embedded = _extract_extras_from_gltf_json(gltf_json)
-            if embedded:
-                workflow = embedded.get("workflow")
-                prompt = embedded.get("prompt")
-    elif ext == ".gltf":
-        gltf_json = _read_gltf_file(file_path)
-        if gltf_json:
-            embedded = _extract_extras_from_gltf_json(gltf_json)
-            if embedded:
-                workflow = embedded.get("workflow")
-                prompt = embedded.get("prompt")
+    # Strategy 1: Parse embedded data from GLB/GLTF.
+    gltf_json = _extract_embedded_3d_json(file_path, ext)
+    if gltf_json:
+        embedded = _extract_extras_from_gltf_json(gltf_json)
+        if embedded:
+            workflow = embedded.get("workflow")
+            prompt = embedded.get("prompt")
 
-    # Strategy 2: Sidecar JSON (works for all formats, also as fallback for GLB/GLTF)
+    # Strategy 2: Sidecar JSON (works for all formats, also as fallback for GLB/GLTF).
     if not workflow and not prompt:
-        sidecar = _read_sidecar_json(file_path)
-        if sidecar:
-            classified = _classify_sidecar_data(sidecar)
+        classified = _extract_sidecar_metadata(file_path)
+        if classified:
             workflow = classified.get("workflow")
             prompt = classified.get("prompt")
             for key in ("parameters", "geninfo", "generation_time_ms"):
                 if key in classified and classified[key] is not None:
                     extras[key] = classified[key]
 
-    # Determine quality
-    has_workflow = workflow is not None and bool(workflow)
-    has_prompt = prompt is not None and bool(prompt)
-    if has_workflow or has_prompt:
-        quality = "full"
-    else:
-        quality = "none"
+    quality = _determine_quality(workflow, prompt)
 
     payload: dict[str, Any] = {
         "workflow": workflow,

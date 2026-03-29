@@ -784,27 +784,22 @@ class AppSettings:
                 "token_hint": self._token_hint(token),
             }
 
+    def _safe_runtime_api_token(self) -> str:
+        try:
+            return str(self._runtime_api_token or "").strip()
+        except Exception:
+            return ""
+
     async def _is_security_api_token_locked(self, token: str) -> bool:
         normalized = str(token or "").strip()
         if not normalized:
             return False
-
-        try:
-            runtime = str(self._runtime_api_token or "").strip()
-        except Exception:
-            runtime = ""
-        if runtime and normalized == runtime:
-            return True
-
-        env_token = self._env_api_token()
-        if env_token and normalized == env_token:
-            return True
-
-        stored_plain = await self._get_stored_api_token_plain_locked()
-        if stored_plain and normalized == stored_plain:
-            return True
-
-        return False
+        sources = [
+            self._safe_runtime_api_token(),
+            self._env_api_token(),
+            await self._get_stored_api_token_plain_locked(),
+        ]
+        return any(s and normalized == s for s in sources)
 
     async def set_huggingface_token(self, token_payload: Any) -> Result[dict[str, Any]]:
         token = str(token_payload or "").strip()

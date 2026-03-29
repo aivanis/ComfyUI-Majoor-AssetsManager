@@ -106,7 +106,7 @@ async def test_schedule_prepared_vectors_includes_refreshed_and_updated_assets(m
 
     monkeypatch.setattr(scanner, "_index_missing_asset_vectors", _fake_index)
 
-    scanner._schedule_prepared_vector_index(
+    task = scanner._schedule_prepared_vector_index(
         prepared=[
             {"action": "refresh", "asset_id": 4},
             {"action": "updated", "asset_id": 5},
@@ -116,7 +116,8 @@ async def test_schedule_prepared_vectors_includes_refreshed_and_updated_assets(m
         prev_added_count=1,
         added_ids=[3, 7, 5],
     )
-    await asyncio.sleep(0)
+    assert task is not None
+    await task
 
     assert captured["asset_ids"] == [7, 5, 4]
 

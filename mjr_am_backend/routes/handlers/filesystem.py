@@ -97,48 +97,47 @@ async def _get_background_scan_lock(key: str) -> asyncio.Lock:
             _BACKGROUND_SCAN_LOCKS[key] = lock
         _BACKGROUND_SCAN_LOCKS_ORDER[key] = None
         _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(key)
-        # Soft-cap pruning: prefer removing old unlocked locks, but allow temporary overflow
-        # when all candidates are active to avoid churn under load.
-        overflow = len(_BACKGROUND_SCAN_LOCKS_ORDER) - _BACKGROUND_SCAN_LOCKS_MAX
-        if overflow > 0:
-            sweep = len(_BACKGROUND_SCAN_LOCKS_ORDER)
-            for _ in range(max(1, sweep)):
-                if overflow <= 0:
-                    break
-                old_key, _ = _BACKGROUND_SCAN_LOCKS_ORDER.popitem(last=False)
-                old_lock = _BACKGROUND_SCAN_LOCKS.get(old_key)
-                if old_key == key:
-                    _BACKGROUND_SCAN_LOCKS_ORDER[old_key] = None
-                    _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(old_key)
-                    continue
-                try:
-                    if old_lock is not None and old_lock.locked():
-                        _BACKGROUND_SCAN_LOCKS_ORDER[old_key] = None
-                        _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(old_key)
-                        continue
-                except Exception:
-                    _BACKGROUND_SCAN_LOCKS_ORDER[old_key] = None
-                    _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(old_key)
-                    continue
-                _BACKGROUND_SCAN_LOCKS.pop(old_key, None)
-                overflow -= 1
-
-        # H-13: Hard-cap fallback — if the dict has grown beyond 2× the soft cap
-        # (meaning every candidate was in use and skipped during the soft sweep),
-        # forcibly evict the oldest entries regardless of lock state to prevent
-        # unbounded memory growth.  The current key is always preserved.
-        hard_cap = _BACKGROUND_SCAN_LOCKS_MAX * 2
-        while len(_BACKGROUND_SCAN_LOCKS_ORDER) > hard_cap:
-            evict_key, _ = _BACKGROUND_SCAN_LOCKS_ORDER.popitem(last=False)
-            if evict_key == key:
-                # Never evict the lock we just created/looked up.
-                _BACKGROUND_SCAN_LOCKS_ORDER[evict_key] = None
-                _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(evict_key)
-                break
-            _BACKGROUND_SCAN_LOCKS.pop(evict_key, None)
-
+        _prune_background_scan_locks(key)
+        _enforce_background_scan_lock_hard_cap(key)
         return lock
 
+
+def _prune_background_scan_locks(key: str) -> None:
+    overflow = len(_BACKGROUND_SCAN_LOCKS_ORDER) - _BACKGROUND_SCAN_LOCKS_MAX
+    if overflow <= 0:
+        return
+    sweep = len(_BACKGROUND_SCAN_LOCKS_ORDER)
+    for _ in range(max(1, sweep)):
+        if overflow <= 0:
+            break
+        old_key, _ = _BACKGROUND_SCAN_LOCKS_ORDER.popitem(last=False)
+        old_lock = _BACKGROUND_SCAN_LOCKS.get(old_key)
+        if old_key == key:
+            _BACKGROUND_SCAN_LOCKS_ORDER[old_key] = None
+            _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(old_key)
+            continue
+        try:
+            if old_lock is not None and old_lock.locked():
+                _BACKGROUND_SCAN_LOCKS_ORDER[old_key] = None
+                _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(old_key)
+                continue
+        except Exception:
+            _BACKGROUND_SCAN_LOCKS_ORDER[old_key] = None
+            _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(old_key)
+            continue
+        _BACKGROUND_SCAN_LOCKS.pop(old_key, None)
+        overflow -= 1
+
+
+def _enforce_background_scan_lock_hard_cap(key: str) -> None:
+    hard_cap = _BACKGROUND_SCAN_LOCKS_MAX * 2
+    while len(_BACKGROUND_SCAN_LOCKS_ORDER) > hard_cap:
+        evict_key, _ = _BACKGROUND_SCAN_LOCKS_ORDER.popitem(last=False)
+        if evict_key == key:
+            _BACKGROUND_SCAN_LOCKS_ORDER[evict_key] = None
+            _BACKGROUND_SCAN_LOCKS_ORDER.move_to_end(evict_key)
+            break
+        _BACKGROUND_SCAN_LOCKS.pop(evict_key, None)
 
 def _is_truthy_boolish(value: Any) -> bool:
     if value is True:
@@ -238,47 +237,98 @@ async def _kickoff_background_scan(
 
     Returns True only when a task has actually been enqueued.
     """
-    if respect_bg_scan_on_list and not BG_SCAN_ON_LIST:
-        return False
-    if is_db_maintenance_active():
-        return False
-    normalized_dir = normalize_scan_directory(directory)
-    if should_skip_background_scan(normalized_dir, source, root_id, MANUAL_BG_SCAN_GRACE_SECONDS):
-        return False
-
     try:
+        if not _background_scan_can_enqueue(directory, source, root_id, respect_bg_scan_on_list):
+            return False
+        normalized_dir = normalize_scan_directory(directory)
         key = f"{source}|{str(root_id or '')}|{normalized_dir}"
         now_mono = time.monotonic()
         if _should_skip_scan_enqueue(key, now_mono, min_interval_seconds):
             return False
 
         scan_lock = await _get_background_scan_lock(key)
-        async with scan_lock:
-            # Double-check under lock
-            if _should_skip_scan_enqueue(key, now_mono, min_interval_seconds):
-                return False
-
-            job = {
-                "directory": str(normalized_dir),
-                "source": str(source),
-                "root_id": str(root_id) if root_id is not None else None,
-                "recursive": bool(recursive),
-                "incremental": bool(incremental),
-                "fast": bool(fast),
-                "background_metadata": bool(background_metadata),
-            }
-
-            _ensure_worker()
-
-            async with _SCAN_PENDING_LOCK:
-                if not _enqueue_background_scan_job(key, job):
-                    return False
-
-            # Only mark as enqueued once we've successfully updated _SCAN_PENDING.
-            _set_background_entry(key, {"last_mono": now_mono, "in_progress": False, "last_wall": time.time()})
-            return True
+        return await _enqueue_background_scan_job_locked(
+            key=key,
+            normalized_dir=normalized_dir,
+            now_mono=now_mono,
+            scan_lock=scan_lock,
+            recursive=recursive,
+            incremental=incremental,
+            fast=fast,
+            background_metadata=background_metadata,
+            root_id=root_id,
+            min_interval_seconds=min_interval_seconds,
+        )
     except Exception:
         return False
+
+
+def _background_scan_can_enqueue(
+    directory: str,
+    source: str,
+    root_id: str | None,
+    respect_bg_scan_on_list: bool,
+) -> bool:
+    if respect_bg_scan_on_list and not BG_SCAN_ON_LIST:
+        return False
+    if is_db_maintenance_active():
+        return False
+    normalized_dir = normalize_scan_directory(directory)
+    return not should_skip_background_scan(normalized_dir, source, root_id, MANUAL_BG_SCAN_GRACE_SECONDS)
+
+
+async def _enqueue_background_scan_job_locked(
+    *,
+    key: str,
+    normalized_dir: str,
+    now_mono: float,
+    scan_lock: asyncio.Lock,
+    recursive: bool,
+    incremental: bool,
+    fast: bool,
+    background_metadata: bool,
+    root_id: str | None,
+    min_interval_seconds: float,
+) -> bool:
+    async with scan_lock:
+        if _should_skip_scan_enqueue(key, now_mono, min_interval_seconds):
+            return False
+        job = _build_background_scan_job(
+            normalized_dir=normalized_dir,
+            source=key.split("|", 1)[0],
+            root_id=root_id,
+            recursive=recursive,
+            incremental=incremental,
+            fast=fast,
+            background_metadata=background_metadata,
+        )
+        _ensure_worker()
+        async with _SCAN_PENDING_LOCK:
+            if not _enqueue_background_scan_job(key, job):
+                return False
+        _set_background_entry(key, {"last_mono": now_mono, "in_progress": False, "last_wall": time.time()})
+        return True
+
+
+def _build_background_scan_job(
+    *,
+    normalized_dir: str,
+    source: str,
+    root_id: str | None,
+    recursive: bool,
+    incremental: bool,
+    fast: bool,
+    background_metadata: bool,
+) -> dict[str, Any]:
+    return {
+        "directory": str(normalized_dir),
+        "source": str(source),
+        "root_id": str(root_id) if root_id is not None else None,
+        "recursive": bool(recursive),
+        "incremental": bool(incremental),
+        "fast": bool(fast),
+        "background_metadata": bool(background_metadata),
+    }
 
 
 def _ensure_worker() -> None:
@@ -1387,3 +1437,5 @@ async def _dispatch_filesystem_listing_path(
         offset=offset,
         index_service=index_service,
     )
+
+

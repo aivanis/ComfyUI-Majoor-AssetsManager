@@ -149,6 +149,32 @@ def _safe_mode_enabled() -> bool:
     return str(raw).strip().lower() in ("1", "true", "yes", "on")
 
 
+def _resolve_safe_mode(prefs: Mapping[str, Any] | None) -> bool:
+    if prefs and "safe_mode" in prefs:
+        _sm_raw = prefs.get("safe_mode")
+        return _sm_raw is True or str(_sm_raw).strip().lower() in ("1", "true", "yes", "on")
+    return _safe_mode_enabled()
+
+
+def _coerce_pref_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in ("1", "true", "yes", "on")
+    return bool(value)
+
+
+def _pref_truthy(key: str, env_var: str, prefs: Mapping[str, Any] | None) -> bool:
+    if prefs is not None and key in prefs:
+        try:
+            return _coerce_pref_bool(prefs[key])
+        except Exception:
+            pass
+    return _env_truthy(env_var)
+
+
 def _require_operation_enabled(operation: str, *, prefs: Mapping[str, Any] | None = None) -> Result[bool]:
     """
     Gate "dangerous" or state-changing operations behind explicit opt-ins.
@@ -167,41 +193,21 @@ def _require_operation_enabled(operation: str, *, prefs: Mapping[str, Any] | Non
     from ...shared import Result
 
     op = str(operation or "").strip().lower()
-    # Normalize safe_mode from prefs: accept True/1/"1"/"true"/"yes"/"on" as enabled.
-    # Using bool() directly would treat "false" as truthy since it's a non-empty string (NL-2).
-    if prefs and "safe_mode" in prefs:
-        _sm_raw = prefs.get("safe_mode")
-        safe_mode = _sm_raw is True or str(_sm_raw).strip().lower() in ("1", "true", "yes", "on")
-    else:
-        safe_mode = _safe_mode_enabled()
+    safe_mode = _resolve_safe_mode(prefs)
 
-    def _coerce_pref_bool(value: Any) -> bool:
-        if isinstance(value, bool):
-            return value
-        if isinstance(value, (int, float)):
-            return bool(value)
-        if isinstance(value, str):
-            return value.strip().lower() in ("1", "true", "yes", "on")
-        return bool(value)
-
-    def _pref_truthy(key: str, env_var: str) -> bool:
-        if prefs is not None and key in prefs:
-            try:
-                return _coerce_pref_bool(prefs[key])
-            except Exception:
-                pass
-        return _env_truthy(env_var)
+    def _pt(key: str, env_var: str) -> bool:
+        return _pref_truthy(key, env_var, prefs)
 
     static_gates = _operation_static_gates()
     for ops, pref_key, env_var, message in static_gates:
         if op not in ops:
             continue
-        if _pref_truthy(pref_key, env_var):
+        if _pt(pref_key, env_var):
             return Result.Ok(True, operation=op, safe_mode=safe_mode)
         return Result.Err("FORBIDDEN", message, operation=op, safe_mode=safe_mode)
 
     if op in ("write", "rating", "tags", "asset_rating", "asset_tags"):
-        if _write_allowed_in_context(safe_mode=safe_mode, pref_truthy=_pref_truthy):
+        if _write_allowed_in_context(safe_mode=safe_mode, pref_truthy=_pt):
             return Result.Ok(True, operation=op, safe_mode=safe_mode)
         return Result.Err(
             "FORBIDDEN",
@@ -210,7 +216,6 @@ def _require_operation_enabled(operation: str, *, prefs: Mapping[str, Any] | Non
             safe_mode=safe_mode,
         )
 
-    # Unknown operation: fail closed only in safe mode.
     if safe_mode:
         return Result.Err(
             "FORBIDDEN",
@@ -327,6 +332,31 @@ def _extract_bearer_token(headers: Mapping[str, str]) -> str:
     return ""
 
 
+def _extract_mjr_token_header(headers: Mapping[str, str]) -> str:
+    try:
+        return str(headers.get("X-MJR-Token") or "").strip()
+    except Exception:
+        return ""
+
+
+def _extract_write_token_from_cookie(headers: Mapping[str, str]) -> str:
+    try:
+        cookie_header = str(headers.get("Cookie") or "").strip()
+    except Exception:
+        return ""
+    if not cookie_header or len(cookie_header) > 4096:
+        return ""
+    try:
+        parsed = SimpleCookie()
+        parsed.load(cookie_header)
+        raw = parsed.get("mjr_write_token")
+        if raw is not None:
+            return str(raw.value or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
 def _extract_write_token_from_headers(headers: Mapping[str, str]) -> str:
     """
     Extract a user-provided write token from request headers.
@@ -338,30 +368,10 @@ def _extract_write_token_from_headers(headers: Mapping[str, str]) -> str:
     bearer = _extract_bearer_token(headers)
     if bearer:
         return bearer
-
-    try:
-        token = str(headers.get("X-MJR-Token") or "").strip()
-    except Exception:
-        token = ""
+    token = _extract_mjr_token_header(headers)
     if token:
         return token
-
-    try:
-        cookie_header = str(headers.get("Cookie") or "").strip()
-    except Exception:
-        cookie_header = ""
-    # Size guard before SimpleCookie parsing to prevent DoS via oversized headers (NM-7).
-    # A legitimate auth cookie is well under 4 KiB.
-    if cookie_header and len(cookie_header) <= 4096:
-        try:
-            parsed = SimpleCookie()
-            parsed.load(cookie_header)
-            raw = parsed.get("mjr_write_token")
-            if raw is not None:
-                return str(raw.value or "").strip()
-        except Exception:
-            pass
-    return ""
+    return _extract_write_token_from_cookie(headers)
 
 
 def _resolve_client_ip(peer_ip: str, headers: Mapping[str, str]) -> str:
@@ -466,43 +476,62 @@ def _check_write_access(*, peer_ip: str, headers: Mapping[str, str], request_sch
 
     Returns a Result that never raises (route handlers should return 200 with this Result on error).
     """
-    import hmac
-
-    # Local import to avoid cycles: core/security must remain lightweight.
-    from ...shared import Result
-
     configured_hash = _get_write_token_hash()
     require_auth = _env_truthy("MAJOOR_REQUIRE_AUTH")
     # Default: deny remote writes when no token is configured.
     allow_remote = _env_truthy("MAJOOR_ALLOW_REMOTE_WRITE", default=False)
 
     client_ip = _resolve_client_ip(peer_ip, headers)
-
     provided = _extract_write_token_from_headers(headers)
     if configured_hash:
-        # If the client provides a valid token, always accept it (any transport policy applies).
-        if provided and hmac.compare_digest(_hash_token(provided), configured_hash):
-            if not _request_transport_is_secure(peer_ip=peer_ip, headers=headers, request_scheme=request_scheme):
-                if not _env_truthy("MAJOOR_ALLOW_INSECURE_TOKEN_TRANSPORT", default=False):
-                    return Result.Err(
-                        "FORBIDDEN",
-                        "Write operation blocked: API token over insecure transport. Use HTTPS (or trusted proxy with X-Forwarded-Proto=https), or set MAJOOR_ALLOW_INSECURE_TOKEN_TRANSPORT=1.",
-                        auth="token_insecure_transport",
-                        client_ip=client_ip,
-                    )
-            return Result.Ok(True, auth="token", client_ip=client_ip)
-        # Token missing or invalid.
-        # Loopback clients (same machine) are trusted by default unless MAJOOR_REQUIRE_AUTH=1
-        # is explicitly set. This prevents auto-generated or rotated token hashes that were
-        # persisted in the database from locking out local users who never configured a token.
-        if not require_auth and _is_loopback_ip(client_ip):
-            return Result.Ok(True, auth="loopback", client_ip=client_ip)
-        return Result.Err(
-            "AUTH_REQUIRED",
-            "Write operation blocked: missing or invalid API token. Set MAJOOR_API_TOKEN and send it via X-MJR-Token or Authorization: Bearer <token>.",
-            auth="token",
+        return _check_write_access_with_token(
             client_ip=client_ip,
+            configured_hash=configured_hash,
+            provided=provided,
+            peer_ip=peer_ip,
+            headers=headers,
+            request_scheme=request_scheme,
+            require_auth=require_auth,
         )
+    return _check_write_access_without_token(client_ip=client_ip, allow_remote=allow_remote, require_auth=require_auth)
+
+
+def _check_write_access_with_token(
+    *,
+    client_ip: str,
+    configured_hash: str,
+    provided: str,
+    peer_ip: str,
+    headers: Mapping[str, str],
+    request_scheme: str,
+    require_auth: bool,
+) -> Result[bool]:
+    import hmac
+
+    from ...shared import Result
+
+    if provided and hmac.compare_digest(_hash_token(provided), configured_hash):
+        if not _request_transport_is_secure(peer_ip=peer_ip, headers=headers, request_scheme=request_scheme):
+            if not _env_truthy("MAJOOR_ALLOW_INSECURE_TOKEN_TRANSPORT", default=False):
+                return Result.Err(
+                    "FORBIDDEN",
+                    "Write operation blocked: API token over insecure transport. Use HTTPS (or trusted proxy with X-Forwarded-Proto=https), or set MAJOOR_ALLOW_INSECURE_TOKEN_TRANSPORT=1.",
+                    auth="token_insecure_transport",
+                    client_ip=client_ip,
+                )
+        return Result.Ok(True, auth="token", client_ip=client_ip)
+    if not require_auth and _is_loopback_ip(client_ip):
+        return Result.Ok(True, auth="loopback", client_ip=client_ip)
+    return Result.Err(
+        "AUTH_REQUIRED",
+        "Write operation blocked: missing or invalid API token. Set MAJOOR_API_TOKEN and send it via X-MJR-Token or Authorization: Bearer <token>.",
+        auth="token",
+        client_ip=client_ip,
+    )
+
+
+def _check_write_access_without_token(*, client_ip: str, allow_remote: bool, require_auth: bool) -> Result[bool]:
+    from ...shared import Result
 
     if require_auth:
         return Result.Err(
@@ -511,13 +540,10 @@ def _check_write_access(*, peer_ip: str, headers: Mapping[str, str], request_sch
             auth="required_missing_token",
             client_ip=client_ip,
         )
-
     if allow_remote:
         return Result.Ok(True, auth="allow_remote_no_token", client_ip=client_ip)
-
     if _is_loopback_ip(client_ip):
         return Result.Ok(True, auth="loopback", client_ip=client_ip)
-
     return Result.Err(
         "FORBIDDEN",
         "Write operation blocked for non-local clients. Configure MAJOOR_API_TOKEN (recommended) or set MAJOOR_ALLOW_REMOTE_WRITE=1 to allow remote writes when no token is configured.",
@@ -1043,3 +1069,4 @@ def _reset_security_state_for_tests() -> None:
         _WARNED_TOKEN_SOURCES.clear()
     except Exception:
         pass
+

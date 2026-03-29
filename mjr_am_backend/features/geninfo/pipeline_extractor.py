@@ -61,26 +61,45 @@ def _classify_pipeline_pass_name(
     return f"Pass {index + 1}"
 
 
+_INTERNAL_PASS_KEYS = ("_node_type", "_title", "_is_detailer", "_keep_when_sparse", "_add_noise")
+
+
+def _assign_pass_name(sampler_pass: dict[str, Any], index: int, total: int) -> None:
+    denoise_value = _coerce_float(sampler_pass.get("denoise"))
+    hint = _lower(f"{sampler_pass.get('_node_type') or ''} {sampler_pass.get('_title') or ''}")
+    sampler_pass["pass_name"] = _classify_pipeline_pass_name(
+        index,
+        total,
+        is_detailer=sampler_pass.get("_is_detailer") is True,
+        hint=hint,
+        denoise=denoise_value,
+    )
+
+
+def _propagate_missing_seed_steps(
+    sampler_pass: dict[str, Any],
+    index: int,
+    previous_seed: int | None,
+    previous_steps: int | None,
+) -> tuple[int | None, int | None]:
+    if sampler_pass.get("seed_val") is None and sampler_pass.get("_add_noise") is False and previous_seed is not None:
+        sampler_pass["seed_val"] = previous_seed
+    if sampler_pass.get("steps") is None and index > 0 and previous_steps is not None:
+        sampler_pass["steps"] = previous_steps
+    new_seed = _coerce_int(sampler_pass.get("seed_val"), previous_seed)
+    new_steps = _coerce_int(sampler_pass.get("steps"), previous_steps)
+    return new_seed, new_steps
+
+
 def _finalize_pipeline_passes(passes: list[dict[str, Any]]) -> None:
     previous_seed: int | None = None
     previous_steps: int | None = None
     for index, sampler_pass in enumerate(passes):
-        denoise_value = _coerce_float(sampler_pass.get("denoise"))
-        hint = _lower(f"{sampler_pass.get('_node_type') or ''} {sampler_pass.get('_title') or ''}")
-        sampler_pass["pass_name"] = _classify_pipeline_pass_name(
-            index,
-            len(passes),
-            is_detailer=sampler_pass.get("_is_detailer") is True,
-            hint=hint,
-            denoise=denoise_value,
+        _assign_pass_name(sampler_pass, index, len(passes))
+        previous_seed, previous_steps = _propagate_missing_seed_steps(
+            sampler_pass, index, previous_seed, previous_steps
         )
-        if sampler_pass.get("seed_val") is None and sampler_pass.get("_add_noise") is False and previous_seed is not None:
-            sampler_pass["seed_val"] = previous_seed
-        if sampler_pass.get("steps") is None and index > 0 and previous_steps is not None:
-            sampler_pass["steps"] = previous_steps
-        previous_seed = _coerce_int(sampler_pass.get("seed_val"), previous_seed)
-        previous_steps = _coerce_int(sampler_pass.get("steps"), previous_steps)
-        for key in ("_node_type", "_title", "_is_detailer", "_keep_when_sparse", "_add_noise"):
+        for key in _INTERNAL_PASS_KEYS:
             sampler_pass.pop(key, None)
 
 
@@ -164,51 +183,89 @@ def _collect_chained_samplers_from_sink(
     sink_id: str,
     max_depth: int = 10,
 ) -> list[dict[str, Any]]:
-    from . import parser_impl as _p
-
     sampler_id, sampler_conf, _ = _select_sampler_context(nodes_by_id, sink_id)
     if not sampler_id:
         return []
 
+    collected = _walk_advanced_sampler_chain(nodes_by_id, sampler_id, sampler_conf, max_depth)
+    ordered = list(reversed(collected))
+    _label_chained_passes(ordered)
+    return ordered
+
+
+def _walk_advanced_sampler_chain(
+    nodes_by_id: dict[str, Any],
+    start_id: str,
+    sampler_conf: str,
+    max_depth: int,
+) -> list[dict[str, Any]]:
     collected: list[dict[str, Any]] = []
     seen_ids: set[str] = set()
     seen_hashes: set[str] = set()
-    current_id: str | None = sampler_id
+    current_id: str | None = start_id
     depth = 0
 
     while current_id and depth < max_depth:
-        if current_id in seen_ids:
-            break
-        seen_ids.add(current_id)
-        depth += 1
-
-        sampler_node = nodes_by_id.get(current_id)
-        if not isinstance(sampler_node, dict) or not _is_advanced_sampler(sampler_node):
-            break
-
-        ins = _inputs(sampler_node)
-        trace = _extract_prompt_trace(nodes_by_id, sampler_node, current_id, ins, True)
-        confidence = sampler_conf if depth == 1 else "medium"
-        sampler_values = _p._extract_sampler_values(nodes_by_id, sampler_node, current_id, ins, True, confidence, trace)
-
-        export_sampler: dict[str, Any] = {"_node_type": str(_node_type(sampler_node) or "")}
-        _cast_sampler_fields(sampler_values, export_sampler)
-
-        val_str = json.dumps(export_sampler, sort_keys=True)
-        if val_str not in seen_hashes:
-            seen_hashes.add(val_str)
-            collected.append(export_sampler)
-
-        latent_link = ins.get("latent_image")
-        if not _is_link(latent_link):
-            break
-        next_id = str(latent_link[0])
-        next_node = nodes_by_id.get(next_id)
-        if not isinstance(next_node, dict) or not _is_advanced_sampler(next_node):
+        next_id = _advance_advanced_sampler_chain_step(
+            nodes_by_id,
+            current_id,
+            sampler_conf,
+            depth + 1,
+            seen_ids,
+            seen_hashes,
+            collected,
+        )
+        if not next_id:
             break
         current_id = next_id
+        depth += 1
 
-    ordered = list(reversed(collected))
+    return collected
+
+
+def _advance_advanced_sampler_chain_step(
+    nodes_by_id: dict[str, Any],
+    current_id: str,
+    sampler_conf: str,
+    depth: int,
+    seen_ids: set[str],
+    seen_hashes: set[str],
+    collected: list[dict[str, Any]],
+) -> str | None:
+    from . import parser_impl as _p
+
+    if current_id in seen_ids:
+        return None
+    seen_ids.add(current_id)
+
+    sampler_node = nodes_by_id.get(current_id)
+    if not isinstance(sampler_node, dict) or not _is_advanced_sampler(sampler_node):
+        return None
+
+    ins = _inputs(sampler_node)
+    trace = _extract_prompt_trace(nodes_by_id, sampler_node, current_id, ins, True)
+    confidence = sampler_conf if depth == 1 else "medium"
+    sampler_values = _p._extract_sampler_values(nodes_by_id, sampler_node, current_id, ins, True, confidence, trace)
+
+    entry: dict[str, Any] = {"_node_type": str(_node_type(sampler_node) or "")}
+    _cast_sampler_fields(sampler_values, entry)
+
+    val_str = json.dumps(entry, sort_keys=True)
+    if val_str not in seen_hashes:
+        seen_hashes.add(val_str)
+        collected.append(entry)
+
+    latent_link = ins.get("latent_image")
+    if not _is_link(latent_link):
+        return None
+    next_id = str(latent_link[0])
+    next_node = nodes_by_id.get(next_id)
+    if not isinstance(next_node, dict) or not _is_advanced_sampler(next_node):
+        return None
+    return next_id
+
+
+def _label_chained_passes(ordered: list[dict[str, Any]]) -> None:
     for index, sampler_pass in enumerate(ordered):
         pass_name = _classify_pipeline_pass_name(
             index,
@@ -220,7 +277,6 @@ def _collect_chained_samplers_from_sink(
         if pass_name:
             sampler_pass["pass_name"] = pass_name
         sampler_pass.pop("_node_type", None)
-    return ordered
 
 
 def _collect_pipeline_sampler_ids(nodes_by_id: dict[str, Any], dist: dict[str, int]) -> list[tuple[int, int, str]]:
@@ -248,23 +304,31 @@ def _deduplicate_pipeline_passes(
     seen_hashes: set[str] = set()
     for _, _, sampler_id in sampler_ids:
         export_sampler = _build_pipeline_pass_entry(nodes_by_id, sampler_id)
-        if export_sampler is None:
-            continue
-        dedupe_sampler = {k: v for k, v in export_sampler.items() if not k.startswith("_")}
-        if not dedupe_sampler and export_sampler.get("_keep_when_sparse") is not True:
-            continue
-        val_str = json.dumps(
-            dedupe_sampler if dedupe_sampler else {
-                "_node_type": export_sampler.get("_node_type") or "",
-                "_title": export_sampler.get("_title") or "",
-            },
-            sort_keys=True,
-        )
-        if val_str in seen_hashes:
-            continue
-        seen_hashes.add(val_str)
-        passes.append(export_sampler)
+        if _should_keep_pipeline_pass(export_sampler, seen_hashes) and export_sampler is not None:
+            passes.append(export_sampler)
     return passes
+
+
+def _should_keep_pipeline_pass(
+    export_sampler: dict[str, Any] | None,
+    seen_hashes: set[str],
+) -> bool:
+    if export_sampler is None:
+        return False
+    dedupe_sampler = {k: v for k, v in export_sampler.items() if not k.startswith("_")}
+    if not dedupe_sampler and export_sampler.get("_keep_when_sparse") is not True:
+        return False
+    val_str = json.dumps(
+        dedupe_sampler if dedupe_sampler else {
+            "_node_type": export_sampler.get("_node_type") or "",
+            "_title": export_sampler.get("_title") or "",
+        },
+        sort_keys=True,
+    )
+    if val_str in seen_hashes:
+        return False
+    seen_hashes.add(val_str)
+    return True
 
 
 def _collect_sampler_pipeline_from_sink(
@@ -276,22 +340,13 @@ def _collect_sampler_pipeline_from_sink(
     if not isinstance(sink, dict):
         return []
 
-    sink_link = _pick_sink_inputs(sink)
-    if not sink_link:
-        return []
-    sink_start_id = _walk_passthrough(nodes_by_id, sink_link)
+    sink_start_id = _resolve_pipeline_start(nodes_by_id, sink)
     if not sink_start_id:
         return []
-
     dist = _collect_upstream_nodes(nodes_by_id, sink_start_id, max_nodes=max_nodes)
     if not dist:
         return []
-
-    detailer_present_in_branch = any(
-        isinstance(nodes_by_id.get(nid), dict) and _node_has_detailer_signals(nodes_by_id[nid])
-        for nid in dist
-    )
-
+    detailer_present_in_branch = _branch_has_detailer(nodes_by_id, dist)
     sampler_ids = _collect_pipeline_sampler_ids(nodes_by_id, dist)
     passes = _deduplicate_pipeline_passes(nodes_by_id, sampler_ids)
     _finalize_pipeline_passes(passes)
@@ -300,6 +355,20 @@ def _collect_sampler_pipeline_from_sink(
         passes[-1]["pass_name"] = "Detailer"
 
     return passes
+
+
+def _resolve_pipeline_start(nodes_by_id: dict[str, Any], sink: dict[str, Any]) -> str | None:
+    sink_link = _pick_sink_inputs(sink)
+    if not sink_link:
+        return None
+    return _walk_passthrough(nodes_by_id, sink_link)
+
+
+def _branch_has_detailer(nodes_by_id: dict[str, Any], dist: dict[str, int]) -> bool:
+    return any(
+        isinstance(nodes_by_id.get(nid), dict) and _node_has_detailer_signals(nodes_by_id[nid])
+        for nid in dist
+    )
 
 
 def _find_checkpoint_for_sampler(nodes_by_id: dict[str, Any], sampler_node: dict[str, Any]) -> dict[str, Any] | None:
@@ -335,35 +404,64 @@ def _collect_all_checkpoints_from_chained_samplers(
     if not sampler_id:
         return []
 
+    collected = _collect_checkpoint_chain(nodes_by_id, sampler_id, max_depth=max_depth)
+    return list(reversed(collected))
+
+
+def _collect_checkpoint_chain(
+    nodes_by_id: dict[str, Any],
+    start_id: str,
+    *,
+    max_depth: int,
+) -> list[dict[str, Any]]:
     collected: list[dict[str, Any]] = []
     seen_names: set[str] = set()
     seen_ids: set[str] = set()
-    current_id: str | None = sampler_id
+    current_id: str | None = start_id
     depth = 0
 
     while current_id and depth < max_depth:
-        if current_id in seen_ids:
-            break
-        seen_ids.add(current_id)
-        depth += 1
-
-        node = nodes_by_id.get(current_id)
-        if not isinstance(node, dict):
-            break
-
-        ckpt = _find_checkpoint_for_sampler(nodes_by_id, node)
-        if ckpt and ckpt["name"] not in seen_names:
-            seen_names.add(ckpt["name"])
-            collected.append(ckpt)
-
-        ins = _inputs(node)
-        latent_link = ins.get("latent_image")
-        if not _is_link(latent_link):
-            break
-        next_id = str(latent_link[0])
-        next_node = nodes_by_id.get(next_id)
-        if not isinstance(next_node, dict) or not _is_advanced_sampler(next_node):
+        next_id = _advance_checkpoint_chain_step(
+            nodes_by_id,
+            current_id,
+            seen_ids,
+            seen_names,
+            collected,
+        )
+        if not next_id:
             break
         current_id = next_id
+        depth += 1
 
-    return list(reversed(collected))
+    return collected
+
+
+def _advance_checkpoint_chain_step(
+    nodes_by_id: dict[str, Any],
+    current_id: str,
+    seen_ids: set[str],
+    seen_names: set[str],
+    collected: list[dict[str, Any]],
+) -> str | None:
+    if current_id in seen_ids:
+        return None
+    seen_ids.add(current_id)
+
+    node = nodes_by_id.get(current_id)
+    if not isinstance(node, dict):
+        return None
+
+    ckpt = _find_checkpoint_for_sampler(nodes_by_id, node)
+    if ckpt and ckpt["name"] not in seen_names:
+        seen_names.add(ckpt["name"])
+        collected.append(ckpt)
+
+    ins = _inputs(node)
+    latent_link = ins.get("latent_image")
+    if not _is_link(latent_link):
+        return None
+    next_id = str(latent_link[0])
+    next_node = nodes_by_id.get(next_id)
+    if not isinstance(next_node, dict) or not _is_advanced_sampler(next_node):
+        return None
+    return next_id

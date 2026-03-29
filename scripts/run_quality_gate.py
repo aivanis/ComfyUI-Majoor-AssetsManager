@@ -162,10 +162,15 @@ def main() -> int:
 
     if not args.skip_ruff:
         if changed_python:
-            _run(
-                _python_cmd("ruff", "check", *changed_python),
-                label="Ruff lint (changed Python files)",
-            )
+            changed_python_existing = _existing_paths(changed_python)
+            if not changed_python_existing:
+                print("\n==> Ruff lint")
+                print("No existing changed Python files detected; skipping incremental Ruff gate.")
+            else:
+                _run(
+                    _python_cmd("ruff", "check", *changed_python_existing),
+                    label="Ruff lint (changed Python files)",
+                )
         else:
             print("\n==> Ruff lint")
             print("No changed Python files detected; skipping incremental Ruff gate.")

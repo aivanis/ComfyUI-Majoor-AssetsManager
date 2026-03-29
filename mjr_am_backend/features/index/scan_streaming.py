@@ -66,6 +66,86 @@ async def run_scan_streaming_loop(
             pass
 
 
+def _should_log_progress(
+    scanned_count: int,
+    last_progress_scanned: int,
+    now: float,
+    last_progress_ts: float,
+    progress_every: int,
+    progress_min_seconds: float,
+) -> bool:
+    return (
+        progress_every > 0
+        and scanned_count - last_progress_scanned >= progress_every
+        and (now - last_progress_ts) >= progress_min_seconds
+    )
+
+
+def _emit_scan_progress(scanner: Any, stats: dict[str, Any], batch: list[Path], scanned_count: int) -> None:
+    try:
+        log_event = getattr(scanner, "_log_scan_event", None)
+        if callable(log_event):
+            log_event(
+                logging.INFO,
+                "Directory scan progress",
+                scanned=scanned_count,
+                added=int(stats.get("added") or 0),
+                updated=int(stats.get("updated") or 0),
+                skipped=int(stats.get("skipped") or 0),
+                errors=int(stats.get("errors") or 0),
+                queue_batch_size=len(batch),
+            )
+    except Exception:
+        pass
+
+
+async def _process_pulled_files(
+    scanner: Any,
+    pulled: list[Path | None],
+    batch: list[Path],
+    stats: dict[str, Any],
+    progress_every: int,
+    progress_min_seconds: float,
+    last_progress_scanned: int,
+    last_progress_ts: float,
+    directory: str,
+    incremental: bool,
+    source: str,
+    root_id: str | None,
+    fast: bool,
+    to_enrich: list[str],
+    added_ids: list[int] | None,
+) -> tuple[list[Path], bool, int, float]:
+    done = False
+    for file_path in pulled:
+        if file_path is None:
+            done = True
+            break
+        batch.append(file_path)
+        stats["scanned"] += 1
+        scanned_count = int(stats.get("scanned") or 0)
+        now = time.monotonic()
+        if _should_log_progress(scanned_count, last_progress_scanned, now, last_progress_ts, progress_every, progress_min_seconds):
+            _emit_scan_progress(scanner, stats, batch, scanned_count)
+            last_progress_scanned = scanned_count
+            last_progress_ts = now
+        if len(batch) >= stream_batch_target(stats["scanned"]):
+            await process_scan_batch(
+                scanner,
+                batch=batch,
+                directory=directory,
+                incremental=incremental,
+                source=source,
+                root_id=root_id,
+                fast=fast,
+                stats=stats,
+                to_enrich=to_enrich,
+                added_ids=added_ids,
+            )
+            batch = []
+    return batch, done, last_progress_scanned, last_progress_ts
+
+
 async def consume_scan_queue(
     scanner: Any,
     *,
@@ -93,48 +173,23 @@ async def consume_scan_queue(
             if not pulled:
                 await asyncio.sleep(0)
                 continue
-            for file_path in pulled:
-                if file_path is None:
-                    done = True
-                    break
-                batch.append(file_path)
-                stats["scanned"] += 1
-                if progress_every > 0:
-                    scanned_count = int(stats.get("scanned") or 0)
-                    if scanned_count - last_progress_scanned >= progress_every:
-                        now = time.monotonic()
-                        if (now - last_progress_ts) >= progress_min_seconds:
-                            try:
-                                log_event = getattr(scanner, "_log_scan_event", None)
-                                if callable(log_event):
-                                    log_event(
-                                        logging.INFO,
-                                        "Directory scan progress",
-                                        scanned=scanned_count,
-                                        added=int(stats.get("added") or 0),
-                                        updated=int(stats.get("updated") or 0),
-                                        skipped=int(stats.get("skipped") or 0),
-                                        errors=int(stats.get("errors") or 0),
-                                        queue_batch_size=len(batch),
-                                    )
-                            except Exception:
-                                pass
-                            last_progress_scanned = scanned_count
-                            last_progress_ts = now
-                if len(batch) >= stream_batch_target(stats["scanned"]):
-                    await process_scan_batch(
-                        scanner,
-                        batch=batch,
-                        directory=directory,
-                        incremental=incremental,
-                        source=source,
-                        root_id=root_id,
-                        fast=fast,
-                        stats=stats,
-                        to_enrich=to_enrich,
-                        added_ids=added_ids,
-                    )
-                    batch = []
+            batch, done, last_progress_scanned, last_progress_ts = await _process_pulled_files(
+                scanner,
+                pulled,
+                batch,
+                stats,
+                progress_every,
+                progress_min_seconds,
+                last_progress_scanned,
+                last_progress_ts,
+                directory,
+                incremental,
+                source,
+                root_id,
+                fast,
+                to_enrich,
+                added_ids,
+            )
             await asyncio.sleep(0)
         if batch:
             await process_scan_batch(

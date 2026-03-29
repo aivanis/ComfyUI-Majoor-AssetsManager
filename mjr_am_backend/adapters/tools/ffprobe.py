@@ -169,41 +169,49 @@ class FFProbe:
             quality="degraded",
         )
 
+    def _aread_not_available(self) -> Result[dict]:
+        return Result.Err(ErrorCode.TOOL_MISSING, "ffprobe not found in PATH", quality="none")
+
+    def _aread_invalid_path(self, path_res: Result) -> Result[dict]:
+        return Result.Err(
+            path_res.code or ErrorCode.INVALID_INPUT,
+            path_res.error or "Invalid file path",
+            quality="none",
+        )
+
+    def _aread_communication_failed(self, communicated: Result) -> Result[dict]:
+        return Result.Err(
+            communicated.code or ErrorCode.FFPROBE_ERROR,
+            communicated.error or "ffprobe communication failed",
+            **(communicated.meta or {}),
+        )
+
+    async def _aread_run_probe(self, safe_path: str) -> Result[dict]:
+        cmd = self._build_ffprobe_cmd(safe_path)
+        process = await self._spawn_ffprobe_process(cmd)
+        communicated = await self._communicate_with_timeout(process, safe_path)
+        if not communicated.ok:
+            return self._aread_communication_failed(communicated)
+        data = communicated.data
+        if not isinstance(data, tuple) or len(data) != 2:
+            return Result.Err(ErrorCode.FFPROBE_ERROR, "Invalid ffprobe process output", quality="degraded")
+        stdout, stderr = data
+        return self._parse_ffprobe_output(stdout, stderr, process.returncode, safe_path)
+
     async def aread(self, path: str) -> Result[dict]:
         """
         Async variant of read() using native asyncio subprocess execution.
         """
         if not self._available:
-            return Result.Err(
-                ErrorCode.TOOL_MISSING,
-                "ffprobe not found in PATH",
-                quality="none"
-            )
+            return self._aread_not_available()
 
         path_res = self._validate_probe_path(path)
         if not path_res.ok:
-            return Result.Err(
-                path_res.code or ErrorCode.INVALID_INPUT,
-                path_res.error or "Invalid file path",
-                quality="none",
-            )
+            return self._aread_invalid_path(path_res)
         safe_path = str(path_res.data or "")
 
         try:
-            cmd = self._build_ffprobe_cmd(safe_path)
-            process = await self._spawn_ffprobe_process(cmd)
-            communicated = await self._communicate_with_timeout(process, safe_path)
-            if not communicated.ok:
-                return Result.Err(
-                    communicated.code or ErrorCode.FFPROBE_ERROR,
-                    communicated.error or "ffprobe communication failed",
-                    **(communicated.meta or {}),
-                )
-            data = communicated.data
-            if not isinstance(data, tuple) or len(data) != 2:
-                return Result.Err(ErrorCode.FFPROBE_ERROR, "Invalid ffprobe process output", quality="degraded")
-            stdout, stderr = data
-            return self._parse_ffprobe_output(stdout, stderr, process.returncode, safe_path)
+            return await self._aread_run_probe(safe_path)
         except json.JSONDecodeError as e:
             logger.error(f"ffprobe JSON parse error: {e}")
             return Result.Err(
@@ -213,11 +221,7 @@ class FFProbe:
             )
         except Exception as e:
             logger.error(f"ffprobe unexpected error: {e}")
-            return Result.Err(
-                ErrorCode.FFPROBE_ERROR,
-                str(e),
-                quality="degraded"
-            )
+            return Result.Err(ErrorCode.FFPROBE_ERROR, str(e), quality="degraded")
 
     def _build_ffprobe_cmd(self, path: str) -> list[str]:
         return [

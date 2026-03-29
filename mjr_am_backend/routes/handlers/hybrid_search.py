@@ -67,6 +67,33 @@ def _build_scope_clauses(scope: str, custom_root_id: str | None) -> tuple[list[s
     return where, params
 
 
+def _build_asset_filter_query(asset_ids: list[Any], scope: str, custom_root_id: str | None, filters: dict[str, Any]) -> tuple[str, tuple[Any, ...]]:
+    placeholders = ",".join("?" for _ in asset_ids)
+    where = [f"a.id IN ({placeholders})"]
+    params: list[Any] = list(asset_ids)
+    scope_where, scope_params = _build_scope_clauses(scope, custom_root_id)
+    filter_where, filter_params = _build_filter_clauses(filters, alias="a")
+    where.extend(scope_where)
+    params.extend(scope_params)
+    params.extend(filter_params)
+    where_sql = " AND ".join(where)
+    sql = f"""
+        SELECT a.id AS asset_id
+        FROM assets a
+        LEFT JOIN asset_metadata m ON a.id = m.asset_id
+        WHERE {where_sql} {' '.join(filter_where)}
+        """
+    return sql, tuple(params)
+
+
+async def _query_allowed_asset_ids(db: Any, asset_ids: list[Any], scope: str, custom_root_id: str | None, filters: dict[str, Any]) -> set[int]:
+    sql, params = _build_asset_filter_query(asset_ids, scope, custom_root_id, filters)
+    rows = await db.aquery(sql, params)
+    if not rows.ok or not rows.data:
+        return set()
+    return _rows_to_allowed_set(rows.data)
+
+
 async def _filter_semantic_hits(
     db: Any | None,
     hits: list[dict[str, Any]],
@@ -77,14 +104,26 @@ async def _filter_semantic_hits(
     min_score: float,
     relative_ratio: float,
 ) -> list[dict[str, Any]]:
-    if db is None or not isinstance(hits, list) or not hits:
+    if db is None or not isinstance(hits, list):
         return hits if isinstance(hits, list) else []
-
-    hits = _filter_text_search_hits(
-        list(hits),
-        min_score=min_score,
-        relative_ratio=relative_ratio,
+    filtered_hits = _filter_text_search_hits(list(hits), min_score=min_score, relative_ratio=relative_ratio)
+    return await _allow_semantic_hits_by_scope(
+        db,
+        filtered_hits,
+        scope=scope,
+        custom_root_id=custom_root_id,
+        filters=filters,
     )
+
+
+async def _allow_semantic_hits_by_scope(
+    db: Any,
+    hits: list[dict[str, Any]],
+    *,
+    scope: str,
+    custom_root_id: str | None,
+    filters: dict[str, Any],
+) -> list[dict[str, Any]]:
     if not hits:
         return []
 
@@ -92,78 +131,71 @@ async def _filter_semantic_hits(
     if not asset_ids:
         return []
 
-    placeholders = ",".join("?" for _ in asset_ids)
-    where = [f"a.id IN ({placeholders})"]
-    params: list[Any] = list(asset_ids)
-    scope_where, scope_params = _build_scope_clauses(scope, custom_root_id)
-    filter_where, filter_params = _build_filter_clauses(filters, alias="a")
-    where.extend(scope_where)
-    params.extend(scope_params)
-    params.extend(filter_params)
-    where_sql = " AND ".join(where)
-
-    rows = await db.aquery(
-        f"""
-        SELECT a.id AS asset_id
-        FROM assets a
-        LEFT JOIN asset_metadata m ON a.id = m.asset_id
-        WHERE {where_sql} {' '.join(filter_where)}
-        """,
-        tuple(params),
-    )
-    if not rows.ok or not rows.data:
-        return []
-
-    allowed = _rows_to_allowed_set(rows.data)
+    allowed = await _query_allowed_asset_ids(db, asset_ids, scope, custom_root_id, filters)
     if not allowed:
         return []
-
     return [hit for hit in hits if int(hit.get("asset_id") or 0) in allowed]
 
 
-def _parse_query_filters(raw: str) -> tuple[str, dict[str, Any]]:
-    """Strip inline filters from *raw* and return (clean_text, filters_dict)."""
-    filters: dict[str, Any] = {}
-    q = raw
-
+def _extract_rating_filter(q: str, filters: dict[str, Any]) -> str:
     m = _RE_RATING.search(q)
     if m:
         filters["min_rating"] = int(m.group(1))
         q = _RE_RATING.sub("", q)
+    return q
 
+
+def _extract_tag_filters(q: str, filters: dict[str, Any]) -> str:
     for m in _RE_TAG.finditer(q):
         tag = (m.group(1) or m.group(2) or "").strip()
         if tag:
             filters.setdefault("tags", []).append(tag)
-    q = _RE_TAG.sub("", q)
+    return _RE_TAG.sub("", q)
 
+
+def _extract_kind_filter(q: str, filters: dict[str, Any]) -> str:
     m = _RE_KIND.search(q)
     if m:
         filters["kind"] = m.group(1).lower()
         q = _RE_KIND.sub("", q)
+    return q
 
+
+def _extract_date_filters(q: str, filters: dict[str, Any]) -> str:
     m = _RE_AFTER.search(q)
     if m:
         start, _ = date_bounds_for_exact(m.group(1))
         if start is not None:
             filters["mtime_start"] = start
         q = _RE_AFTER.sub("", q)
-
     m = _RE_BEFORE.search(q)
     if m:
         _, end = date_bounds_for_exact(m.group(1))
         if end is not None:
             filters["mtime_end"] = end
         q = _RE_BEFORE.sub("", q)
+    return q
 
+
+def _extract_ext_filter(q: str, filters: dict[str, Any]) -> str:
     m = _RE_EXT.search(q)
     if m:
         ext = m.group(1).lower()
         filters.setdefault("extensions", [])
         if ext not in filters["extensions"]:
             filters["extensions"].append(ext)
-    q = _RE_EXT.sub("", q)
+        q = _RE_EXT.sub("", q)
+    return q
 
+
+def _parse_query_filters(raw: str) -> tuple[str, dict[str, Any]]:
+    filters: dict[str, Any] = {}
+    q = raw
+    q = _extract_rating_filter(q, filters)
+    q = _extract_tag_filters(q, filters)
+    q = _extract_kind_filter(q, filters)
+    q = _extract_date_filters(q, filters)
+    q = _extract_ext_filter(q, filters)
     return " ".join(q.split()), filters
 
 

@@ -114,39 +114,60 @@ def _mean_vector(vectors: list[list[float]], dim: int) -> list[float]:
     return [v * scale for v in out]
 
 
+def _initial_kmeans_centroids(vectors: list[list[float]], k: int) -> list[list[float]]:
+    return [_normalise_vector(list(vectors[i])) for i in range(max(1, min(int(k), len(vectors))))]
+
+
+def _assign_kmeans_labels(
+    vectors: list[list[float]],
+    centroids: list[list[float]],
+) -> tuple[list[int], bool]:
+    labels = [0] * len(vectors)
+    changed = False
+    for idx, vec in enumerate(vectors):
+        best_cluster = 0
+        best_score = -1e18
+        for cid, centroid in enumerate(centroids):
+            score = _cosine_similarity(vec, centroid)
+            if score > best_score:
+                best_score = score
+                best_cluster = cid
+        if labels[idx] != best_cluster:
+            labels[idx] = best_cluster
+            changed = True
+    return labels, changed
+
+
+def _recompute_kmeans_centroids(
+    vectors: list[list[float]],
+    labels: list[int],
+    k: int,
+    dim: int,
+) -> list[list[float]]:
+    grouped: list[list[list[float]]] = [[] for _ in range(k)]
+    for idx, lbl in enumerate(labels):
+        grouped[int(lbl)].append(vectors[idx])
+
+    centroids: list[list[float]] = []
+    for cid in range(k):
+        if grouped[cid]:
+            centroids.append(_normalise_vector(_mean_vector(grouped[cid], dim)))
+        else:
+            centroids.append(_normalise_vector(list(vectors[cid % len(vectors)])))
+    return centroids
+
+
 def _kmeans_python(vectors: list[list[float]], k: int, max_iter: int = 12) -> tuple[list[int], list[list[float]]]:
     if not vectors:
         return [], []
     n = len(vectors)
     k = max(1, min(int(k), n))
     dim = len(vectors[0])
-    centroids = [_normalise_vector(list(vectors[i])) for i in range(k)]
+    centroids = _initial_kmeans_centroids(vectors, k)
     labels = [0] * n
     for _ in range(max(1, int(max_iter))):
-        changed = False
-        for idx, vec in enumerate(vectors):
-            best_cluster = 0
-            best_score = -1e18
-            for cid, centroid in enumerate(centroids):
-                score = _cosine_similarity(vec, centroid)
-                if score > best_score:
-                    best_score = score
-                    best_cluster = cid
-            if labels[idx] != best_cluster:
-                labels[idx] = best_cluster
-                changed = True
-
-        grouped: list[list[list[float]]] = [[] for _ in range(k)]
-        for idx, lbl in enumerate(labels):
-            grouped[int(lbl)].append(vectors[idx])
-
-        for cid in range(k):
-            if grouped[cid]:
-                centroids[cid] = _normalise_vector(_mean_vector(grouped[cid], dim))
-            else:
-                # Keep empty clusters stable by pinning them to a deterministic sample.
-                centroids[cid] = _normalise_vector(list(vectors[cid % n]))
-
+        labels, changed = _assign_kmeans_labels(vectors, centroids)
+        centroids = _recompute_kmeans_centroids(vectors, labels, k, dim)
         if not changed:
             break
     return labels, centroids
@@ -194,19 +215,23 @@ def _read_vector_scope_params(request: web.Request) -> tuple[str, str, Result | 
     return scope, custom_root_id, None
 
 
-async def _filter_hits_by_scope(
+def _filter_hits_to_allowed_asset_ids(
+    hits: list[dict[str, Any]],
+    allowed: set[int],
+) -> list[dict[str, Any]]:
+    if not allowed:
+        return []
+    return [hit for hit in hits if int(hit.get("asset_id") or 0) in allowed]
+
+
+async def _filter_hits_by_scope_query(
     db: Any,
     hits: list[dict[str, Any]],
     *,
     scope: str,
     custom_root_id: str,
-    filters: dict[str, Any] | None = None,
+    filters: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    if db is None or not isinstance(hits, list) or not hits:
-        return hits if isinstance(hits, list) else []
-    if scope == "all" and not filters:
-        return hits
-
     asset_ids = _hits_to_asset_ids(hits)
     if not asset_ids:
         return []
@@ -220,7 +245,7 @@ async def _filter_hits_by_scope(
     if scope == "custom" and custom_root_id:
         where_parts.append("a.root_id = ?")
         params.append(custom_root_id)
-    filter_clauses, filter_params = _build_filter_clauses(filters or {}, alias="a")
+    filter_clauses, filter_params = _build_filter_clauses(filters, alias="a")
     params.extend(filter_params)
 
     where_sql = " AND ".join(where_parts)
@@ -235,12 +260,123 @@ async def _filter_hits_by_scope(
     )
     if not rows.ok or not rows.data:
         return []
+    return _filter_hits_to_allowed_asset_ids(hits, _rows_to_allowed_set(rows.data))
 
-    allowed = _rows_to_allowed_set(rows.data)
-    if not allowed:
+
+def _parse_hydrated_tags(tags_raw: Any) -> list[Any]:
+    import json as _json
+
+    if isinstance(tags_raw, str) and tags_raw.strip():
+        try:
+            parsed = _json.loads(tags_raw)
+        except (ValueError, TypeError):
+            return []
+        return parsed if isinstance(parsed, list) else []
+    if isinstance(tags_raw, list):
+        return tags_raw
+    return []
+
+
+def _hydrate_vector_row(row: dict[str, Any], score_map: dict[int, Any], aid: int) -> dict[str, Any]:
+    return {
+        "id": aid,
+        "asset_id": aid,
+        "filepath": row.get("filepath", ""),
+        "filename": row.get("filename", ""),
+        "subfolder": row.get("subfolder", ""),
+        "kind": row.get("kind", "image"),
+        "type": row.get("type", "output"),
+        "file_size": row.get("file_size"),
+        "width": row.get("width"),
+        "height": row.get("height"),
+        "mtime": row.get("mtime"),
+        "enhanced_caption": row.get("enhanced_caption", "") or "",
+        "rating": row.get("rating", 0),
+        "tags": _parse_hydrated_tags(row.get("tags", "")),
+        "has_workflow": bool(row.get("has_workflow")),
+        "has_generation_data": bool(row.get("has_generation_data")),
+        "_vectorScore": score_map.get(aid, 0),
+    }
+
+
+def _hydrate_vector_rows(
+    rows: list[dict[str, Any]],
+    asset_ids: list[int],
+    score_map: dict[int, Any],
+) -> list[dict[str, Any]]:
+    row_map: dict[int, Any] = {int(row["id"]): row for row in rows}
+    hydrated = []
+    for aid in asset_ids:
+        row = row_map.get(aid)
+        if row:
+            hydrated.append(_hydrate_vector_row(row, score_map, aid))
+    return hydrated
+
+
+def _best_text_search_threshold(hits: list[dict[str, Any]], min_score: float, relative_ratio: float) -> float:
+    ratio = max(0.0, min(1.0, float(relative_ratio or 0.0)))
+    floor = max(0.0, min(1.0, float(min_score or 0.0)))
+    best_score = 0.0
+    for hit in hits:
+        try:
+            score = float(hit.get("score") or 0.0)
+        except Exception:
+            score = 0.0
+        if score > best_score:
+            best_score = score
+    return max(floor, best_score * ratio)
+
+
+def _filter_hits_above_threshold(hits: list[dict[str, Any]], threshold: float) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
+    for hit in hits:
+        try:
+            score = float(hit.get("score") or 0.0)
+        except Exception:
+            score = 0.0
+        if score >= threshold:
+            filtered.append(hit)
+    return filtered
+
+
+async def _filter_hits_by_kind(db: Any, hits: list[dict[str, Any]], *, query_asset_id: int) -> list[dict[str, Any]]:
+    source_row = await db.aquery(
+        "SELECT LOWER(COALESCE(kind, '')) AS kind FROM assets WHERE id = ?",
+        (int(query_asset_id),),
+    )
+    if not source_row.ok or not source_row.data:
+        return hits
+    source_kind = str(source_row.data[0].get("kind") or "").strip().lower()
+    if not source_kind:
+        return hits
+
+    asset_ids = _hits_to_asset_ids(hits)
+    if not asset_ids:
         return []
 
-    return [hit for hit in hits if int(hit.get("asset_id") or 0) in allowed]
+    placeholders = ",".join("?" for _ in asset_ids)
+    rows = await db.aquery(
+        f"SELECT id AS asset_id FROM assets WHERE id IN ({placeholders}) AND LOWER(COALESCE(kind, '')) = ?",
+        tuple(asset_ids + [source_kind]),
+    )
+    if not rows.ok or not rows.data:
+        return []
+    return _filter_hits_to_allowed_asset_ids(hits, _rows_to_allowed_set(rows.data))
+
+
+async def _filter_hits_by_scope(
+    db: Any,
+    hits: list[dict[str, Any]],
+    *,
+    scope: str,
+    custom_root_id: str,
+    filters: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    if db is None or not isinstance(hits, list) or not hits:
+        return hits if isinstance(hits, list) else []
+    if scope == "all" and not filters:
+        return hits
+    return await _filter_hits_by_scope_query(db, hits, scope=scope, custom_root_id=custom_root_id, filters=filters or {})
 
 
 async def _filter_similar_hits(
@@ -256,33 +392,7 @@ async def _filter_similar_hits(
     filtered = _filter_by_score_floor(hits, min_score)
     if not filtered or db is None:
         return filtered
-
-    source_row = await db.aquery(
-        "SELECT LOWER(COALESCE(kind, '')) AS kind FROM assets WHERE id = ?",
-        (int(query_asset_id),),
-    )
-    if not source_row.ok or not source_row.data:
-        return filtered
-    source_kind = str(source_row.data[0].get("kind") or "").strip().lower()
-    if not source_kind:
-        return filtered
-
-    asset_ids = _hits_to_asset_ids(filtered)
-    if not asset_ids:
-        return []
-
-    placeholders = ",".join("?" for _ in asset_ids)
-    rows = await db.aquery(
-        f"SELECT id AS asset_id FROM assets WHERE id IN ({placeholders}) AND LOWER(COALESCE(kind, '')) = ?",
-        tuple(asset_ids + [source_kind]),
-    )
-    if not rows.ok or not rows.data:
-        return []
-
-    allowed = _rows_to_allowed_set(rows.data)
-    if not allowed:
-        return []
-    return [hit for hit in filtered if int(hit.get("asset_id") or 0) in allowed]
+    return await _filter_hits_by_kind(db, filtered, query_asset_id=query_asset_id)
 
 
 def _filter_text_search_hits(
@@ -293,29 +403,8 @@ def _filter_text_search_hits(
 ) -> list[dict[str, Any]]:
     if not isinstance(hits, list) or not hits:
         return []
-
-    ratio = max(0.0, min(1.0, float(relative_ratio or 0.0)))
-    floor = max(0.0, min(1.0, float(min_score or 0.0)))
-
-    filtered: list[dict[str, Any]] = []
-    best_score = 0.0
-    for hit in hits:
-        try:
-            score = float(hit.get("score") or 0.0)
-        except Exception:
-            score = 0.0
-        if score > best_score:
-            best_score = score
-
-    threshold = max(floor, best_score * ratio)
-    for hit in hits:
-        try:
-            score = float(hit.get("score") or 0.0)
-        except Exception:
-            score = 0.0
-        if score >= threshold:
-            filtered.append(hit)
-    return filtered
+    threshold = _best_text_search_threshold(hits, min_score, relative_ratio)
+    return _filter_hits_above_threshold(hits, threshold)
 
 
 def _require_vector_services(services: dict[str, Any]):
@@ -371,8 +460,6 @@ async def _hydrate_vector_results(
     if not items:
         return result
 
-    import json as _json
-
     asset_ids = [r["asset_id"] for r in items]
     score_map = {r["asset_id"]: r.get("score", 0) for r in items}
     placeholders = ",".join("?" for _ in asset_ids)
@@ -401,48 +488,7 @@ async def _hydrate_vector_results(
     if not rows.ok or not rows.data:
         return result
 
-    row_map: dict[int, Any] = {}
-    for row in rows.data:
-        row_map[int(row["id"])] = row
-
-    hydrated = []
-    for aid in asset_ids:
-        row = row_map.get(aid)
-        if not row:
-            continue
-
-        tags_raw = row.get("tags", "")
-        if isinstance(tags_raw, str) and tags_raw.strip():
-            try:
-                tags = _json.loads(tags_raw)
-            except (ValueError, TypeError):
-                tags = []
-        elif isinstance(tags_raw, list):
-            tags = tags_raw
-        else:
-            tags = []
-
-        hydrated.append({
-            "id": aid,
-            "asset_id": aid,
-            "filepath": row.get("filepath", ""),
-            "filename": row.get("filename", ""),
-            "subfolder": row.get("subfolder", ""),
-            "kind": row.get("kind", "image"),
-            "type": row.get("type", "output"),
-            "file_size": row.get("file_size"),
-            "width": row.get("width"),
-            "height": row.get("height"),
-            "mtime": row.get("mtime"),
-            "enhanced_caption": row.get("enhanced_caption", "") or "",
-            "rating": row.get("rating", 0),
-            "tags": tags,
-            "has_workflow": bool(row.get("has_workflow")),
-            "has_generation_data": bool(row.get("has_generation_data")),
-            "_vectorScore": score_map.get(aid, 0),
-        })
-
-    return Result.Ok(hydrated)
+    return Result.Ok(_hydrate_vector_rows(rows.data, asset_ids, score_map))
 
 
 def register_vector_search_routes(routes: web.RouteTableDef) -> None:

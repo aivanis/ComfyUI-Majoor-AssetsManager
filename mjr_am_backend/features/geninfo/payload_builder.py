@@ -120,10 +120,9 @@ def _apply_multi_sink_prompt_fields(out: dict[str, Any], nodes_by_id: dict[str, 
         out["all_negative_prompts"] = all_neg
 
 
-def _effective_sampler_sinks(nodes_by_id: dict[str, Any], sinks: list[str]) -> list[str]:
-    if len(sinks) <= 1:
-        return sinks
-
+def _dedup_sinks_by_start(
+    nodes_by_id: dict[str, Any], sinks: list[str]
+) -> tuple[list[str], dict[str, str]]:
     deduped: list[str] = []
     seen_starts: set[str] = set()
     sink_starts: dict[str, str] = {}
@@ -140,30 +139,54 @@ def _effective_sampler_sinks(nodes_by_id: dict[str, Any], sinks: list[str]) -> l
         deduped.append(sink_id)
         if start:
             sink_starts[sink_id] = start
+    return deduped, sink_starts
+
+
+def _is_sink_upstream_of_another(
+    nodes_by_id: dict[str, Any],
+    sink_id: str,
+    deduped: list[str],
+    sink_starts: dict[str, str],
+) -> bool:
+    from . import parser_impl as _p
+
+    start = sink_starts.get(sink_id)
+    if not start:
+        return False
+    for other_sink in deduped:
+        if other_sink == sink_id:
+            continue
+        other_start = sink_starts.get(other_sink)
+        if not other_start:
+            continue
+        upstream = _p._collect_upstream_nodes(nodes_by_id, other_start, max_nodes=500, max_depth=80)
+        if start in upstream:
+            return True
+    return False
+
+
+def _prune_intermediate_sinks(
+    nodes_by_id: dict[str, Any],
+    deduped: list[str],
+    sink_starts: dict[str, str],
+) -> list[str]:
+    keep = set(deduped)
+    for sink_id in deduped:
+        if _is_sink_upstream_of_another(nodes_by_id, sink_id, deduped, sink_starts):
+            keep.discard(sink_id)
+    return [sid for sid in deduped if sid in keep]
+
+
+def _effective_sampler_sinks(nodes_by_id: dict[str, Any], sinks: list[str]) -> list[str]:
+    if len(sinks) <= 1:
+        return sinks
+
+    deduped, sink_starts = _dedup_sinks_by_start(nodes_by_id, sinks)
 
     if len(deduped) <= 1:
         return deduped or sinks
 
-    from . import parser_impl as _p
-
-    # Remove sinks that represent upstream/intermediate previews of another sink branch.
-    keep = set(deduped)
-    for sink_id in deduped:
-        start = sink_starts.get(sink_id)
-        if not start:
-            continue
-        for other_sink in deduped:
-            if other_sink == sink_id:
-                continue
-            other_start = sink_starts.get(other_sink)
-            if not other_start:
-                continue
-            upstream = _p._collect_upstream_nodes(nodes_by_id, other_start, max_nodes=500, max_depth=80)
-            if start in upstream:
-                keep.discard(sink_id)
-                break
-
-    pruned = [sid for sid in deduped if sid in keep]
+    pruned = _prune_intermediate_sinks(nodes_by_id, deduped, sink_starts)
     return pruned or deduped or sinks
 
 
@@ -279,6 +302,46 @@ def _build_no_sampler_result(nodes_by_id: dict[str, Any], workflow_meta: dict[st
     return Result.Ok(None)
 
 
+def _find_sampler_in_sinks(
+    nodes_by_id: dict[str, Any], sinks: list[str]
+) -> tuple[str, str, str, str] | None:
+    from . import parser_impl as _p
+
+    for candidate in sinks:
+        sampler_id, sampler_conf, sampler_mode = _p._select_sampler_context(nodes_by_id, candidate)
+        if sampler_id:
+            return candidate, sampler_id, sampler_conf, sampler_mode
+    return None
+
+
+def _build_pipeline_passes_result(
+    nodes_by_id: dict[str, Any],
+    sink_id: str,
+    sinks: list[str],
+    workflow_meta: dict[str, Any] | None,
+) -> Result | None:
+    from . import parser_impl as _p
+
+    pipeline_passes = _p._collect_sampler_pipeline_from_sink(nodes_by_id, sink_id)
+    if len(pipeline_passes) <= 1:
+        return None
+    out_fallback: dict[str, Any] = {
+        "engine": {
+            "parser_version": "geninfo-v1",
+            "sink": str(_node_type(nodes_by_id.get(sink_id, {}))),
+            "sampler_mode": "fallback",
+            "type": _p._determine_workflow_type(nodes_by_id, sink_id, ""),
+        },
+        "chained_passes": pipeline_passes,
+        "all_samplers": pipeline_passes,
+    }
+    if workflow_meta:
+        out_fallback["metadata"] = workflow_meta
+    _apply_multi_checkpoint_fields(out_fallback, nodes_by_id, sinks)
+    _apply_input_files_field(out_fallback, nodes_by_id)
+    return Result.Ok(out_fallback)
+
+
 def _trace_size(nodes_by_id: dict[str, dict[str, Any]], latent_link: Any, confidence: str) -> dict[str, Any] | None:
     from . import parser_impl as _p
 
@@ -323,48 +386,52 @@ def _next_latent_link(ins: dict[str, Any]) -> Any | None:
 
 
 def _extract_geninfo(nodes_by_id: dict[str, Any], sinks: list[str], workflow_meta: dict | None) -> Result:
+    sink_id = sinks[0]
+    sampler_context = _resolve_sampler_context_for_geninfo(nodes_by_id, sink_id, sinks)
+    if sampler_context is None:
+        pipeline_result = _build_pipeline_passes_result(nodes_by_id, sink_id, sinks, workflow_meta)
+        if pipeline_result is not None:
+            return pipeline_result
+        return _build_no_sampler_result(nodes_by_id, workflow_meta)
+
+    sampler_id, sampler_conf, sampler_mode = sampler_context
+    return _build_sampler_geninfo_result(
+        nodes_by_id,
+        sinks,
+        sink_id,
+        sampler_id,
+        sampler_conf,
+        sampler_mode,
+        workflow_meta,
+    )
+
+
+def _resolve_sampler_context_for_geninfo(
+    nodes_by_id: dict[str, Any],
+    sink_id: str,
+    sinks: list[str],
+) -> tuple[str, str, str] | None:
     from . import parser_impl as _p
 
-    sink_id = sinks[0]
     sampler_id, sampler_conf, sampler_mode = _p._select_sampler_context(nodes_by_id, sink_id)
+    if sampler_id or len(sinks) <= 1:
+        return (sampler_id, sampler_conf, sampler_mode) if sampler_id else None
+    found = _find_sampler_in_sinks(nodes_by_id, sinks[1:])
+    if found:
+        return found[1], found[2], found[3]
+    return None
 
-    # Multi-output video workflows can contain intermediate save/combine branches
-    # (for previews, tracks, masks, etc.) before the final generated video sink.
-    # Prefer the first sink that resolves to an actual sampler branch so geninfo
-    # comes from the real generation path rather than a metadata-only helper clip.
-    if not sampler_id and len(sinks) > 1:
-        for candidate_sink_id in sinks[1:]:
-            candidate_sampler_id, candidate_sampler_conf, candidate_sampler_mode = _p._select_sampler_context(
-                nodes_by_id,
-                candidate_sink_id,
-            )
-            if candidate_sampler_id:
-                sink_id = candidate_sink_id
-                sampler_id = candidate_sampler_id
-                sampler_conf = candidate_sampler_conf
-                sampler_mode = candidate_sampler_mode
-                break
 
-    if not sampler_id:
-        pipeline_passes = _p._collect_sampler_pipeline_from_sink(nodes_by_id, sink_id)
-        if len(pipeline_passes) > 1:
-            out_fallback: dict[str, Any] = {
-                "engine": {
-                    "parser_version": "geninfo-v1",
-                    "sink": str(_node_type(nodes_by_id.get(sink_id, {}))),
-                    "sampler_mode": "fallback",
-                    "type": _p._determine_workflow_type(nodes_by_id, sink_id, ""),
-                },
-                "chained_passes": pipeline_passes,
-                # Compatibility for legacy clients.
-                "all_samplers": pipeline_passes,
-            }
-            if workflow_meta:
-                out_fallback["metadata"] = workflow_meta
-            _apply_multi_checkpoint_fields(out_fallback, nodes_by_id, sinks)
-            _apply_input_files_field(out_fallback, nodes_by_id)
-            return Result.Ok(out_fallback)
-        return _build_no_sampler_result(nodes_by_id, workflow_meta)
+def _build_sampler_geninfo_result(
+    nodes_by_id: dict[str, Any],
+    sinks: list[str],
+    sink_id: str,
+    sampler_id: str,
+    sampler_conf: str,
+    sampler_mode: str,
+    workflow_meta: dict[str, Any] | None,
+) -> Result:
+    from . import parser_impl as _p
 
     sink = nodes_by_id.get(sink_id) or {}
     sink_link = _pick_sink_inputs(sink)
@@ -389,7 +456,6 @@ def _extract_geninfo(nodes_by_id: dict[str, Any], sinks: list[str], workflow_met
         trace.get("conditioning_link"),
         sampler_values.get("model_link_for_chain"),
     )
-
     out = _build_geninfo_payload(
         nodes_by_id,
         sinks,
@@ -403,10 +469,10 @@ def _extract_geninfo(nodes_by_id: dict[str, Any], sinks: list[str], workflow_met
         sampler_values,
         model_related,
     )
+    return _finalize_geninfo_payload(out, workflow_meta)
 
+
+def _finalize_geninfo_payload(out: dict[str, Any], workflow_meta: dict[str, Any] | None) -> Result:
     if len(out.keys()) <= 1:
-        if workflow_meta:
-            return Result.Ok({"metadata": workflow_meta})
-        return Result.Ok(None)
-
+        return Result.Ok({"metadata": workflow_meta}) if workflow_meta else Result.Ok(None)
     return Result.Ok(out)

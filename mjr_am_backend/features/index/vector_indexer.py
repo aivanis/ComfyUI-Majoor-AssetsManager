@@ -269,6 +269,176 @@ def _calibrate_score(raw: float) -> float:
     return max(0.0, min(1.0, (raw - _CALIB_LOW) / (_CALIB_HIGH - _CALIB_LOW)))
 
 
+def _caption_fallback_title(filepath: str) -> str:
+    return Path(filepath).stem.replace("_", " ").replace("-", " ").strip() or "Untitled"
+
+
+def _normalize_generated_caption(value: Any, *, filepath: str) -> str | None:
+    caption = _normalise_title_caption(str(value or "").strip(), fallback_title=_caption_fallback_title(filepath))
+    return caption or None
+
+
+def _coerce_metadata_payload(raw: Any) -> dict[str, Any] | None:
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+        except Exception:
+            return None
+        return parsed if isinstance(parsed, dict) else None
+    return None
+
+
+def _extract_metadata_text(
+    meta: dict[str, Any],
+    key_paths: tuple[str, ...],
+    *,
+    normalizer: Any,
+) -> str | None:
+    for key_path in key_paths:
+        cleaned = _normalize_metadata_candidate(_resolve_key_path(meta, key_path), normalizer)
+        if cleaned:
+            return cleaned
+    return None
+
+
+def _normalize_metadata_candidate(value: Any, normalizer: Any) -> str | None:
+    if isinstance(value, str) and value.strip():
+        cleaned = normalizer(value)
+        if cleaned:
+            return cleaned
+    if isinstance(value, list):
+        joined = " ".join(str(x) for x in value if isinstance(x, str) and x.strip())
+        if joined.strip():
+            cleaned = normalizer(joined)
+            if cleaned:
+                return cleaned
+    return None
+
+
+async def _resolve_image_caption_source(db: Sqlite, asset_id: int) -> Result[dict[str, Any]]:
+    row = await db.aquery(
+        "SELECT filepath, kind FROM assets WHERE id = ? LIMIT 1",
+        (asset_id,),
+    )
+    if not row.ok:
+        return Result.Err("DB_ERROR", row.error or "Failed to query asset")
+    if not row.data:
+        return Result.Err("NOT_FOUND", f"Asset {asset_id} not found")
+
+    data = row.data[0]
+    kind = str(data.get("kind") or "").strip().lower()
+    if kind != "image":
+        return Result.Err("INVALID_INPUT", "Enhanced prompt generation is only available for image assets")
+
+    filepath = str(data.get("filepath") or "").strip()
+    if not filepath:
+        return Result.Err("INVALID_INPUT", "Asset filepath is empty")
+
+    return Result.Ok({"filepath": filepath, "kind": kind})
+
+
+async def _generate_caption_text(vs: VectorService, filepath: str) -> Result[str]:
+    try:
+        generated = await asyncio.wait_for(vs.generate_enhanced_caption(filepath), timeout=90)
+    except asyncio.TimeoutError:
+        return Result.Err("METADATA_FAILED", "Enhanced caption generation timed out")
+
+    if not generated.ok or not generated.data:
+        return Result.Err(generated.code or "METADATA_FAILED", generated.error or "Enhanced caption generation failed")
+
+    caption = _normalize_generated_caption(generated.data, filepath=filepath)
+    if not caption:
+        return Result.Err("METADATA_FAILED", "Enhanced caption generation returned empty output")
+    return Result.Ok(caption)
+
+
+async def _generate_caption_with_fallback(
+    db: Sqlite,
+    vs: VectorService,
+    asset_id: int,
+    filepath: str,
+) -> Result[str]:
+    caption = await _resolve_caption_text_with_fallback(db, vs, asset_id, filepath)
+    if not caption.ok or not caption.data:
+        return caption
+
+    write = await _store_enhanced_caption(db, asset_id, caption.data)
+    if not write.ok:
+        return Result.Err(write.code or "DB_ERROR", write.error or "Failed to store enhanced caption")
+    return Result.Ok(caption.data)
+
+
+async def _resolve_caption_text_with_fallback(
+    db: Sqlite,
+    vs: VectorService,
+    asset_id: int,
+    filepath: str,
+) -> Result[str]:
+    generated = await _generate_caption_text(vs, filepath)
+    if generated.ok and generated.data:
+        return generated
+
+    fallback = await _fallback_enhanced_caption(db, asset_id)
+    if not fallback.ok or not fallback.data:
+        return Result.Err(generated.code or "METADATA_FAILED", generated.error or "Enhanced caption generation failed")
+
+    caption = _normalize_generated_caption(fallback.data, filepath=filepath) or ""
+    if not caption:
+        return Result.Err("METADATA_FAILED", "Enhanced caption generation returned empty output")
+    return Result.Ok(caption)
+
+
+def _alignment_fusion(
+    adjusted_image_text: float,
+    *,
+    caption_score: float | None,
+    semantic_score: float | None,
+) -> float:
+    total_weight = _W_IMAGE_TEXT
+    weighted_sum = adjusted_image_text * _W_IMAGE_TEXT
+
+    if caption_score is not None:
+        weighted_sum += caption_score * _W_CAPTION_TEXT
+        total_weight += _W_CAPTION_TEXT
+
+    if semantic_score is not None:
+        weighted_sum += semantic_score * _W_SEMANTIC
+        total_weight += _W_SEMANTIC
+
+    return weighted_sum / total_weight if total_weight > 0 else adjusted_image_text
+
+
+async def _resolve_image_text_alignment(
+    vs: VectorService,
+    asset_embedding: list[float],
+    prompt: str,
+) -> Result[float]:
+    raw_image_text = await _multi_segment_score(vs, asset_embedding, prompt)
+    if raw_image_text is not None:
+        return Result.Ok(raw_image_text)
+
+    text_result = await vs.get_text_embedding(prompt)
+    if not text_result.ok or not text_result.data:
+        return Result.Err("METADATA_FAILED", text_result.error or "Text embedding failed")
+    return Result.Ok(VectorService.cosine_similarity(asset_embedding, text_result.data))
+
+
+async def _resolve_negative_prompt_penalty(
+    vs: VectorService,
+    asset_embedding: list[float],
+    negative_prompt: str | None,
+) -> float:
+    if not negative_prompt:
+        return 0.0
+    neg_result = await vs.get_text_embedding(negative_prompt)
+    if not neg_result.ok or not neg_result.data:
+        return 0.0
+    raw_neg = VectorService.cosine_similarity(asset_embedding, neg_result.data)
+    return max(0.0, raw_neg) * _NEG_PENALTY_WEIGHT
+
+
 async def compute_prompt_alignment(
     vs: VectorService,
     asset_embedding: list[float],
@@ -281,63 +451,34 @@ async def compute_prompt_alignment(
 
     Returns a float in [0, 1].  Higher means the image closely matches the
     textual prompt.
-
-    Three signals are fused:
-    1. **Multi-segment image↔text** — the prompt is split into segments;
-       each segment is scored against the image embedding, then combined
-       as a length-weighted average with a best-segment bonus.
-    2. **Caption↔prompt text** — if an enhanced caption is available, its
-       text embedding is compared to the prompt embedding for a text↔text
-       coherence signal.
-    3. **Semantic decomposition** — key concepts (subject, style, medium,
-       mood, color) are extracted and each dimension is scored separately
-       against the image embedding.
-
-    If *negative_prompt* is provided, its similarity to the image is
-    subtracted (weighted) to penalise unwanted content leaking in.
     """
-    # ── 1. Multi-segment image↔text score ──────────────────────────────
-    raw_image_text = await _multi_segment_score(vs, asset_embedding, prompt)
-    if raw_image_text is None:
-        # Fallback: single-embedding score
-        text_result = await vs.get_text_embedding(prompt)
-        if not text_result.ok or not text_result.data:
-            return Result.Err("METADATA_FAILED", text_result.error or "Text embedding failed")
-        raw_image_text = VectorService.cosine_similarity(asset_embedding, text_result.data)
+    image_text_result = await _resolve_image_text_alignment(vs, asset_embedding, prompt)
+    if not image_text_result.ok:
+        return image_text_result
 
-    # ── Negative prompt penalty ────────────────────────────────────────
-    neg_penalty = 0.0
-    if negative_prompt:
-        neg_result = await vs.get_text_embedding(negative_prompt)
-        if neg_result.ok and neg_result.data:
-            raw_neg = VectorService.cosine_similarity(asset_embedding, neg_result.data)
-            neg_penalty = max(0.0, raw_neg) * _NEG_PENALTY_WEIGHT
+    adjusted_image_text = float(image_text_result.data or 0.0)
+    adjusted_image_text -= await _resolve_negative_prompt_penalty(vs, asset_embedding, negative_prompt)
 
-    adjusted_image_text = raw_image_text - neg_penalty
-
-    # ── 2. Caption↔prompt text similarity ──────────────────────────────
-    caption_score: float | None = None
+    caption_score = None
     if enhanced_caption and enhanced_caption.strip():
         caption_score = await _caption_prompt_similarity(vs, enhanced_caption, prompt)
 
-    # ── 3. Semantic decomposition ──────────────────────────────────────
     semantic_score = await _semantic_dimension_score(vs, asset_embedding, prompt)
-
-    # ── Weighted fusion ────────────────────────────────────────────────
-    total_weight = _W_IMAGE_TEXT
-    weighted_sum = adjusted_image_text * _W_IMAGE_TEXT
-
-    if caption_score is not None:
-        weighted_sum += caption_score * _W_CAPTION_TEXT
-        total_weight += _W_CAPTION_TEXT
-
-    if semantic_score is not None:
-        weighted_sum += semantic_score * _W_SEMANTIC
-        total_weight += _W_SEMANTIC
-
-    fused_raw = weighted_sum / total_weight if total_weight > 0 else adjusted_image_text
-    calibrated = _calibrate_score(fused_raw)
+    calibrated = _calibrate_score(
+        _alignment_fusion(
+            adjusted_image_text,
+            caption_score=caption_score,
+            semantic_score=semantic_score,
+        )
+    )
     return Result.Ok(round(calibrated, 4))
+
+
+def _length_weighted_average(scores: list[tuple[float, int]]) -> float | None:
+    total_len = sum(length for _, length in scores)
+    if total_len == 0:
+        return None
+    return sum(sim * length for sim, length in scores) / total_len
 
 
 async def _multi_segment_score(
@@ -366,13 +507,10 @@ async def _multi_segment_score(
     if not scores:
         return None
 
-    # Length-weighted average
-    total_len = sum(length for _, length in scores)
-    if total_len == 0:
+    weighted_avg = _length_weighted_average(scores)
+    if weighted_avg is None:
         return None
-    weighted_avg = sum(sim * length for sim, length in scores) / total_len
 
-    # Boost from best segment
     best_sim = max(sim for sim, _ in scores)
     return weighted_avg + (best_sim - weighted_avg) * _SEGMENT_MAX_BOOST
 
@@ -421,6 +559,13 @@ async def _semantic_dimension_score(
     return sum(dim_scores) / len(dim_scores) if dim_scores else None
 
 
+def _first_matching_keyword(lower: str, keywords: tuple[str, ...]) -> str | None:
+    for kw in keywords:
+        if kw in lower:
+            return kw
+    return None
+
+
 def _extract_semantic_concepts(prompt: str) -> dict[str, str]:
     """Heuristic extraction of semantic dimensions from a prompt.
 
@@ -431,12 +576,10 @@ def _extract_semantic_concepts(prompt: str) -> dict[str, str]:
     lower = prompt.lower()
     concepts: dict[str, str] = {}
 
-    # Subject: first segment (usually the main subject)
     segments = [s.strip() for s in _SEGMENT_SPLIT_RE.split(prompt) if len(s.strip()) >= _MIN_SEGMENT_CHARS]
     if segments:
         concepts["subject"] = segments[0]
 
-    # Style keywords
     style_kws = (
         "anime", "manga", "photorealistic", "realistic", "cartoon", "oil painting",
         "watercolor", "impressionist", "surrealist", "art nouveau", "art deco",
@@ -444,46 +587,36 @@ def _extract_semantic_concepts(prompt: str) -> dict[str, str]:
         "cinematic", "studio ghibli", "ukiyo-e", "pop art", "minimalist",
         "gothic", "baroque", "renaissance", "cubist", "futuristic",
     )
-    for kw in style_kws:
-        if kw in lower:
-            concepts["style"] = kw
-            break
-
-    # Medium keywords (longer/compound keywords first to avoid substring
-    # matches like "painting" taking precedence over "watercolor painting").
     medium_kws = (
         "oil painting", "watercolor", "photograph", "photo", "illustration",
         "painting", "drawing", "sketch", "render", "sculpture", "collage",
         "engraving", "print", "pencil", "charcoal", "pastel", "acrylic",
         "fresco", "mosaic", "tapestry",
     )
-    for kw in medium_kws:
-        if kw in lower:
-            concepts["medium"] = kw
-            break
-
-    # Mood keywords
     mood_kws = (
         "dark", "bright", "moody", "cheerful", "mysterious", "serene",
         "dramatic", "peaceful", "ethereal", "gloomy", "vibrant", "melancholic",
         "nostalgic", "whimsical", "epic", "dreamy", "eerie", "cozy",
         "romantic", "surreal", "ominous", "tranquil",
     )
-    for kw in mood_kws:
-        if kw in lower:
-            concepts["mood"] = kw
-            break
-
-    # Color palette keywords
     color_kws = (
         "monochrome", "black and white", "pastel colors", "neon", "warm tones",
         "cool tones", "golden hour", "blue hour", "sepia", "high contrast",
         "muted colors", "saturated", "desaturated", "earth tones",
     )
-    for kw in color_kws:
-        if kw in lower:
-            concepts["color"] = kw
-            break
+
+    style = _first_matching_keyword(lower, style_kws)
+    if style:
+        concepts["style"] = style
+    medium = _first_matching_keyword(lower, medium_kws)
+    if medium:
+        concepts["medium"] = medium
+    mood = _first_matching_keyword(lower, mood_kws)
+    if mood:
+        concepts["mood"] = mood
+    color = _first_matching_keyword(lower, color_kws)
+    if color:
+        concepts["color"] = color
 
     return concepts
 
@@ -494,52 +627,12 @@ async def generate_enhanced_prompt(
     asset_id: int,
 ) -> Result[str]:
     """Generate and persist an enhanced Florence-2 caption for one image asset."""
-    row = await db.aquery(
-        "SELECT filepath, kind FROM assets WHERE id = ? LIMIT 1",
-        (asset_id,),
-    )
-    if not row.ok:
-        return Result.Err("DB_ERROR", row.error or "Failed to query asset")
-    if not row.data:
-        return Result.Err("NOT_FOUND", f"Asset {asset_id} not found")
+    source = await _resolve_image_caption_source(db, asset_id)
+    if not source.ok or not source.data:
+        return Result.Err(source.code or "METADATA_FAILED", source.error or "Enhanced caption generation failed")
 
-    data = row.data[0]
-    kind = str(data.get("kind") or "").strip().lower()
-    if kind != "image":
-        return Result.Err("INVALID_INPUT", "Enhanced prompt generation is only available for image assets")
-
-    filepath = str(data.get("filepath") or "").strip()
-    if not filepath:
-        return Result.Err("INVALID_INPUT", "Asset filepath is empty")
-
-    try:
-        generated = await asyncio.wait_for(vs.generate_enhanced_caption(filepath), timeout=90)
-    except asyncio.TimeoutError:
-        generated = Result.Err("METADATA_FAILED", "Enhanced caption generation timed out")
-
-    if generated.ok and generated.data:
-        caption = str(generated.data).strip()
-    else:
-        fallback = await _fallback_enhanced_caption(db, asset_id)
-        if not fallback.ok or not fallback.data:
-            return Result.Err(generated.code or "METADATA_FAILED", generated.error or "Enhanced caption generation failed")
-        caption = str(fallback.data).strip()
-
-    if not caption:
-        return Result.Err("METADATA_FAILED", "Enhanced caption generation returned empty output")
-    fallback_title = (
-        Path(filepath).stem.replace("_", " ").replace("-", " ").strip()
-        or "Untitled"
-    )
-    caption = _normalise_title_caption(caption, fallback_title=fallback_title)
-
-    write = await _store_enhanced_caption(db, asset_id, caption)
-    if not write.ok:
-        return Result.Err(write.code or "DB_ERROR", write.error or "Failed to store enhanced caption")
-    return Result.Ok(caption)
-
-
-# ── Private helpers ────────────────────────────────────────────────────────
+    filepath = str(source.data["filepath"])
+    return await _generate_caption_with_fallback(db, vs, asset_id, filepath)
 
 
 async def _compute_prompt_alignment(
@@ -583,18 +676,7 @@ async def _fallback_enhanced_caption(db: Sqlite, asset_id: int) -> Result[str]:
         return Result.Err("NOT_FOUND", f"Asset {asset_id} not found")
 
     data = row.data[0]
-    raw = data.get("metadata_raw")
-    meta_obj: dict[str, Any] | None = None
-    if isinstance(raw, str) and raw.strip():
-        try:
-            parsed = json.loads(raw)
-            if isinstance(parsed, dict):
-                meta_obj = parsed
-        except Exception:
-            meta_obj = None
-    elif isinstance(raw, dict):
-        meta_obj = raw
-
+    meta_obj = _coerce_metadata_payload(data.get("metadata_raw"))
     if meta_obj:
         prompt = _extract_prompt_from_metadata(meta_obj)
         if prompt:
@@ -602,7 +684,7 @@ async def _fallback_enhanced_caption(db: Sqlite, asset_id: int) -> Result[str]:
 
     filename = str(data.get("filename") or "").strip()
     if filename:
-        stem = filename.rsplit(".", 1)[0].replace("_", " ").replace("-", " ").strip()
+        stem = _caption_fallback_title(filename)
         if stem:
             return Result.Ok(stem)
 
@@ -622,35 +704,28 @@ def _resolve_key_path(meta: dict[str, Any], key_path: str) -> Any:
 
 def _extract_prompt_from_metadata(meta: dict[str, Any]) -> str | None:
     """Best-effort extraction of the generation prompt from metadata JSON."""
-    # ComfyUI / A1111 / various formats
-    for key_path in (
-        "prompt",
-        "parameters",
-        "geninfo.prompt",
-        "geninfo.positive.value",
-        "geninfo.positive.text",
-        "geninfo.positive_prompt",
-        "positive_prompt",
-        "sd_prompt",
-        "generation.prompt",
-        "workflow.prompt",
-        "comfy.positive",
-        "comfyui.positive",
-        "dream.prompt",
-        "invokeai.positive_conditioning",
-    ):
-        obj = _resolve_key_path(meta, key_path)
-        if isinstance(obj, str) and obj.strip():
-            cleaned = _sanitize_prompt_text(obj)
-            if cleaned:
-                return cleaned
-        # Some formats store the prompt as a list of strings
-        if isinstance(obj, list):
-            joined = " ".join(str(x) for x in obj if isinstance(x, str) and x.strip())
-            if joined.strip():
-                cleaned = _sanitize_prompt_text(joined)
-                if cleaned:
-                    return cleaned
+    prompt = _extract_metadata_text(
+        meta,
+        (
+            "prompt",
+            "parameters",
+            "geninfo.prompt",
+            "geninfo.positive.value",
+            "geninfo.positive.text",
+            "geninfo.positive_prompt",
+            "positive_prompt",
+            "sd_prompt",
+            "generation.prompt",
+            "workflow.prompt",
+            "comfy.positive",
+            "comfyui.positive",
+            "dream.prompt",
+            "invokeai.positive_conditioning",
+        ),
+        normalizer=_sanitize_prompt_text,
+    )
+    if prompt:
+        return prompt
     for blob_key in (
         "PNG:Parameters",
         "EXIF:UserComment",

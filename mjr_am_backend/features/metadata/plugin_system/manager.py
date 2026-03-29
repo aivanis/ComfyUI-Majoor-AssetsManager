@@ -116,16 +116,6 @@ class PluginManager:
         filepath: str,
         fallback_extractor: Callable | None = None
     ) -> ExtractionResult:
-        """
-        Extract metadata using plugin system.
-
-        Args:
-            filepath: Path to file
-            fallback_extractor: Optional fallback if no plugin matches
-
-        Returns:
-            ExtractionResult
-        """
         if not self._initialized:
             await self.initialize()
 
@@ -135,7 +125,6 @@ class PluginManager:
                 error="Plugin system not initialized"
             )
 
-        # Prevent extraction while a reload is swapping extractors.
         if self._reload_lock.locked():
             if fallback_extractor:
                 return await fallback_extractor(filepath)
@@ -144,7 +133,6 @@ class PluginManager:
                 error="Plugin system is reloading"
             )
 
-        # Get best extractor for file
         extractor = self._loader.get_extractor(filepath)
 
         if not extractor:
@@ -156,8 +144,22 @@ class PluginManager:
                 error="No suitable extractor found"
             )
 
-        # Check if plugin is enabled
-        if not self._registry.is_enabled(extractor.name):
+        early_out = await self._run_pre_extract(extractor, filepath, fallback_extractor)
+        if early_out is not None:
+            return early_out
+
+        return await self._run_plugin_extraction(extractor, filepath, fallback_extractor)
+
+    async def _run_pre_extract(
+        self,
+        extractor,
+        filepath: str,
+        fallback_extractor: Callable | None
+    ) -> ExtractionResult | None:
+        registry = self._registry
+        if registry is None:
+            return self._error_result(extractor.name, "Plugin registry not initialized")
+        if not registry.is_enabled(extractor.name):
             logger.debug(f"Plugin {extractor.name} is disabled")
             if fallback_extractor:
                 return await fallback_extractor(filepath)
@@ -166,7 +168,6 @@ class PluginManager:
                 error=f"Plugin {extractor.name} is disabled"
             )
 
-        # Pre-extraction hook
         try:
             if not await extractor.pre_extract(filepath):
                 logger.debug(f"Plugin {extractor.name} pre_extract returned False")
@@ -178,27 +179,35 @@ class PluginManager:
                 )
         except Exception as e:
             logger.warning(f"Plugin {extractor.name} pre_extract failed: {e}")
-            self._registry.record_error(extractor.name, str(e))
+            registry.record_error(extractor.name, str(e))
             if fallback_extractor:
                 return await fallback_extractor(filepath)
             return self._error_result(extractor.name, str(e))
 
-        # Extract with timing
+        return None
+
+    async def _run_plugin_extraction(
+        self,
+        extractor,
+        filepath: str,
+        fallback_extractor: Callable | None
+    ) -> ExtractionResult:
         start_time = time.perf_counter()
+        registry = self._registry
+        if registry is None:
+            return self._error_result(extractor.name, "Plugin registry not initialized")
         try:
             result = await extractor.extract(filepath)
 
             extraction_time_ms = (time.perf_counter() - start_time) * 1000
 
             if result.success:
-                # Record success
-                self._registry.record_extraction(
+                registry.record_extraction(
                     extractor.name,
                     result.confidence,
                     extraction_time_ms
                 )
 
-                # Post-extraction hook
                 try:
                     result = await extractor.post_extract(filepath, result)
                 except Exception as e:
@@ -206,13 +215,11 @@ class PluginManager:
                         f"Plugin {extractor.name} post_extract failed: {e}"
                     )
 
-                # Fire success hooks
                 await self._fire_extract_hooks(filepath, result)
 
                 return result
             else:
-                # Record error
-                self._registry.record_error(
+                registry.record_error(
                     extractor.name,
                     result.error or "Unknown error"
                 )
@@ -220,7 +227,6 @@ class PluginManager:
                     f"Plugin {extractor.name} extraction failed: {result.error}"
                 )
 
-                # Fire error hooks
                 await self._fire_error_hooks(filepath, extractor.name, result.error or "")
 
                 if fallback_extractor:
@@ -230,14 +236,13 @@ class PluginManager:
         except Exception as e:
             extraction_time_ms = (time.perf_counter() - start_time) * 1000
             logger.exception(f"Plugin {extractor.name} raised exception: {e}")
-            self._registry.record_error(extractor.name, str(e))
-            self._registry.record_extraction(
+            registry.record_error(extractor.name, str(e))
+            registry.record_extraction(
                 extractor.name,
                 confidence=0.0,
                 extraction_time_ms=extraction_time_ms
             )
 
-            # Fire error hooks
             await self._fire_error_hooks(filepath, extractor.name, str(e))
 
             if fallback_extractor:

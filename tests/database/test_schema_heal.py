@@ -3,22 +3,13 @@ import sqlite3
 import pytest
 
 
-@pytest.mark.asyncio
-async def test_schema_self_heals_missing_columns(tmp_path):
-    from mjr_am_backend.adapters.db.schema import CURRENT_SCHEMA_VERSION, migrate_schema
-    from mjr_am_backend.adapters.db.sqlite import Sqlite
-
-    db_path = tmp_path / "partial_schema.db"
-
-    # Create an "old/partial" schema that reports as up-to-date but is missing columns.
+def _create_partial_schema(db_path, current_schema_version) -> None:
     conn = sqlite3.connect(str(db_path))
     try:
-        conn.execute(
-            "CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)"
-        )
+        conn.execute("CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
         conn.execute(
             "INSERT OR REPLACE INTO metadata (key, value) VALUES ('schema_version', ?)",
-            (str(CURRENT_SCHEMA_VERSION),),
+            (str(current_schema_version),),
         )
         conn.execute(
             """
@@ -45,53 +36,75 @@ async def test_schema_self_heals_missing_columns(tmp_path):
     finally:
         conn.close()
 
-    db = Sqlite(str(db_path), attach={"vec": str(tmp_path / "vectors.sqlite")})
-    try:
-        result = await migrate_schema(db)
-        assert result.ok, result.error
 
-        assets_cols = await db.aquery("PRAGMA table_info('assets')")
-        assert assets_cols.ok, assets_cols.error
-        assets_col_names = {row["name"] for row in (assets_cols.data or [])}
-        for name in [
-            "source",
-            "root_id",
-            "subfolder",
-            "width",
-            "height",
-            "duration",
-            "enhanced_caption",
-            "indexed_at",
-            "content_hash",
-            "phash",
-            "hash_state",
-        ]:
-            assert name in assets_col_names
+async def _assert_table_contains_columns(db, table: str, expected_columns: list[str]) -> None:
+    cols = await db.aquery(f"PRAGMA table_info('{table}')")
+    assert cols.ok, cols.error
+    col_names = {row["name"] for row in (cols.data or [])}
+    for name in expected_columns:
+        assert name in col_names
 
-        meta_cols = await db.aquery("PRAGMA table_info('asset_metadata')")
-        assert meta_cols.ok, meta_cols.error
-        meta_col_names = {row["name"] for row in (meta_cols.data or [])}
-        for name in [
-            "tags",
-            "tags_text",
-            "metadata_text",
-            "workflow_hash",
-            "has_workflow",
-            "has_generation_data",
-            "metadata_quality",
-            "metadata_raw",
-        ]:
-            assert name in meta_col_names
 
-        # Ensure common queries won't crash with "no such column".
-        assert (await db.aquery("SELECT source, root_id, enhanced_caption, content_hash, phash, hash_state FROM assets LIMIT 0")).ok
-        assert (await db.aquery(
+async def _assert_schema_healed_queries(db) -> None:
+    assert (
+        await db.aquery("SELECT source, root_id, enhanced_caption, content_hash, phash, hash_state FROM assets LIMIT 0")
+    ).ok
+    assert (
+        await db.aquery(
             """
             SELECT tags, tags_text, metadata_text, metadata_raw, has_workflow, has_generation_data, metadata_quality
             FROM asset_metadata
             LIMIT 0
             """
-        )).ok
+        )
+    ).ok
+
+
+@pytest.mark.asyncio
+async def test_schema_self_heals_missing_columns(tmp_path):
+    from mjr_am_backend.adapters.db.schema import CURRENT_SCHEMA_VERSION, migrate_schema
+    from mjr_am_backend.adapters.db.sqlite import Sqlite
+
+    db_path = tmp_path / "partial_schema.db"
+    _create_partial_schema(db_path, CURRENT_SCHEMA_VERSION)
+
+    db = Sqlite(str(db_path), attach={"vec": str(tmp_path / "vectors.sqlite")})
+    try:
+        result = await migrate_schema(db)
+        assert result.ok, result.error
+
+        await _assert_table_contains_columns(
+            db,
+            "assets",
+            [
+                "source",
+                "root_id",
+                "subfolder",
+                "width",
+                "height",
+                "duration",
+                "enhanced_caption",
+                "indexed_at",
+                "content_hash",
+                "phash",
+                "hash_state",
+            ],
+        )
+        await _assert_table_contains_columns(
+            db,
+            "asset_metadata",
+            [
+                "tags",
+                "tags_text",
+                "metadata_text",
+                "workflow_hash",
+                "has_workflow",
+                "has_generation_data",
+                "metadata_quality",
+                "metadata_raw",
+            ],
+        )
+        await _assert_schema_healed_queries(db)
     finally:
         try:
             await db.aclose()

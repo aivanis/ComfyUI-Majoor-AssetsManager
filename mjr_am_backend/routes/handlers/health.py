@@ -188,17 +188,20 @@ def _extract_vector_search_payload(body: dict) -> object | None:
     return None
 
 
+def _str_token_from_body(source: dict, *keys: str) -> str | None:
+    for key in keys:
+        if key in source:
+            return str(source.get(key) or "")
+    return None
+
+
 def _extract_huggingface_token_payload(body: dict) -> str | None:
-    if "token" in body:
-        return str(body.get("token") or "")
-    if "huggingface_token" in body:
-        return str(body.get("huggingface_token") or "")
+    result = _str_token_from_body(body, "token", "huggingface_token")
+    if result is not None:
+        return result
     prefs = body.get("prefs") if isinstance(body.get("prefs"), dict) else {}
     if isinstance(prefs, dict):
-        if "token" in prefs:
-            return str(prefs.get("token") or "")
-        if "huggingface_token" in prefs:
-            return str(prefs.get("huggingface_token") or "")
+        return _str_token_from_body(prefs, "token", "huggingface_token")
     return None
 
 

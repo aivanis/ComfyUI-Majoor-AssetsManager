@@ -146,24 +146,35 @@ def _run_cleanup_loop() -> None:
                 exc,
                 exc_info=True,
             )
-            try:
-                if _BATCH_DIR.is_dir():
-                    orphaned = [
-                        p.name for p in _BATCH_DIR.glob(".mjr_batch_*.zip")
-                        if p.name not in {
-                            (path.name if path is not None and isinstance(path, Path) else "")
-                            for e in _BATCH_CACHE.values()
-                            for path in [e.get("path")]
-                        }
-                    ]
-                    if orphaned:
-                        logger.warning(
-                            "Found %s orphaned batch zip file(s) during cleanup error: %s",
-                            len(orphaned),
-                            ", ".join(orphaned[:10]),
-                        )
-            except Exception:
-                pass
+            _log_orphaned_batch_zips()
+
+
+def _log_orphaned_batch_zips() -> None:
+    try:
+        if not _BATCH_DIR.is_dir():
+            return
+        orphaned = _orphaned_batch_zip_names()
+        if orphaned:
+            logger.warning(
+                "Found %s orphaned batch zip file(s) during cleanup error: %s",
+                len(orphaned),
+                ", ".join(orphaned[:10]),
+            )
+    except Exception:
+        pass
+
+
+def _orphaned_batch_zip_names() -> list[str]:
+    cached_paths = {
+        (path.name if path is not None and isinstance(path, Path) else "")
+        for entry in _BATCH_CACHE.values()
+        for path in [entry.get("path")]
+    }
+    return [
+        p.name
+        for p in _BATCH_DIR.glob(".mjr_batch_*.zip")
+        if p.name not in cached_paths
+    ]
 
 
 def _ensure_cleanup_thread() -> None:
@@ -671,3 +682,4 @@ def register_batch_zip_routes(routes: web.RouteTableDef) -> None:
         if not entry_res.ok:
             return _json_response(entry_res, status=404)
         return _batch_file_response(entry_res.data or {}, token)
+

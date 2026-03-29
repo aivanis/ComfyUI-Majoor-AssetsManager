@@ -156,12 +156,37 @@ class PluginValidator:
         return warnings
 
     @classmethod
+    def _record_import_warning(
+        cls,
+        warnings: list[str],
+        dangerous_found: set[str],
+        import_name: str,
+        *,
+        from_import: bool = False,
+    ) -> None:
+        if import_name not in cls.DANGEROUS_IMPORTS:
+            return
+        if import_name in dangerous_found:
+            return
+        prefix = "Dangerous import from" if from_import else "Dangerous import"
+        warnings.append(f"{prefix}: {import_name} ({cls.DANGEROUS_IMPORTS[import_name]})")
+        dangerous_found.add(import_name)
+
+    @staticmethod
+    def _record_function_call_warning(warnings: list[str], node: ast.Call) -> None:
+        if isinstance(node.func, ast.Name) and node.func.id in {"eval", "exec", "compile"}:
+            warnings.append(f"Dangerous function call: {node.func.id}()")
+            return
+        if isinstance(node.func, ast.Attribute) and node.func.attr in {"system", "popen", "eval", "exec"}:
+            warnings.append(f"Dangerous method call: {node.func.attr}()")
+
+    @classmethod
     def _check_ast(
         cls,
         tree: ast.AST
     ) -> tuple[list[str], dict[str, Any]]:
         """AST-based security checks."""
-        warnings = []
+        warnings: list[str] = []
         info: dict[str, Any] = {
             "classes": 0,
             "functions": 0,
@@ -171,50 +196,31 @@ class PluginValidator:
         dangerous_found: set[str] = set()
 
         for node in ast.walk(tree):
-            # Count classes
             if isinstance(node, ast.ClassDef):
                 info["classes"] += 1
 
-            # Count functions
             if isinstance(node, ast.FunctionDef):
                 info["functions"] += 1
 
-            # Check for dangerous imports
             if isinstance(node, ast.Import):
                 for alias in node.names:
                     import_name = alias.name.split('.')[0]
                     info["imports"].append(import_name)
-
-                    if import_name in cls.DANGEROUS_IMPORTS:
-                        if import_name not in dangerous_found:
-                            warnings.append(
-                                f"Dangerous import: {import_name} "
-                                f"({cls.DANGEROUS_IMPORTS[import_name]})"
-                            )
-                            dangerous_found.add(import_name)
+                    cls._record_import_warning(warnings, dangerous_found, import_name)
 
             if isinstance(node, ast.ImportFrom):
                 if node.module:
                     module_name = node.module.split('.')[0]
                     info["imports"].append(module_name)
+                    cls._record_import_warning(
+                        warnings,
+                        dangerous_found,
+                        module_name,
+                        from_import=True,
+                    )
 
-                    if module_name in cls.DANGEROUS_IMPORTS:
-                        if module_name not in dangerous_found:
-                            warnings.append(
-                                f"Dangerous import from: {module_name} "
-                                f"({cls.DANGEROUS_IMPORTS[module_name]})"
-                            )
-                            dangerous_found.add(module_name)
-
-            # Check for dangerous function calls
             if isinstance(node, ast.Call):
-                if isinstance(node.func, ast.Name):
-                    if node.func.id in ['eval', 'exec', 'compile']:
-                        warnings.append(f"Dangerous function call: {node.func.id}()")
-
-                if isinstance(node.func, ast.Attribute):
-                    if node.func.attr in ['system', 'popen', 'eval', 'exec']:
-                        warnings.append(f"Dangerous method call: {node.func.attr}()")
+                cls._record_function_call_warning(warnings, node)
 
         return warnings, info
 

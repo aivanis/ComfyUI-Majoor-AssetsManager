@@ -19,6 +19,13 @@ def normalize_path(value: str) -> Path | None:
         return None
 
 
+def _is_path_absolute_or_rooted(raw: str, rel: Path) -> bool:
+    win_path = PureWindowsPath(raw)
+    if win_path.drive or win_path.root in ("\\", "/") or win_path.is_absolute():
+        return True
+    return bool(getattr(rel, "drive", "")) or rel.is_absolute()
+
+
 def safe_rel_path(value: str) -> Path | None:
     if value is None:
         return Path("")
@@ -31,16 +38,7 @@ def safe_rel_path(value: str) -> Path | None:
         rel = Path(raw)
     except (OSError, ValueError):
         return None
-    win_path = PureWindowsPath(raw)
-    if win_path.drive:
-        return None
-    if win_path.root in ("\\", "/"):
-        return None
-    if win_path.is_absolute():
-        return None
-    if getattr(rel, "drive", ""):
-        return None
-    if rel.is_absolute():
+    if _is_path_absolute_or_rooted(raw, rel):
         return None
     if any(part == ".." for part in rel.parts):
         return None

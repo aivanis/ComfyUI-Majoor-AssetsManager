@@ -79,37 +79,40 @@ async def _maybe_purge_audit_log(db: Any, *, now: float) -> None:
         logger.debug("Audit log purge skipped: %s", exc)
 
 
-async def audit_log_write(
-    db_or_services: Any,
-    *,
-    request: web.Request | None,
-    operation: str,
-    target: Any,
-    result: Any,
-    details: Mapping[str, Any] | None = None,
-) -> bool:
-    db = _resolve_audit_db(db_or_services)
-    if db is None:
-        return False
-
-    headers: Mapping[str, str]
+def _resolve_request_headers(request: web.Request | None) -> Mapping[str, str]:
     try:
-        headers = request.headers if request is not None else {}
+        return request.headers if request is not None else {}
     except Exception:
-        headers = {}
+        return {}
 
+
+def _resolve_request_client_ip(request: web.Request | None, headers: Mapping[str, str]) -> str:
     try:
         peer_ip = _extract_peer_ip(request) if request is not None else ""
     except Exception:
         peer_ip = ""
-    client_ip = _resolve_client_ip(peer_ip, headers) if peer_ip else "unknown"
-    user_ctx = _current_user_id() or _get_request_user_id(request)
+    return _resolve_client_ip(peer_ip, headers) if peer_ip else "unknown"
+
+
+def _safe_now() -> float:
     now = time.time()
     try:
-        now = float(now)
+        return float(now)
     except (TypeError, ValueError):
-        now = time.time()
+        return time.time()
 
+
+async def _do_audit_insert(
+    db: Any,
+    *,
+    now: float,
+    client_ip: str,
+    user_ctx: Any,
+    operation: str,
+    target: Any,
+    result: Any,
+    details: Mapping[str, Any] | None,
+) -> bool:
     try:
         insert_res = await db.aexecute(
             """
@@ -131,6 +134,39 @@ async def audit_log_write(
             return False
     except Exception as exc:
         logger.debug("Audit log insert raised for %s: %s", operation, exc)
+        return False
+    return True
+
+
+async def audit_log_write(
+    db_or_services: Any,
+    *,
+    request: web.Request | None,
+    operation: str,
+    target: Any,
+    result: Any,
+    details: Mapping[str, Any] | None = None,
+) -> bool:
+    db = _resolve_audit_db(db_or_services)
+    if db is None:
+        return False
+
+    headers = _resolve_request_headers(request)
+    client_ip = _resolve_request_client_ip(request, headers)
+    user_ctx = _current_user_id() or _get_request_user_id(request)
+    now = _safe_now()
+
+    inserted = await _do_audit_insert(
+        db,
+        now=now,
+        client_ip=client_ip,
+        user_ctx=user_ctx,
+        operation=operation,
+        target=target,
+        result=result,
+        details=details,
+    )
+    if not inserted:
         return False
 
     await _maybe_purge_audit_log(db, now=now)

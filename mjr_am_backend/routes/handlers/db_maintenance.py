@@ -118,6 +118,13 @@ def _vector_backfill_job_public(job: dict[str, Any]) -> dict[str, Any]:
             "status": "idle",
             "async": True,
         }
+    public_job = _vector_backfill_job_public_base(job)
+    public_job.update(_vector_backfill_job_public_timing(job))
+    public_job.update(_vector_backfill_job_public_payload(job))
+    return public_job
+
+
+def _vector_backfill_job_public_base(job: dict[str, Any]) -> dict[str, Any]:
     return {
         "backfill_id": str(job.get("backfill_id") or ""),
         "status": str(job.get("status") or "unknown"),
@@ -125,10 +132,20 @@ def _vector_backfill_job_public(job: dict[str, Any]) -> dict[str, Any]:
         "batch_size": int(job.get("batch_size") or 64),
         "scope": str(job.get("scope") or "output"),
         "custom_root_id": str(job.get("custom_root_id") or "") or None,
+    }
+
+
+def _vector_backfill_job_public_timing(job: dict[str, Any]) -> dict[str, Any]:
+    return {
         "created_at": str(job.get("created_at") or ""),
         "updated_at": str(job.get("updated_at") or ""),
         "started_at": str(job.get("started_at") or ""),
         "finished_at": str(job.get("finished_at") or ""),
+    }
+
+
+def _vector_backfill_job_public_payload(job: dict[str, Any]) -> dict[str, Any]:
+    return {
         "progress": job.get("progress") if isinstance(job.get("progress"), dict) else None,
         "result": job.get("result") if isinstance(job.get("result"), dict) else None,
         "code": str(job.get("code") or "") or None,
@@ -314,19 +331,14 @@ async def _run_vector_backfill_job(
     watcher_was_running = False
     try:
         watcher_was_running = await _stop_watcher_if_running(svc if isinstance(svc, dict) else None)
-        index_service = svc.get("index") if isinstance(svc, dict) else None
-        await _stop_index_enrichment(index_service)
-
-        def _on_progress(progress: dict[str, int]) -> None:
-            _vector_backfill_update_job(backfill_id, progress=dict(progress or {}))
-
-        backfill_res = await _backfill_missing_asset_vectors(
-            db,
-            vector_service,
+        await _stop_index_enrichment(_vector_backfill_index_service(svc))
+        backfill_res = await _run_vector_backfill_payload(
+            backfill_id=backfill_id,
+            db=db,
+            vector_service=vector_service,
             batch_size=batch_size,
             scope=scope,
             custom_root_id=custom_root_id,
-            on_progress=_on_progress,
         )
         if not backfill_res.ok:
             _vector_backfill_update_job(
@@ -337,31 +349,10 @@ async def _run_vector_backfill_job(
                 error=str(backfill_res.error or "Vector backfill failed"),
             )
             return
-
         _invalidate_vector_searcher(svc)
-
-        payload = {
-            "ran": True,
-            "scope": _normalize_backfill_scope(scope) or "output",
-            "custom_root_id": str(custom_root_id or "") or None,
-            **(backfill_res.data or {}),
-        }
-        _vector_backfill_update_job(
-            backfill_id,
-            status="succeeded",
-            finished_at=_utc_now_iso(),
-            result=payload,
-            code=None,
-            error=None,
-        )
+        _vector_backfill_complete_job(backfill_id, scope=scope, custom_root_id=custom_root_id, payload=backfill_res.data or {})
     except Exception as exc:
-        _vector_backfill_update_job(
-            backfill_id,
-            status="failed",
-            finished_at=_utc_now_iso(),
-            code="DB_ERROR",
-            error=safe_error_message(exc, "Vector backfill failed"),
-        )
+        _vector_backfill_fail_job(backfill_id, exc)
     finally:
         _clear_vector_backfill_priority_window()
         try:
@@ -374,6 +365,59 @@ async def _run_vector_backfill_job(
             if _VECTOR_BACKFILL_ACTIVE_JOB_ID == backfill_id:
                 _VECTOR_BACKFILL_ACTIVE_JOB_ID = None
         _vector_backfill_prune_history()
+
+
+def _vector_backfill_index_service(svc: dict[str, Any] | None) -> Any:
+    return svc.get("index") if isinstance(svc, dict) else None
+
+
+async def _run_vector_backfill_payload(
+    *,
+    backfill_id: str,
+    db: Any,
+    vector_service: Any,
+    batch_size: int,
+    scope: str,
+    custom_root_id: str,
+) -> Result[dict[str, int | str | None]]:
+    def _on_progress(progress: dict[str, int]) -> None:
+        _vector_backfill_update_job(backfill_id, progress=dict(progress or {}))
+
+    return await _backfill_missing_asset_vectors(
+        db,
+        vector_service,
+        batch_size=batch_size,
+        scope=scope,
+        custom_root_id=custom_root_id,
+        on_progress=_on_progress,
+    )
+
+
+def _vector_backfill_complete_job(backfill_id: str, *, scope: str, custom_root_id: str, payload: dict[str, Any]) -> None:
+    job_payload = {
+        "ran": True,
+        "scope": _normalize_backfill_scope(scope) or "output",
+        "custom_root_id": str(custom_root_id or "") or None,
+        **payload,
+    }
+    _vector_backfill_update_job(
+        backfill_id,
+        status="succeeded",
+        finished_at=_utc_now_iso(),
+        result=job_payload,
+        code=None,
+        error=None,
+    )
+
+
+def _vector_backfill_fail_job(backfill_id: str, exc: Exception) -> None:
+    _vector_backfill_update_job(
+        backfill_id,
+        status="failed",
+        finished_at=_utc_now_iso(),
+        code="DB_ERROR",
+        error=safe_error_message(exc, "Vector backfill failed"),
+    )
 
 
 def _archive_root_resolved() -> Path:
@@ -467,16 +511,20 @@ async def _restart_watcher_if_needed(svc: dict | None, should_restart: bool) -> 
         return
     try:
         from mjr_am_backend.features.index.watcher_scope import build_watch_paths
-        scope_cfg = svc.get("watcher_scope") if isinstance(svc.get("watcher_scope"), dict) else {}
-        scope = str((scope_cfg or {}).get("scope") or "output")
-        custom_root_id = (scope_cfg or {}).get("custom_root_id")
-        active_user_id = str(svc.get("watcher_scope_active_user_id") or "").strip()
-        paths = build_watch_paths(scope, custom_root_id, user_id=active_user_id or None)
+        paths = _resolve_watcher_restart_paths(svc, build_watch_paths)
         if paths:
             import asyncio
             await watcher.start(paths, asyncio.get_running_loop())
     except Exception as exc:
         logger.debug("Failed to restart watcher after DB maintenance: %s", exc)
+
+
+def _resolve_watcher_restart_paths(svc: dict[str, Any], build_watch_paths: Any) -> list[Path]:
+    scope_cfg = svc.get("watcher_scope") if isinstance(svc.get("watcher_scope"), dict) else {}
+    scope = str((scope_cfg or {}).get("scope") or "output")
+    custom_root_id = (scope_cfg or {}).get("custom_root_id")
+    active_user_id = str(svc.get("watcher_scope_active_user_id") or "").strip()
+    return build_watch_paths(scope, custom_root_id, user_id=active_user_id or None)
 
 
 def _backup_name(now: datetime.datetime | None = None) -> str:
@@ -692,36 +740,47 @@ async def _process_backfill_row(
     outcome is one of: 'skip_invalid', 'skipped_missing', 'indexed', 'skipped', 'error'.
     """
     await _vector_backfill_wait_for_priority_window()
-    try:
-        asset_id = int(row.get("id") or 0)
-    except Exception:
-        asset_id = 0
+    asset_id = _parse_backfill_asset_id(row)
     if asset_id <= 0:
         return "skip_invalid", 0
 
-    filepath = str(row.get("filepath") or "").strip()
-    kind: FileKind = "video" if str(row.get("kind") or "").strip().lower() == "video" else "image"
+    filepath, kind = _parse_backfill_file_context(row)
     if not filepath or not Path(filepath).is_file():
         return "skipped_missing", asset_id
 
-    raw = row.get("metadata_raw")
-    if isinstance(raw, dict):
-        metadata_raw: dict[str, Any] | None = raw
-    elif isinstance(raw, str) and raw.strip():
-        try:
-            parsed = json.loads(raw)
-            metadata_raw = parsed if isinstance(parsed, dict) else None
-        except Exception:
-            metadata_raw = None
-    else:
-        metadata_raw = None
-
+    metadata_raw = _parse_backfill_metadata_raw(row)
     result = await index_asset_vector(db, vector_service, asset_id, filepath, kind, metadata_raw=metadata_raw)
     if result.ok and bool(result.data):
         return "indexed", asset_id
     if result.ok:
         return "skipped", asset_id
     return "error", asset_id
+
+
+def _parse_backfill_asset_id(row: dict[str, Any]) -> int:
+    try:
+        return int(row.get("id") or 0)
+    except Exception:
+        return 0
+
+
+def _parse_backfill_file_context(row: dict[str, Any]) -> tuple[str, FileKind]:
+    filepath = str(row.get("filepath") or "").strip()
+    kind: FileKind = "video" if str(row.get("kind") or "").strip().lower() == "video" else "image"
+    return filepath, kind
+
+
+def _parse_backfill_metadata_raw(row: dict[str, Any]) -> dict[str, Any] | None:
+    raw = row.get("metadata_raw")
+    if isinstance(raw, dict):
+        return raw
+    if isinstance(raw, str) and raw.strip():
+        try:
+            parsed = json.loads(raw)
+            return parsed if isinstance(parsed, dict) else None
+        except Exception:
+            return None
+    return None
 
 
 async def _backfill_missing_asset_vectors(
@@ -743,106 +802,167 @@ async def _backfill_missing_asset_vectors(
     except Exception as exc:
         return Result.Err("SERVICE_UNAVAILABLE", safe_error_message(exc, "Vector indexer unavailable"))
 
-    size = max(1, min(200, int(batch_size or 64)))
+    size = _normalize_backfill_batch_size(batch_size)
     normalized_scope = _normalize_backfill_scope(scope)
     if not normalized_scope:
         return Result.Err("INVALID_INPUT", "Invalid scope. Must be one of: output, input, custom, all")
-    normalized_custom_root = str(custom_root_id or "").strip() if normalized_scope == "custom" else ""
+    normalized_custom_root = _normalize_backfill_custom_root(normalized_scope, custom_root_id)
     if normalized_scope == "custom" and not normalized_custom_root:
         return Result.Err("INVALID_INPUT", "Missing custom_root_id for custom scope")
 
     scope_sql, scope_params = _build_backfill_scope_clause(normalized_scope, normalized_custom_root)
-
-    last_id = 0
-    candidates = 0
-    indexed = 0
-    skipped = 0
-    skipped_missing_files = 0
-    errors = 0
-
-    def _emit_progress() -> None:
-        if not callable(on_progress):
-            return
-        try:
-            on_progress(
-                {
-                    "candidates": int(candidates),
-                    "indexed": int(indexed),
-                    "skipped": int(skipped),
-                    "skipped_missing_files": int(skipped_missing_files),
-                    "errors": int(errors),
-                    "batch_size": int(size),
-                }
-            )
-        except Exception:
-            return
-
-    _emit_progress()
-
-    while True:
-        await _vector_backfill_wait_for_priority_window()
-        rows_res = await db.aquery(
-            """
-            SELECT a.id, a.filepath, a.kind, m.metadata_raw
-            FROM assets a
-            LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id
-            LEFT JOIN asset_metadata m ON m.asset_id = a.id
-            WHERE a.id > ?
-              AND a.kind IN ('image', 'video')
-              AND (ae.asset_id IS NULL OR ae.vector IS NULL OR length(ae.vector) = 0)
-            """
-            + scope_sql
-            + """
-            ORDER BY a.id ASC
-            LIMIT ?
-            """,
-            (int(last_id), *scope_params, int(size)),
-        )
-        if not rows_res.ok:
-            return Result.Err("DB_ERROR", rows_res.error or "Failed to query missing vectors")
-
-        rows = rows_res.data or []
-        if not rows:
-            break
-
-        for row in rows:
-            outcome, row_asset_id = await _process_backfill_row(db, vector_service, row, index_asset_vector)
-            if outcome == "skip_invalid":
-                continue
-            last_id = row_asset_id
-            candidates += 1
-            if outcome == "indexed":
-                indexed += 1
-            elif outcome == "skipped_missing":
-                skipped += 1
-                skipped_missing_files += 1
-            elif outcome == "skipped":
-                # ``skipped`` means the indexer intentionally skipped this row
-                # (e.g. unsupported content or dependency/runtime guard).
-                skipped += 1
-            else:
-                errors += 1
-            _emit_progress()
-
-        if len(rows) < size:
-            break
-
-        _emit_progress()
-
-    _emit_progress()
-
+    counters = _BackfillCounters(batch_size=size)
+    _emit_backfill_progress(on_progress, counters)
+    result = await _run_backfill_vector_query_loop(
+        db=db,
+        vector_service=vector_service,
+        index_asset_vector=index_asset_vector,
+        scope_sql=scope_sql,
+        scope_params=scope_params,
+        counters=counters,
+        on_progress=on_progress,
+    )
+    if not result.ok:
+        return result
     return Result.Ok(
         {
-            "candidates": int(candidates),
-            "indexed": int(indexed),
-            "skipped": int(skipped),
-            "skipped_missing_files": int(skipped_missing_files),
-            "errors": int(errors),
-            "batch_size": int(size),
+            **counters.as_payload(),
             "scope": normalized_scope,
             "custom_root_id": normalized_custom_root or None,
         }
     )
+
+
+def _normalize_backfill_batch_size(batch_size: int) -> int:
+    return max(1, min(200, int(batch_size or 64)))
+
+
+def _normalize_backfill_custom_root(normalized_scope: str, custom_root_id: str) -> str:
+    return str(custom_root_id or "").strip() if normalized_scope == "custom" else ""
+
+
+class _BackfillCounters:
+    def __init__(self, *, batch_size: int) -> None:
+        self.candidates = 0
+        self.indexed = 0
+        self.skipped = 0
+        self.skipped_missing_files = 0
+        self.errors = 0
+        self.batch_size = int(batch_size)
+
+    def as_payload(self) -> dict[str, int]:
+        return {
+            "candidates": int(self.candidates),
+            "indexed": int(self.indexed),
+            "skipped": int(self.skipped),
+            "skipped_missing_files": int(self.skipped_missing_files),
+            "errors": int(self.errors),
+            "batch_size": int(self.batch_size),
+        }
+
+
+def _emit_backfill_progress(on_progress: Any | None, counters: _BackfillCounters) -> None:
+    if not callable(on_progress):
+        return
+    try:
+        on_progress(counters.as_payload())
+    except Exception:
+        return
+
+
+async def _run_backfill_vector_query_loop(
+    *,
+    db: Any,
+    vector_service: Any,
+    index_asset_vector: Any,
+    scope_sql: str,
+    scope_params: list[Any],
+    counters: _BackfillCounters,
+    on_progress: Any | None,
+) -> Result[dict[str, int | str | None]]:
+    last_id = 0
+    while True:
+        await _vector_backfill_wait_for_priority_window()
+        rows_res = await _query_missing_vector_rows(
+            db=db,
+            last_id=last_id,
+            scope_sql=scope_sql,
+            scope_params=scope_params,
+            batch_size=counters.batch_size,
+        )
+        if not rows_res.ok:
+            return Result.Err(rows_res.code, rows_res.error or "Failed to query missing vector rows")
+        rows = rows_res.data or []
+        if not rows:
+            break
+        last_id = await _process_backfill_rows(rows, db, vector_service, index_asset_vector, counters, on_progress)
+        if len(rows) < counters.batch_size:
+            break
+        _emit_backfill_progress(on_progress, counters)
+    _emit_backfill_progress(on_progress, counters)
+    return Result.Ok({})
+
+
+async def _query_missing_vector_rows(
+    *,
+    db: Any,
+    last_id: int,
+    scope_sql: str,
+    scope_params: list[Any],
+    batch_size: int,
+) -> Result[list[dict[str, Any]]]:
+    rows_res = await db.aquery(
+        """
+        SELECT a.id, a.filepath, a.kind, m.metadata_raw
+        FROM assets a
+        LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id
+        LEFT JOIN asset_metadata m ON m.asset_id = a.id
+        WHERE a.id > ?
+          AND a.kind IN ('image', 'video')
+          AND (ae.asset_id IS NULL OR ae.vector IS NULL OR length(ae.vector) = 0)
+        """
+        + scope_sql
+        + """
+        ORDER BY a.id ASC
+        LIMIT ?
+        """,
+        (int(last_id), *scope_params, int(batch_size)),
+    )
+    if not rows_res.ok:
+        return Result.Err("DB_ERROR", rows_res.error or "Failed to query missing vectors")
+    return Result.Ok(rows_res.data or [])
+
+
+async def _process_backfill_rows(
+    rows: list[dict[str, Any]],
+    db: Any,
+    vector_service: Any,
+    index_asset_vector: Any,
+    counters: _BackfillCounters,
+    on_progress: Any | None,
+) -> int:
+    last_id = 0
+    for row in rows:
+        outcome, row_asset_id = await _process_backfill_row(db, vector_service, row, index_asset_vector)
+        if outcome == "skip_invalid":
+            continue
+        last_id = row_asset_id
+        _accumulate_backfill_outcome(counters, outcome)
+        _emit_backfill_progress(on_progress, counters)
+    return last_id
+
+
+def _accumulate_backfill_outcome(counters: _BackfillCounters, outcome: str) -> None:
+    counters.candidates += 1
+    if outcome == "indexed":
+        counters.indexed += 1
+    elif outcome == "skipped_missing":
+        counters.skipped += 1
+        counters.skipped_missing_files += 1
+    elif outcome == "skipped":
+        counters.skipped += 1
+    else:
+        counters.errors += 1
 
 
 def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:

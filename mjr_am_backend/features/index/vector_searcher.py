@@ -192,34 +192,19 @@ class VectorSearcher:
             return Result.Err("SERVICE_UNAVAILABLE", "Vector search is disabled")
 
         top_k = top_k or VECTOR_SIMILAR_TOPK
-
         variants = self._semantic_query_variants(query)
         last_error: Result | None = None
 
         for idx, candidate in enumerate(variants):
-            try:
-                emb = await self.vs.get_text_embedding(candidate)
-            except ModuleNotFoundError as exc:
-                return Result.Err("SERVICE_UNAVAILABLE", f"Missing dependency: {exc}")
-            except Exception as exc:
-                if idx == 0:
-                    return Result.Err("SERVICE_UNAVAILABLE", f"Text embedding unavailable: {exc}")
-                continue
-
-            if not emb.ok or not emb.data:
-                code = str(emb.code or "") if hasattr(emb, "code") else ""
-                if code == "SERVICE_UNAVAILABLE":
-                    if idx == 0:
-                        return Result.Err("SERVICE_UNAVAILABLE", emb.error or "Text embedding unavailable")
-                    continue
-                last_error = Result.Err("METADATA_FAILED", emb.error or "Text embedding failed")
-                continue
-
-            result = await self._query_index(emb.data, top_k=top_k, exclude_ids=set())
-            if result.ok and result.data:
+            result, error = await self._search_text_candidate(
+                candidate,
+                top_k=top_k,
+                primary=(idx == 0),
+            )
+            if result is not None and result.ok and result.data:
                 return result
-            if not result.ok:
-                last_error = result
+            if error is not None:
+                last_error = error
 
         if last_error is not None:
             return last_error
@@ -248,7 +233,6 @@ class VectorSearcher:
             "chevaux": "horses",
             "voiture": "car",
             "voitures": "cars",
-            # Common FR -> EN visual color mappings.
             "vert": "green",
             "bleu": "blue",
             "rouge": "red",
@@ -260,7 +244,6 @@ class VectorSearcher:
             "blanc": "white",
             "gris": "gray",
         }
-
         color_query_expansions: dict[str, list[str]] = {
             "green": [
                 "images with dominant green color tones",
@@ -312,18 +295,13 @@ class VectorSearcher:
         if translated and translated.lower() not in seen:
             variants.append(translated)
             seen.add(translated.lower())
-
         if " " not in base and translated:
             combined = f"{base} {translated}".strip()
             if combined.lower() not in seen:
                 variants.append(combined)
-
         expansion_key = translated.lower() if translated else key
         for phrase in color_query_expansions.get(expansion_key, []):
-            candidate = str(phrase or "").strip()
-            if candidate and candidate.lower() not in seen:
-                variants.append(candidate)
-                seen.add(candidate.lower())
+            VectorSearcher._append_variant(variants, seen, phrase)
 
         return variants
 
@@ -449,3 +427,54 @@ class VectorSearcher:
                 break
 
         return Result.Ok(results)
+
+    @staticmethod
+    def _append_variant(variants: list[str], seen: set[str], candidate: str) -> None:
+        value = str(candidate or "").strip()
+        if value and value.lower() not in seen:
+            variants.append(value)
+            seen.add(value.lower())
+
+    async def _search_text_candidate(
+        self,
+        candidate: str,
+        *,
+        top_k: int,
+        primary: bool,
+    ) -> tuple[Result[list[dict[str, Any]]] | None, Result | None]:
+        try:
+            emb = await self.vs.get_text_embedding(candidate)
+        except ModuleNotFoundError as exc:
+            return None, Result.Err("SERVICE_UNAVAILABLE", f"Missing dependency: {exc}")
+        except Exception as exc:
+            if primary:
+                return None, Result.Err("SERVICE_UNAVAILABLE", f"Text embedding unavailable: {exc}")
+            return None, None
+
+        emb_vec, error = self._normalize_candidate_embedding(emb, primary=primary)
+        if error is not None:
+            return None, error
+        if emb_vec is None:
+            return None, None
+
+        result = await self._query_index(emb_vec, top_k=top_k, exclude_ids=set())
+        if result.ok and result.data:
+            return result, None
+        if not result.ok:
+            return None, result
+        return None, None
+
+    @staticmethod
+    def _normalize_candidate_embedding(
+        emb: Result[list[float]],
+        *,
+        primary: bool,
+    ) -> tuple[list[float] | None, Result | None]:
+        if not emb.ok or not emb.data:
+            code = str(emb.code or "") if hasattr(emb, "code") else ""
+            if code == "SERVICE_UNAVAILABLE":
+                if primary:
+                    return None, Result.Err("SERVICE_UNAVAILABLE", emb.error or "Text embedding unavailable")
+                return None, None
+            return None, Result.Err("METADATA_FAILED", emb.error or "Text embedding failed")
+        return emb.data, None

@@ -203,14 +203,27 @@ def _pick_sink_inputs(node: dict[str, Any]) -> Any | None:
     return None
 
 
+_SINK_ACTION_KEYWORDS = {"save", "preview", "export"}
+_SINK_MEDIA_KEYWORDS = {"image", "video", "audio", "mesh", "3d", "glb", "obj", "ply"}
+
+
+def _has_sink_action(ct: str) -> bool:
+    return any(k in ct for k in _SINK_ACTION_KEYWORDS)
+
+
+def _has_sink_media(ct: str) -> bool:
+    return any(k in ct for k in _SINK_MEDIA_KEYWORDS)
+
+
+def _is_sink_node(ct: str) -> bool:
+    return ct in SINK_CLASS_TYPES or (_has_sink_action(ct) and _has_sink_media(ct))
+
+
 def _find_candidate_sinks(nodes_by_id: dict[str, dict[str, Any]]) -> list[str]:
     sinks: list[str] = []
     for node_id, node in nodes_by_id.items():
         ct = _lower(_node_type(node))
-        if ct in SINK_CLASS_TYPES:
-            sinks.append(node_id)
-            continue
-        if ("save" in ct or "preview" in ct or "export" in ct) and ("image" in ct or "video" in ct or "audio" in ct or "mesh" in ct or "3d" in ct or "glb" in ct or "obj" in ct or "ply" in ct):
+        if _is_sink_node(ct):
             sinks.append(node_id)
     return sinks
 
@@ -239,13 +252,31 @@ def _collect_upstream_nodes(nodes_by_id: dict[str, dict[str, Any]], start_node_i
     return dist
 
 
+_3D_SINK_KEYWORDS = ("mesh", "glb", "obj", "ply", "3d", "voxel")
+_VIDEO_SINK_KEYWORDS = ("video", "animate", "gif")
+
+
+def _is_3d_sink(sink_type: str) -> bool:
+    return sink_type in _3D_SINK_TYPES or any(k in sink_type for k in _3D_SINK_KEYWORDS)
+
+
+def _is_audio_sink(sink_type: str) -> bool:
+    return "audio" in sink_type and "image" not in sink_type and "video" not in sink_type
+
+
+def _is_video_sink(sink_type: str, is_audio: bool) -> bool:
+    return (not is_audio) and any(k in sink_type for k in _VIDEO_SINK_KEYWORDS)
+
+
 def _workflow_sink_suffix(sink_type: str) -> str:
-    is_3d_out = sink_type in _3D_SINK_TYPES or any(k in sink_type for k in ("mesh", "glb", "obj", "ply", "3d", "voxel"))
-    is_audio_out = ("audio" in sink_type) and ("image" not in sink_type) and ("video" not in sink_type)
-    is_video_out = (not is_audio_out) and ("video" in sink_type or "animate" in sink_type or "gif" in sink_type)
-    if is_3d_out:
+    if _is_3d_sink(sink_type):
         return "3D"
-    return "A" if is_audio_out else ("V" if is_video_out else "I")
+    is_audio = _is_audio_sink(sink_type)
+    if is_audio:
+        return "A"
+    if _is_video_sink(sink_type, is_audio):
+        return "V"
+    return "I"
 
 
 def _is_image_loader_node_type(ct: str) -> bool:
@@ -484,33 +515,44 @@ def _convert_litegraph_node(node: dict[str, Any], link_to_source: dict[int, tupl
     return converted
 
 
+def _apply_subgraph_mapping(converted: dict[str, Any], raw_type: str, mapped_name: str) -> None:
+    converted["class_type"] = mapped_name
+    converted["type"] = mapped_name
+    props = converted.get("properties")
+    if isinstance(props, dict):
+        props["subgraph_id"] = raw_type
+        props["subgraph_name"] = mapped_name
+
+
+def _nodes_by_id_from_litegraph(target_graph: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    link_to_source = _build_link_source_map(target_graph.get("links", []))
+    subgraph_name_map = _build_subgraph_name_map(target_graph)
+    nodes_by_id: dict[str, dict[str, Any]] = {}
+    for node in target_graph["nodes"]:
+        if not isinstance(node, dict):
+            continue
+        node_id = str(node.get("id"))
+        converted = _convert_litegraph_node(node, link_to_source)
+        raw_type = str(node.get("type") or "")
+        mapped_name = subgraph_name_map.get(raw_type)
+        if mapped_name:
+            _apply_subgraph_mapping(converted, raw_type, mapped_name)
+        nodes_by_id[node_id] = converted
+    return nodes_by_id
+
+
+def _nodes_by_id_from_prompt(target_graph: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {str(k): v for k, v in target_graph.items() if isinstance(v, dict)}
+
+
 def _normalize_graph_input(prompt_graph: Any, workflow: Any) -> dict[str, dict[str, Any]] | None:
     target_graph = _resolve_graph_target(prompt_graph, workflow)
     if not isinstance(target_graph, dict):
         return None
-    nodes_by_id: dict[str, dict[str, Any]] = {}
     if "nodes" in target_graph and isinstance(target_graph["nodes"], list):
-        link_to_source = _build_link_source_map(target_graph.get("links", []))
-        subgraph_name_map = _build_subgraph_name_map(target_graph)
-        for node in target_graph["nodes"]:
-            if not isinstance(node, dict):
-                continue
-            node_id = str(node.get("id"))
-            converted = _convert_litegraph_node(node, link_to_source)
-            raw_type = str(node.get("type") or "")
-            mapped_name = subgraph_name_map.get(raw_type)
-            if mapped_name:
-                converted["class_type"] = mapped_name
-                converted["type"] = mapped_name
-                props = converted.get("properties")
-                if isinstance(props, dict):
-                    props["subgraph_id"] = raw_type
-                    props["subgraph_name"] = mapped_name
-            nodes_by_id[node_id] = converted
+        nodes_by_id = _nodes_by_id_from_litegraph(target_graph)
     else:
-        for key, value in target_graph.items():
-            if isinstance(value, dict):
-                nodes_by_id[str(key)] = value
+        nodes_by_id = _nodes_by_id_from_prompt(target_graph)
     return nodes_by_id if nodes_by_id else None
 
 

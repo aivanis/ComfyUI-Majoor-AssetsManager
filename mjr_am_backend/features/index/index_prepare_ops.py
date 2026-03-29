@@ -162,6 +162,15 @@ async def maybe_skip_prepare_for_incremental(
     return None
 
 
+def _journal_hashes_match(prepare_ctx: dict[str, Any]) -> bool:
+    journal = prepare_ctx["journal_state_hash"]
+    return bool(journal) and str(journal) == prepare_ctx["state_hash"]
+
+
+async def _vector_coverage_ok(scanner: Any, existing_id: int) -> bool:
+    return not (existing_id and await _asset_missing_vector(scanner, asset_id=existing_id))
+
+
 async def should_skip_by_journal_state(
     scanner: Any,
     *,
@@ -169,19 +178,13 @@ async def should_skip_by_journal_state(
     incremental: bool,
     fast: bool,
 ) -> bool:
-    if not incremental:
-        return False
-    if not prepare_ctx["journal_state_hash"]:
-        return False
-    if str(prepare_ctx["journal_state_hash"]) != prepare_ctx["state_hash"]:
+    if not incremental or not _journal_hashes_match(prepare_ctx):
         return False
     existing_id = int(prepare_ctx.get("existing_id") or 0)
-    if fast:
-        if existing_id and await _asset_missing_vector(scanner, asset_id=existing_id):
-            return False
-        return True
-    if existing_id and await _asset_missing_vector(scanner, asset_id=existing_id):
+    if not await _vector_coverage_ok(scanner, existing_id):
         return False
+    if fast:
+        return True
     return bool(existing_id and await scanner._asset_has_rich_metadata(asset_id=existing_id))
 
 

@@ -41,16 +41,23 @@ except Exception:
 
     folder_paths = _FolderPathsStub()  # type: ignore
 
-def _iter_view_allowed_roots() -> list[Path]:
+
+def _runtime_output_root() -> Path | None:
+    try:
+        return Path(get_runtime_output_root()).resolve(strict=False)
+    except Exception:
+        return None
+
+
+def _input_root() -> Path | None:
+    try:
+        return Path(folder_paths.get_input_directory()).resolve(strict=False)
+    except Exception:
+        return None
+
+
+def _custom_view_roots() -> list[Path]:
     roots: list[Path] = []
-    try:
-        roots.append(Path(get_runtime_output_root()).resolve(strict=False))
-    except Exception:
-        pass
-    try:
-        roots.append(Path(folder_paths.get_input_directory()).resolve(strict=False))
-    except Exception:
-        pass
     try:
         custom_res = list_custom_roots()
         if custom_res.ok:
@@ -66,6 +73,18 @@ def _iter_view_allowed_roots() -> list[Path]:
                     continue
     except Exception:
         pass
+    return roots
+
+
+def _iter_view_allowed_roots() -> list[Path]:
+    roots: list[Path] = []
+    runtime_root = _runtime_output_root()
+    if runtime_root is not None:
+        roots.append(runtime_root)
+    input_root = _input_root()
+    if input_root is not None:
+        roots.append(input_root)
+    roots.extend(_custom_view_roots())
     return roots
 
 
@@ -134,18 +153,69 @@ def _strict_resolve(candidate: Path, fail_context: str) -> tuple[Path | None, Re
     return resolved, None
 
 
-async def _resolve_by_asset_id(
+def _parse_positive_int(raw_value: str, *, error_code: str, error_message: str) -> Result[int]:
+    try:
+        value = int(raw_value)
+    except Exception:
+        return Result.Err(error_code, error_message)
+    if value <= 0:
+        return Result.Err(error_code, error_message)
+    return Result.Ok(value)
+
+
+def _resolve_allowed_viewer_candidate(raw_path: str) -> tuple[Path | None, Result | None]:
+    candidate = _normalize_path(raw_path)
+    if not candidate:
+        return None, Result.Err("INVALID_INPUT", "Invalid asset path")
+    if not (_is_path_allowed(candidate) or _is_path_allowed_custom(candidate)):
+        return None, Result.Err("FORBIDDEN", "Path is not within allowed roots")
+    return candidate, None
+
+
+def _resolve_viewer_filename_candidate(base_root: Path, rel: Path, filename: str) -> tuple[Path | None, Result | None]:
+    candidate = base_root / rel / filename
+    if not _is_within_root(candidate, base_root):
+        return None, Result.Err("FORBIDDEN", "Path access denied (outside allowed scope)")
+
+    resolved, err = _strict_resolve(candidate, "viewer path")
+    if err:
+        return None, err
+    if resolved is None:
+        return None, Result.Err("VIEW_FAILED", "Failed to resolve viewer path")
+    if not _is_within_root(resolved, base_root):
+        return None, Result.Err("FORBIDDEN", "Path access denied (outside allowed scope)")
+    return resolved, None
+
+
+def _default_view_root(path: Path | None) -> Path | None:
+    if path is None:
+        return None
+    return _find_best_view_root(path) or path.parent
+
+
+def _resolve_viewer_asset_path(raw_path: str) -> tuple[Path | None, Path | None, Result | None]:
+    candidate, candidate_error = _resolve_allowed_viewer_candidate(raw_path)
+    if candidate_error:
+        return None, None, candidate_error
+    if candidate is None:
+        return None, None, Result.Err("VIEW_FAILED", "Failed to resolve viewer candidate")
+
+    resolved, err = _strict_resolve(candidate, "asset path")
+    if err:
+        return None, None, err
+    if resolved is None:
+        return None, None, Result.Err("VIEW_FAILED", "Failed to resolve asset path")
+    return resolved, _default_view_root(resolved), None
+
+
+async def _resolve_viewer_asset_context(
     raw_id: str,
 ) -> tuple[dict | None, Path | None, Path | None, Result | None]:
-    """Resolve viewer context from an asset_id query parameter."""
-    try:
-        asset_id = int(raw_id)
-    except Exception:
-        return None, None, None, Result.Err("INVALID_INPUT", "Invalid asset_id")
-    if asset_id <= 0:
-        return None, None, None, Result.Err("INVALID_INPUT", "Invalid asset_id")
+    asset_id_res = _parse_positive_int(raw_id, error_code="INVALID_INPUT", error_message="Invalid asset_id")
+    if not asset_id_res.ok:
+        return None, None, None, asset_id_res
 
-    asset, error = await _resolve_asset_from_id(asset_id)
+    asset, error = await _resolve_asset_from_id(asset_id_res.data or 0)
     if error:
         return None, None, None, error
     if asset is None:
@@ -154,18 +224,18 @@ async def _resolve_by_asset_id(
     raw_path = asset.get("filepath")
     if not raw_path or not isinstance(raw_path, str):
         return None, None, None, Result.Err("NOT_FOUND", "Asset path not available")
-    candidate = _normalize_path(raw_path)
-    if not candidate:
-        return None, None, None, Result.Err("INVALID_INPUT", "Invalid asset path")
-    if not (_is_path_allowed(candidate) or _is_path_allowed_custom(candidate)):
-        return None, None, None, Result.Err("FORBIDDEN", "Path is not within allowed roots")
 
-    resolved, err = _strict_resolve(candidate, "asset path")
-    if err:
-        return asset, None, None, err
-    if resolved is None:
-        return asset, None, None, Result.Err("VIEW_FAILED", "Failed to resolve asset path")
-    return asset, resolved, _find_best_view_root(resolved) or resolved.parent, None
+    resolved, root_limit, error = _resolve_viewer_asset_path(raw_path)
+    if error:
+        return asset, None, None, error
+    return asset, resolved, root_limit, None
+
+
+async def _resolve_by_asset_id(
+    raw_id: str,
+) -> tuple[dict | None, Path | None, Path | None, Result | None]:
+    """Resolve viewer context from an asset_id query parameter."""
+    return await _resolve_viewer_asset_context(raw_id)
 
 
 async def _resolve_by_filepath(
@@ -183,7 +253,7 @@ async def _resolve_by_filepath(
         return None, None, None, err
     if resolved is None:
         return None, None, None, Result.Err("VIEW_FAILED", "Failed to resolve file path")
-    return None, resolved, _find_best_view_root(resolved) or resolved.parent, None
+    return None, resolved, _default_view_root(resolved), None
 
 
 def _resolve_base_root(root_id: str, asset_type: str) -> tuple[Path | None, Result | None]:
@@ -208,41 +278,43 @@ def _resolve_base_root(root_id: str, asset_type: str) -> tuple[Path | None, Resu
         return None, Result.Err("VIEW_FAILED", "Output directory is unavailable")
 
 
-async def _resolve_by_filename(
+def _parse_viewer_filename_context(
     request: web.Request,
-) -> tuple[dict | None, Path | None, Path | None, Result | None]:
-    """Resolve viewer context from filename + subfolder + type query parameters."""
+) -> tuple[str, str, Path | None, str | None, Result | None]:
     root_id = str(request.query.get("root_id", "") or "").strip()
     filename = str(request.query.get("filename", "") or "").strip()
     subfolder = str(request.query.get("subfolder", "") or "").strip()
     asset_type = str(request.query.get("type", "output") or "output").strip().lower()
 
     if not filename:
-        return None, None, None, Result.Err("INVALID_INPUT", "Missing viewer file context")
+        return root_id, filename, None, asset_type, Result.Err("INVALID_INPUT", "Missing viewer file context")
     if Path(filename).name != filename:
-        return None, None, None, Result.Err("INVALID_INPUT", "Invalid filename")
+        return root_id, filename, None, asset_type, Result.Err("INVALID_INPUT", "Invalid filename")
 
     rel = _safe_rel_path(subfolder)
     if rel is None:
-        return None, None, None, Result.Err("INVALID_INPUT", "Invalid subfolder")
+        return root_id, filename, None, asset_type, Result.Err("INVALID_INPUT", "Invalid subfolder")
+    return root_id, filename, rel, asset_type, None
 
-    base_root, err = _resolve_base_root(root_id, asset_type)
+
+async def _resolve_by_filename(
+    request: web.Request,
+) -> tuple[dict | None, Path | None, Path | None, Result | None]:
+    """Resolve viewer context from filename + subfolder + type query parameters."""
+    root_id, filename, rel, asset_type, error = _parse_viewer_filename_context(request)
+    if error:
+        return None, None, None, error
+
+    asset_type_value = asset_type or "output"
+    base_root, err = _resolve_base_root(root_id, asset_type_value)
     if err:
         return None, None, None, err
     if base_root is None:
         return None, None, None, Result.Err("VIEW_FAILED", "Root not available")
 
-    candidate = base_root / rel / filename
-    if not _is_within_root(candidate, base_root):
-        return None, None, None, Result.Err("FORBIDDEN", "Path access denied (outside allowed scope)")
-
-    resolved, err = _strict_resolve(candidate, "viewer path")
+    resolved, err = _resolve_viewer_filename_candidate(base_root, rel or Path(), filename)
     if err:
         return None, None, None, err
-    if resolved is None:
-        return None, None, None, Result.Err("VIEW_FAILED", "Failed to resolve viewer path")
-    if not _is_within_root(resolved, base_root):
-        return None, None, None, Result.Err("FORBIDDEN", "Path access denied (outside allowed scope)")
     return None, resolved, base_root, None
 
 

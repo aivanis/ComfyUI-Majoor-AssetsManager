@@ -506,6 +506,37 @@ def _select_group_representative(current: dict[str, Any], candidate: dict[str, A
     return current
 
 
+def _merge_asset_into_group(
+    asset: dict[str, Any],
+    grouped_assets: list[dict[str, Any]],
+    grouped_by_key: dict[str, dict[str, Any]],
+    stack_counts: dict[str, int],
+) -> None:
+    key = _stack_group_key(asset)
+    stack_counts[key] = stack_counts.get(key, 0) + 1
+    existing = grouped_by_key.get(key)
+    if existing is None:
+        grouped_by_key[key] = asset
+        grouped_assets.append(asset)
+        return
+    selected = _select_group_representative(existing, asset)
+    if selected is existing:
+        return
+    grouped_by_key[key] = selected
+    try:
+        idx = grouped_assets.index(existing)
+    except ValueError:
+        grouped_assets.append(selected)
+    else:
+        grouped_assets[idx] = selected
+
+
+def _apply_stack_counts(grouped_assets: list[dict[str, Any]], stack_counts: dict[str, int]) -> None:
+    for asset in grouped_assets:
+        key = _stack_group_key(asset)
+        asset["stack_asset_count"] = stack_counts.get(key, 1)
+
+
 async def _paginate_grouped_assets(
     fetch_rows,
     hydrate_rows,
@@ -520,58 +551,83 @@ async def _paginate_grouped_assets(
     grouped_assets: list[dict[str, Any]] = []
     grouped_by_key: dict[str, dict[str, Any]] = {}
     stack_counts: dict[str, int] = {}
-    exhausted = False
+    result = await _collect_grouped_assets(
+        fetch_rows,
+        hydrate_rows,
+        grouped_assets,
+        grouped_by_key,
+        stack_counts,
+        target=target,
+        raw_chunk=raw_chunk,
+        raw_offset=raw_offset,
+        include_total=include_total,
+    )
+    if not result.ok:
+        return Result.Err(result.code, result.error or "Grouped search query failed")
 
-    while not exhausted:
-        if not include_total and len(grouped_assets) >= target:
-            break
-
-        rows_res = await fetch_rows(raw_chunk, raw_offset)
-        if not rows_res.ok:
-            return Result.Err(rows_res.code, rows_res.error or "Grouped search query failed")
-
-        payload = rows_res.data if isinstance(rows_res.data, dict) else {}
-        rows = payload.get("rows") if isinstance(payload.get("rows"), list) else []
-        if not rows:
-            exhausted = True
-            break
-
-        hydrated = hydrate_rows(rows)
-        for asset in hydrated:
-            if not isinstance(asset, dict):
-                continue
-            key = _stack_group_key(asset)
-            stack_counts[key] = stack_counts.get(key, 0) + 1
-            existing = grouped_by_key.get(key)
-            if existing is None:
-                grouped_by_key[key] = asset
-                grouped_assets.append(asset)
-                continue
-            selected = _select_group_representative(existing, asset)
-            if selected is existing:
-                continue
-            grouped_by_key[key] = selected
-            try:
-                idx = grouped_assets.index(existing)
-            except ValueError:
-                grouped_assets.append(selected)
-            else:
-                grouped_assets[idx] = selected
-
-        row_count = len(rows)
-        raw_offset += row_count
-        if row_count < raw_chunk:
-            exhausted = True
-
-    # Enrich grouped assets with stack_asset_count
-    for asset in grouped_assets:
-        key = _stack_group_key(asset)
-        count = stack_counts.get(key, 1)
-        asset["stack_asset_count"] = count
+    _apply_stack_counts(grouped_assets, stack_counts)
 
     total = len(grouped_assets) if include_total else None
     page_assets = grouped_assets[offset: offset + limit] if limit > 0 else []
     return Result.Ok({"assets": page_assets, "total": total})
+
+
+async def _collect_grouped_assets(
+    fetch_rows,
+    hydrate_rows,
+    grouped_assets: list[dict[str, Any]],
+    grouped_by_key: dict[str, dict[str, Any]],
+    stack_counts: dict[str, int],
+    *,
+    target: int,
+    raw_chunk: int,
+    raw_offset: int,
+    include_total: bool,
+) -> Result[None]:
+    while True:
+        if not include_total and len(grouped_assets) >= target:
+            return Result.Ok(None)
+        rows_res = await fetch_rows(raw_chunk, raw_offset)
+        if not rows_res.ok:
+            return Result.Err(rows_res.code, rows_res.error or "Grouped search query failed")
+        rows = _rows_from_grouped_result(rows_res.data)
+        if not rows:
+            return Result.Ok(None)
+        _merge_grouped_rows(rows, hydrate_rows, grouped_assets, grouped_by_key, stack_counts)
+        row_count = len(rows)
+        raw_offset += row_count
+        if row_count < raw_chunk:
+            return Result.Ok(None)
+
+
+def _rows_from_grouped_result(data: Any) -> list[dict[str, Any]]:
+    payload = data if isinstance(data, dict) else {}
+    rows = payload.get("rows")
+    return rows if isinstance(rows, list) else []
+
+
+def _merge_grouped_rows(
+    rows: list[dict[str, Any]],
+    hydrate_rows,
+    grouped_assets: list[dict[str, Any]],
+    grouped_by_key: dict[str, dict[str, Any]],
+    stack_counts: dict[str, int],
+) -> None:
+    for asset in hydrate_rows(rows):
+        if isinstance(asset, dict):
+            _merge_asset_into_group(asset, grouped_assets, grouped_by_key, stack_counts)
+
+
+def _build_grouped_search_result(
+    grouped_assets: list[dict[str, Any]],
+    *,
+    offset: int,
+    limit: int,
+    include_total: bool,
+) -> dict[str, Any]:
+    total = len(grouped_assets) if include_total else None
+    page_assets = grouped_assets[offset: offset + limit] if limit > 0 else []
+    return {"assets": page_assets, "total": total}
 
 
 def _safe_positive_int(value: Any) -> int | None:
@@ -1061,86 +1117,15 @@ class IndexSearcher:
         include_total = bool(include_total)
         logger.debug("Searching for: %s (limit=%s, offset=%s)", query, limit, offset)
         metadata_tags_text_clause = self._build_tags_text_clause()
-
-        if filters and filters.get("group_stacks"):
-            async def _fetch_group_rows(raw_limit: int, raw_offset: int) -> Result[dict[str, Any]]:
-                if query.strip() == "*":
-                    return await self._search_global_browse_rows(
-                        limit=raw_limit,
-                        offset=raw_offset,
-                        filters=filters,
-                        include_total=False,
-                        metadata_tags_text_clause=metadata_tags_text_clause,
-                    )
-                fts_query = self._sanitize_fts_query(query)
-                if not fts_query:
-                    return Result.Err("INVALID_INPUT", "Invalid search query syntax")
-                return await self._search_global_fts_rows(
-                    fts_query=fts_query,
-                    limit=raw_limit,
-                    offset=raw_offset,
-                    filters=filters,
-                    include_total=False,
-                    metadata_tags_text_clause=metadata_tags_text_clause,
-                )
-
-            grouped_res = await _paginate_grouped_assets(
-                _fetch_group_rows,
-                lambda rows: _hydrate_search_rows(rows, include_highlight=True),
-                limit=limit,
-                offset=offset,
-                include_total=include_total,
-            )
-            if not grouped_res.ok:
-                return grouped_res
-            grouped_data = grouped_res.data or {}
-            return Result.Ok(
-                self._build_search_payload(
-                    assets=grouped_data.get("assets") or [],
-                    limit=limit,
-                    offset=offset,
-                    query=query,
-                    include_total=include_total,
-                    total=grouped_data.get("total"),
-                )
-            )
-
-        if query.strip() == "*":
-            rows_total_res = await self._search_global_browse_rows(
-                limit=limit,
-                offset=offset,
-                filters=filters,
-                include_total=include_total,
-                metadata_tags_text_clause=metadata_tags_text_clause,
-            )
-        else:
-            fts_query = self._sanitize_fts_query(query)
-            if not fts_query:
-                return Result.Err("INVALID_INPUT", "Invalid search query syntax")
-            rows_total_res = await self._search_global_fts_rows(
-                fts_query=fts_query,
-                limit=limit,
-                offset=offset,
-                filters=filters,
-                include_total=include_total,
-                metadata_tags_text_clause=metadata_tags_text_clause,
-            )
-
-        if not rows_total_res.ok:
-            return Result.Err(rows_total_res.code, rows_total_res.error or "Search query failed")
-
-        rows, total = self._search_rows_total(rows_total_res.data)
-        assets = _hydrate_search_rows(rows, include_highlight=True)
-        logger.debug("Found %s results (total=%s)", len(assets), total if include_total else "skipped")
-        return Result.Ok(
-            self._build_search_payload(
-                assets=assets,
-                limit=limit,
-                offset=offset,
-                query=query,
-                include_total=include_total,
-                total=total,
-            )
+        return await self._search_assets(
+            query=query,
+            limit=limit,
+            offset=offset,
+            filters=filters,
+            include_total=include_total,
+            metadata_tags_text_clause=metadata_tags_text_clause,
+            include_highlight=True,
+            roots=None,
         )
     async def search_scoped(
         self,
@@ -1169,27 +1154,147 @@ class IndexSearcher:
         include_total = bool(include_total)
         logger.debug(f"Searching (scoped) for: {query} (limit={limit}, offset={offset}, roots={len(cleaned_roots)})")
         metadata_tags_text_clause = self._build_tags_text_clause()
+        return await self._search_assets(
+            query=query,
+            limit=limit,
+            offset=offset,
+            filters=filters,
+            include_total=include_total,
+            metadata_tags_text_clause=metadata_tags_text_clause,
+            include_highlight=False,
+            roots=cleaned_roots,
+            sort=sort,
+        )
 
-        is_browse_all = query.strip() == "*"
-        roots_clause, roots_params = _build_roots_where_clause(cleaned_roots)
+    async def _search_assets(
+        self,
+        *,
+        query: str,
+        limit: int,
+        offset: int,
+        filters: dict[str, Any] | None,
+        include_total: bool,
+        metadata_tags_text_clause: str,
+        include_highlight: bool,
+        roots: list[str] | None,
+        sort: str | None = None,
+    ) -> Result[dict[str, Any]]:
         if filters and filters.get("group_stacks"):
-            async def _fetch_group_rows(raw_limit: int, raw_offset: int) -> Result[dict[str, Any]]:
+            return await self._search_grouped_assets(
+                query=query,
+                limit=limit,
+                offset=offset,
+                filters=filters,
+                include_total=include_total,
+                metadata_tags_text_clause=metadata_tags_text_clause,
+                include_highlight=include_highlight,
+                roots=roots,
+                sort=sort,
+            )
+        if roots is None:
+            return await self._search_unscoped_assets(
+                query=query,
+                limit=limit,
+                offset=offset,
+                filters=filters,
+                include_total=include_total,
+                metadata_tags_text_clause=metadata_tags_text_clause,
+                include_highlight=include_highlight,
+            )
+        return await self._search_scoped_assets(
+            query=query,
+            roots=roots,
+            limit=limit,
+            offset=offset,
+            filters=filters,
+            include_total=include_total,
+            metadata_tags_text_clause=metadata_tags_text_clause,
+            include_highlight=include_highlight,
+            sort=sort,
+        )
+
+    async def _search_grouped_assets(
+        self,
+        *,
+        query: str,
+        limit: int,
+        offset: int,
+        filters: dict[str, Any] | None,
+        include_total: bool,
+        metadata_tags_text_clause: str,
+        include_highlight: bool,
+        roots: list[str] | None,
+        sort: str | None = None,
+    ) -> Result[dict[str, Any]]:
+        fetch_rows = self._build_grouped_fetch_rows(
+            query=query,
+            roots=roots,
+            filters=filters,
+            metadata_tags_text_clause=metadata_tags_text_clause,
+            sort=sort,
+        )
+        grouped_res = await _paginate_grouped_assets(
+            fetch_rows,
+            lambda rows: _hydrate_search_rows(rows, include_highlight=include_highlight),
+            limit=limit,
+            offset=offset,
+            include_total=include_total,
+        )
+        if not grouped_res.ok:
+            return Result.Err(grouped_res.code, grouped_res.error or "Grouped search query failed")
+        grouped_data = grouped_res.data or {}
+        return Result.Ok(
+            self._build_search_payload(
+                assets=grouped_data.get("assets") or [],
+                limit=limit,
+                offset=offset,
+                query=query,
+                include_total=include_total,
+                total=grouped_data.get("total"),
+                sort=sort,
+            )
+        )
+
+    def _build_grouped_fetch_rows(
+        self,
+        *,
+        query: str,
+        roots: list[str] | None,
+        filters: dict[str, Any] | None,
+        metadata_tags_text_clause: str,
+        sort: str | None,
+    ):
+        is_browse_all = query.strip() == "*"
+        if roots is None:
+
+            async def _fetch_global_group_rows(raw_limit: int, raw_offset: int) -> Result[dict[str, Any]]:
                 if is_browse_all:
-                    return await self._search_scoped_browse_rows(
-                        roots_clause=roots_clause,
-                        roots_params=roots_params,
+                    return await self._search_global_browse_rows(
                         limit=raw_limit,
                         offset=raw_offset,
                         filters=filters,
                         include_total=False,
                         metadata_tags_text_clause=metadata_tags_text_clause,
-                        sort=sort,
                     )
                 fts_query = self._sanitize_fts_query(query)
                 if not fts_query:
                     return Result.Err("INVALID_INPUT", "Invalid search query syntax")
-                return await self._search_scoped_fts_rows(
+                return await self._search_global_fts_rows(
                     fts_query=fts_query,
+                    limit=raw_limit,
+                    offset=raw_offset,
+                    filters=filters,
+                    include_total=False,
+                    metadata_tags_text_clause=metadata_tags_text_clause,
+                )
+
+            return _fetch_global_group_rows
+
+        roots_clause, roots_params = _build_roots_where_clause(roots)
+
+        async def _fetch_scoped_group_rows(raw_limit: int, raw_offset: int) -> Result[dict[str, Any]]:
+            if is_browse_all:
+                return await self._search_scoped_browse_rows(
                     roots_clause=roots_clause,
                     roots_params=roots_params,
                     limit=raw_limit,
@@ -1199,30 +1304,80 @@ class IndexSearcher:
                     metadata_tags_text_clause=metadata_tags_text_clause,
                     sort=sort,
                 )
+            fts_query = self._sanitize_fts_query(query)
+            if not fts_query:
+                return Result.Err("INVALID_INPUT", "Invalid search query syntax")
+            return await self._search_scoped_fts_rows(
+                fts_query=fts_query,
+                roots_clause=roots_clause,
+                roots_params=roots_params,
+                limit=raw_limit,
+                offset=raw_offset,
+                filters=filters,
+                include_total=False,
+                metadata_tags_text_clause=metadata_tags_text_clause,
+                sort=sort,
+            )
 
-            grouped_res = await _paginate_grouped_assets(
-                _fetch_group_rows,
-                lambda rows: _hydrate_search_rows(rows, include_highlight=False),
+        return _fetch_scoped_group_rows
+
+    async def _search_unscoped_assets(
+        self,
+        *,
+        query: str,
+        limit: int,
+        offset: int,
+        filters: dict[str, Any] | None,
+        include_total: bool,
+        metadata_tags_text_clause: str,
+        include_highlight: bool,
+    ) -> Result[dict[str, Any]]:
+        if query.strip() == "*":
+            rows_total_res = await self._search_global_browse_rows(
                 limit=limit,
                 offset=offset,
+                filters=filters,
                 include_total=include_total,
+                metadata_tags_text_clause=metadata_tags_text_clause,
             )
-            if not grouped_res.ok:
-                return grouped_res
-            grouped_data = grouped_res.data or {}
-            return Result.Ok(
-                self._build_search_payload(
-                    assets=grouped_data.get("assets") or [],
-                    limit=limit,
-                    offset=offset,
-                    query=query,
-                    include_total=include_total,
-                    total=grouped_data.get("total"),
-                    sort=sort,
-                )
+        else:
+            fts_query = self._sanitize_fts_query(query)
+            if not fts_query:
+                return Result.Err("INVALID_INPUT", "Invalid search query syntax")
+            rows_total_res = await self._search_global_fts_rows(
+                fts_query=fts_query,
+                limit=limit,
+                offset=offset,
+                filters=filters,
+                include_total=include_total,
+                metadata_tags_text_clause=metadata_tags_text_clause,
             )
+        return self._rows_to_search_result(
+            rows_total_res,
+            query=query,
+            limit=limit,
+            offset=offset,
+            include_total=include_total,
+            include_highlight=include_highlight,
+            sort=None,
+            failure_message="Search query failed",
+        )
 
-        if is_browse_all:
+    async def _search_scoped_assets(
+        self,
+        *,
+        query: str,
+        roots: list[str],
+        limit: int,
+        offset: int,
+        filters: dict[str, Any] | None,
+        include_total: bool,
+        metadata_tags_text_clause: str,
+        include_highlight: bool,
+        sort: str | None,
+    ) -> Result[dict[str, Any]]:
+        roots_clause, roots_params = _build_roots_where_clause(roots)
+        if query.strip() == "*":
             rows_total_res = await self._search_scoped_browse_rows(
                 roots_clause=roots_clause,
                 roots_params=roots_params,
@@ -1248,23 +1403,43 @@ class IndexSearcher:
                 metadata_tags_text_clause=metadata_tags_text_clause,
                 sort=sort,
             )
-
-        if not rows_total_res.ok:
-            return Result.Err(rows_total_res.code, rows_total_res.error or "Scoped search query failed")
-
-        rows, total = self._search_rows_total(rows_total_res.data)
-        assets = _hydrate_search_rows(rows, include_highlight=False)
-        return Result.Ok(
-            self._build_search_payload(
-                assets=assets,
-                limit=limit,
-                offset=offset,
-                query=query,
-                include_total=include_total,
-                total=total,
-                sort=sort,
-            )
+        return self._rows_to_search_result(
+            rows_total_res,
+            query=query,
+            limit=limit,
+            offset=offset,
+            include_total=include_total,
+            include_highlight=include_highlight,
+            sort=sort,
+            failure_message="Scoped search query failed",
         )
+
+    def _rows_to_search_result(
+        self,
+        rows_total_res: Result[dict[str, Any]],
+        *,
+        query: str,
+        limit: int,
+        offset: int,
+        include_total: bool,
+        include_highlight: bool,
+        sort: str | None,
+        failure_message: str,
+    ) -> Result[dict[str, Any]]:
+        if not rows_total_res.ok:
+            return Result.Err(rows_total_res.code, rows_total_res.error or failure_message)
+        rows, total = self._search_rows_total(rows_total_res.data)
+        assets = _hydrate_search_rows(rows, include_highlight=include_highlight)
+        payload = self._build_search_payload(
+            assets=assets,
+            limit=limit,
+            offset=offset,
+            query=query,
+            include_total=include_total,
+            total=total,
+            sort=sort,
+        )
+        return Result.Ok(payload)
 
     async def has_assets_under_root(self, root: str) -> Result[bool]:
         """

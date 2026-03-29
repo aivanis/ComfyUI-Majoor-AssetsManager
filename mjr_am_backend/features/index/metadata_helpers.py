@@ -113,99 +113,118 @@ def _safe_max_metadata_bytes() -> int:
 def _truncate_metadata_json_if_needed(metadata_raw_json: str, max_bytes: int) -> tuple[bool, int, str]:
     if not (max_bytes and isinstance(metadata_raw_json, str)):
         return False, 0, metadata_raw_json
-    try:
-        nbytes = len(metadata_raw_json.encode("utf-8", errors="ignore"))
-    except (AttributeError, TypeError, UnicodeError):
-        nbytes = 0
+    nbytes = _json_payload_size_bytes(metadata_raw_json)
     if nbytes <= max_bytes:
         return False, 0, metadata_raw_json
+    candidate = _build_truncated_metadata_candidate(metadata_raw_json, nbytes=nbytes, max_bytes=max_bytes)
+    if candidate is not None:
+        return True, int(nbytes), candidate
+    return True, int(nbytes), _fallback_truncated_metadata_json(nbytes)
+
+
+def _build_truncated_metadata_candidate(metadata_raw_json: str, *, nbytes: int, max_bytes: int) -> str | None:
     try:
         data = json.loads(metadata_raw_json)
-        if isinstance(data, dict):
-            candidate_dict = _priority_metadata_candidate(data, original_bytes=int(nbytes), max_bytes=max_bytes)
-            candidate = _dump_compact_json(candidate_dict)
-            if _json_payload_size_bytes(candidate) <= max_bytes:
-                return True, int(nbytes), candidate
-
-            reduced = dict(candidate_dict)
-            for key in _TRUNCATION_OPTIONAL_KEYS:
-                if key not in reduced:
-                    continue
-                reduced.pop(key, None)
-                candidate = _dump_compact_json(reduced)
-                if _json_payload_size_bytes(candidate) <= max_bytes:
-                    return True, int(nbytes), candidate
     except (TypeError, ValueError, json.JSONDecodeError):
-        pass
+        return None
+    if not isinstance(data, dict):
+        return None
+    candidate_dict = _priority_metadata_candidate(data, original_bytes=int(nbytes), max_bytes=max_bytes)
+    return _fit_truncated_metadata_candidate(candidate_dict, max_bytes=max_bytes)
+
+
+def _fit_truncated_metadata_candidate(candidate_dict: dict[str, Any], *, max_bytes: int) -> str | None:
+    candidate = _dump_compact_json(candidate_dict)
+    if _json_payload_size_bytes(candidate) <= max_bytes:
+        return candidate
+    reduced = dict(candidate_dict)
+    for key in _TRUNCATION_OPTIONAL_KEYS:
+        if key not in reduced:
+            continue
+        reduced.pop(key, None)
+        candidate = _dump_compact_json(reduced)
+        if _json_payload_size_bytes(candidate) <= max_bytes:
+            return candidate
+    return None
+
+
+def _fallback_truncated_metadata_json(nbytes: int) -> str:
     try:
-        truncated = json.dumps(
+        return json.dumps(
             {"_truncated": True, "original_bytes": int(nbytes)},
             ensure_ascii=False,
             separators=(",", ":"),
         )
     except (TypeError, ValueError):
-        truncated = "{}"
-    return True, int(nbytes), truncated
+        return "{}"
 
 
 def _priority_metadata_candidate(data: dict[str, Any], *, original_bytes: int, max_bytes: int) -> dict[str, Any]:
     text_budget = _priority_text_budget(max_bytes)
+    candidate = _priority_metadata_base(data, original_bytes=original_bytes)
+    _append_priority_scalar_fields(candidate, data)
+    _append_priority_text_fields(candidate, data, text_budget=text_budget)
+    _append_priority_named_fields(candidate, data, text_budget=text_budget)
+    _append_priority_nested_fields(candidate, data, text_budget=text_budget)
+    return candidate
+
+
+def _priority_metadata_base(data: dict[str, Any], *, original_bytes: int) -> dict[str, Any]:
     candidate: dict[str, Any] = {
         "_truncated": True,
         "original_bytes": int(original_bytes),
     }
-
     if "quality" in data:
         candidate["quality"] = data.get("quality")
     if "workflow" in data:
         candidate["workflow"] = {"_truncated": True}
+    return candidate
 
+
+def _append_priority_scalar_fields(candidate: dict[str, Any], data: dict[str, Any]) -> None:
     for key in ("workflow_type", "seed", "steps", "cfg", "cfg_scale", "scheduler", "width", "height"):
         value = data.get(key)
         if value not in (None, "", [], {}):
             candidate[key] = value
 
+
+def _append_priority_text_fields(candidate: dict[str, Any], data: dict[str, Any], *, text_budget: int) -> None:
     prompt_text = _best_effort_prompt_text(data, text_budget=text_budget)
     if prompt_text:
         candidate["prompt"] = prompt_text
-
     negative_prompt = _best_effort_negative_prompt_text(data, text_budget=text_budget)
     if negative_prompt:
         candidate["negative_prompt"] = negative_prompt
-
     positive_prompt = _compact_text_value(data.get("positive_prompt"), max_chars=text_budget)
     if positive_prompt:
         candidate["positive_prompt"] = positive_prompt
-
     parameters = _compact_text_value(data.get("parameters"), max_chars=text_budget)
     if parameters:
         candidate["parameters"] = parameters
-
     workflow_type = _best_effort_workflow_type(data)
     if workflow_type:
         candidate["workflow_type"] = workflow_type
 
+
+def _append_priority_named_fields(candidate: dict[str, Any], data: dict[str, Any], *, text_budget: int) -> None:
     model_name = _best_effort_model_name(data, text_budget=text_budget)
     if model_name:
         candidate["model"] = model_name
-
     sampler_name = _best_effort_sampler_name(data, text_budget=text_budget)
     if sampler_name:
         candidate["sampler"] = sampler_name
-
     checkpoint = _compact_named_value(data.get("checkpoint"), max_chars=text_budget)
     if checkpoint:
         candidate["checkpoint"] = checkpoint
 
+
+def _append_priority_nested_fields(candidate: dict[str, Any], data: dict[str, Any], *, text_budget: int) -> None:
     engine = _compact_engine_value(data.get("engine"), max_chars=text_budget)
     if engine:
         candidate["engine"] = engine
-
     geninfo = _compact_geninfo_value(data.get("geninfo"), max_chars=text_budget)
     if geninfo:
         candidate["geninfo"] = geninfo
-
-    return candidate
 
 
 def _priority_text_budget(max_bytes: int) -> int:
@@ -314,40 +333,24 @@ def _best_effort_workflow_type(meta: dict[str, Any]) -> str | None:
 
 
 def _best_effort_model_name(meta: dict[str, Any], *, text_budget: int) -> str | None:
-    for key_path in (
-        "model",
-        "model_name",
-        "checkpoint",
-        "checkpoint.name",
-        "geninfo.model",
-        "geninfo.checkpoint.name",
-    ):
-        compact = _compact_named_value(_resolve_key_path(meta, key_path), max_chars=text_budget)
-        if compact:
-            return compact
-
-    geninfo = meta.get("geninfo")
-    if isinstance(geninfo, dict):
-        models = geninfo.get("models")
-        if isinstance(models, dict):
-            for item in models.values():
-                compact = _compact_named_value(item, max_chars=text_budget)
-                if compact:
-                    return compact
-        if isinstance(models, list):
-            for item in models:
-                compact = _compact_named_value(item, max_chars=text_budget)
-                if compact:
-                    return compact
-
-    parameters = meta.get("parameters")
-    if isinstance(parameters, str):
-        match = _MODEL_PARAM_RE.search(parameters)
-        if match:
-            compact = _compact_text_value(match.group(1), max_chars=text_budget)
-            if compact:
-                return compact
-    return None
+    direct = _first_compact_named_value(
+        meta,
+        (
+            "model",
+            "model_name",
+            "checkpoint",
+            "checkpoint.name",
+            "geninfo.model",
+            "geninfo.checkpoint.name",
+        ),
+        text_budget=text_budget,
+    )
+    if direct:
+        return direct
+    nested = _first_geninfo_model_name(meta.get("geninfo"), text_budget=text_budget)
+    if nested:
+        return nested
+    return _match_parameter_name(meta.get("parameters"), _MODEL_PARAM_RE, text_budget=text_budget)
 
 
 def _best_effort_sampler_name(meta: dict[str, Any], *, text_budget: int) -> str | None:
@@ -372,6 +375,42 @@ def _best_effort_sampler_name(meta: dict[str, Any], *, text_budget: int) -> str 
     return None
 
 
+def _first_compact_named_value(meta: dict[str, Any], key_paths: tuple[str, ...], *, text_budget: int) -> str | None:
+    for key_path in key_paths:
+        compact = _compact_named_value(_resolve_key_path(meta, key_path), max_chars=text_budget)
+        if compact:
+            return compact
+    return None
+
+
+def _iter_geninfo_model_items(geninfo: Any) -> list[Any]:
+    if not isinstance(geninfo, dict):
+        return []
+    models = geninfo.get("models")
+    if isinstance(models, dict):
+        return list(models.values())
+    if isinstance(models, list):
+        return list(models)
+    return []
+
+
+def _first_geninfo_model_name(geninfo: Any, *, text_budget: int) -> str | None:
+    for item in _iter_geninfo_model_items(geninfo):
+        compact = _compact_named_value(item, max_chars=text_budget)
+        if compact:
+            return compact
+    return None
+
+
+def _match_parameter_name(parameters: Any, pattern: re.Pattern[str], *, text_budget: int) -> str | None:
+    if not isinstance(parameters, str):
+        return None
+    match = pattern.search(parameters)
+    if not match:
+        return None
+    return _compact_text_value(match.group(1), max_chars=text_budget)
+
+
 def _compact_engine_value(value: Any, *, max_chars: int) -> dict[str, Any] | None:
     if not isinstance(value, dict):
         return None
@@ -383,15 +422,7 @@ def _compact_engine_value(value: Any, *, max_chars: int) -> dict[str, Any] | Non
     return compact or None
 
 
-def _compact_geninfo_value(value: Any, *, max_chars: int) -> dict[str, Any] | None:
-    if not isinstance(value, dict):
-        return None
-    compact: dict[str, Any] = {}
-
-    engine = _compact_engine_value(value.get("engine"), max_chars=max_chars)
-    if engine:
-        compact["engine"] = engine
-
+def _compact_geninfo_node_fields(value: dict[str, Any], compact: dict[str, Any], *, max_chars: int) -> None:
     for key in ("positive", "negative", "sampler", "checkpoint"):
         item = value.get(key)
         if isinstance(item, dict):
@@ -403,41 +434,69 @@ def _compact_geninfo_value(value: Any, *, max_chars: int) -> dict[str, Any] | No
             if node:
                 compact[key] = node
 
+
+def _compact_geninfo_model_entries(value: dict[str, Any], *, max_chars: int) -> list[Any] | None:
+    models = value.get("models")
+    if not isinstance(models, dict):
+        return None
+    model_names = [
+        name
+        for name in (
+            _compact_named_value(item, max_chars=max_chars)
+            for item in list(models.values())[:3]
+        )
+        if name
+    ]
+    return model_names or None
+
+
+def _compact_geninfo_lora_entries(value: dict[str, Any], *, max_chars: int) -> list[Any] | None:
+    loras = value.get("loras")
+    if not isinstance(loras, list):
+        return None
+    lora_names = [
+        name
+        for name in (
+            _compact_named_value(item, max_chars=max_chars)
+            for item in loras[:3]
+        )
+        if name
+    ]
+    return lora_names or None
+
+
+def _compact_geninfo_scalar_fields(value: dict[str, Any], compact: dict[str, Any]) -> None:
+    for key in ("seed", "steps", "cfg", "cfg_scale", "scheduler"):
+        scalar = value.get(key)
+        if scalar not in (None, "", [], {}):
+            compact[key] = scalar
+
+
+def _compact_geninfo_value(value: Any, *, max_chars: int) -> dict[str, Any] | None:
+    if not isinstance(value, dict):
+        return None
+    compact: dict[str, Any] = {}
+
+    engine = _compact_engine_value(value.get("engine"), max_chars=max_chars)
+    if engine:
+        compact["engine"] = engine
+
+    _compact_geninfo_node_fields(value, compact, max_chars=max_chars)
+
     for key in ("positive_prompt", "negative_prompt", "prompt", "model"):
         text = _compact_text_value(value.get(key), max_chars=max_chars)
         if text:
             compact[key] = text
 
-    models = value.get("models")
-    if isinstance(models, dict):
-        model_names = [
-            name
-            for name in (
-                _compact_named_value(item, max_chars=max_chars)
-                for item in list(models.values())[:3]
-            )
-            if name
-        ]
-        if model_names:
-            compact["models"] = model_names
+    model_names = _compact_geninfo_model_entries(value, max_chars=max_chars)
+    if model_names:
+        compact["models"] = model_names
 
-    loras = value.get("loras")
-    if isinstance(loras, list):
-        lora_names = [
-            name
-            for name in (
-                _compact_named_value(item, max_chars=max_chars)
-                for item in loras[:3]
-            )
-            if name
-        ]
-        if lora_names:
-            compact["loras"] = lora_names
+    lora_names = _compact_geninfo_lora_entries(value, max_chars=max_chars)
+    if lora_names:
+        compact["loras"] = lora_names
 
-    for key in ("seed", "steps", "cfg", "cfg_scale", "scheduler"):
-        scalar = value.get(key)
-        if scalar not in (None, "", [], {}):
-            compact[key] = scalar
+    _compact_geninfo_scalar_fields(value, compact)
 
     return compact or None
 

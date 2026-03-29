@@ -366,29 +366,29 @@ class IndexScanner:
         )
         return bool(result.ok and result.data)
 
-    def _schedule_added_image_vector_index(self, *, prev_added_count: int, added_ids: list[int] | None) -> None:
-        self._schedule_prepared_vector_index(
+    def _schedule_added_image_vector_index(
+        self,
+        *,
+        prev_added_count: int,
+        added_ids: list[int] | None,
+    ) -> asyncio.Task[Any] | None:
+        return self._schedule_prepared_vector_index(
             prepared=None,
             prev_added_count=prev_added_count,
             added_ids=added_ids,
         )
 
-    def _schedule_prepared_vector_index(
+    def _collect_candidate_ids(
         self,
         *,
         prepared: list[dict[str, Any]] | None,
         prev_added_count: int,
         added_ids: list[int] | None,
-    ) -> None:
-        if not is_vector_index_on_scan_enabled():
-            return
-        if self._vector_service is None:
-            return
-
+    ) -> list[int]:
         candidate_ids: list[int] = []
         seen_ids: set[int] = set()
 
-        def _append_asset_id(raw_id: Any) -> None:
+        def _append(raw_id: Any) -> None:
             try:
                 parsed_id = int(raw_id)
             except (TypeError, ValueError):
@@ -400,27 +400,110 @@ class IndexScanner:
 
         if isinstance(added_ids, list):
             for aid in added_ids[prev_added_count:]:
-                _append_asset_id(aid)
+                _append(aid)
 
         if isinstance(prepared, list):
             for entry in prepared:
                 action = str(entry.get("action") or "").strip().lower()
                 if action not in {"refresh", "updated"}:
                     continue
-                _append_asset_id(entry.get("asset_id"))
+                _append(entry.get("asset_id"))
 
-        if not candidate_ids:
-            return
+        return candidate_ids
 
+    def _create_vector_index_task(self, candidate_ids: list[int]) -> asyncio.Task[Any] | None:
         try:
             task = asyncio.create_task(self._index_missing_asset_vectors(asset_ids=candidate_ids))
             self._vector_index_tasks.add(task)
             task.add_done_callback(self._vector_index_tasks.discard)
+            return task
         except Exception as exc:
             logger.debug("Scanner vector indexing scheduling failed: %s", exc)
+            return None
+
+    def _schedule_prepared_vector_index(
+        self,
+        *,
+        prepared: list[dict[str, Any]] | None,
+        prev_added_count: int,
+        added_ids: list[int] | None,
+    ) -> asyncio.Task[Any] | None:
+        if not is_vector_index_on_scan_enabled():
+            return None
+        if self._vector_service is None:
+            return None
+
+        candidate_ids = self._collect_candidate_ids(
+            prepared=prepared,
+            prev_added_count=prev_added_count,
+            added_ids=added_ids,
+        )
+        if not candidate_ids:
+            return None
+
+        return self._create_vector_index_task(candidate_ids)
 
     async def _index_added_image_vectors(self, *, asset_ids: list[int]) -> None:
         await self._index_missing_asset_vectors(asset_ids=asset_ids)
+
+    async def _query_unindexed_vector_rows(self, asset_ids: list[int]) -> list[Any] | None:
+        rows = await self.db.aquery_in(
+            """
+            SELECT a.id, a.filepath, a.kind, m.metadata_raw
+            FROM assets a
+            LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id
+            LEFT JOIN asset_metadata m ON a.id = m.asset_id
+            WHERE a.kind IN ('image', 'video')
+              AND (ae.asset_id IS NULL OR ae.vector IS NULL OR length(ae.vector) = 0)
+              AND {IN_CLAUSE}
+            """,
+            "a.id",
+            asset_ids,
+        )
+        if not rows.ok or not rows.data:
+            return None
+        return rows.data
+
+    def _log_vector_index_result(
+        self,
+        *,
+        entries: list[Any],
+        indexed: int,
+        skipped: int,
+        errors: int,
+        timed_out: int,
+        timed_out_ids: list[int],
+    ) -> None:
+        if timed_out > 0:
+            sample = ", ".join(str(x) for x in timed_out_ids[:8]) or "n/a"
+            logger.warning(
+                "Scanner vector indexing timed out for %d/%d new media assets "
+                "(indexed=%d skipped=%d errors=%d timeout_per_asset=%.0fs sample_asset_ids=%s)",
+                timed_out,
+                len(entries),
+                indexed,
+                skipped,
+                errors,
+                _VECTOR_INDEX_PER_ASSET_TIMEOUT_S,
+                sample,
+            )
+        elif errors > 0:
+            logger.warning(
+                "Scanner vector indexing completed with errors for %d new media assets "
+                "(indexed=%d skipped=%d errors=%d)",
+                len(entries),
+                indexed,
+                skipped,
+                errors,
+            )
+        else:
+            logger.debug(
+                "Scanner vector indexing complete for %d new media assets "
+                "(indexed=%d skipped=%d)",
+                len(entries),
+                indexed,
+                skipped,
+            )
 
     async def _index_missing_asset_vectors(self, *, asset_ids: list[int]) -> None:
         if self._vector_service is None or not isinstance(asset_ids, list) or not asset_ids:
@@ -428,23 +511,11 @@ class IndexScanner:
 
         try:
             async with self._vector_index_lock:
-                rows = await self.db.aquery_in(
-                    """
-                    SELECT a.id, a.filepath, a.kind, m.metadata_raw
-                    FROM assets a
-                    LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id
-                    LEFT JOIN asset_metadata m ON a.id = m.asset_id
-                    WHERE a.kind IN ('image', 'video')
-                      AND (ae.asset_id IS NULL OR ae.vector IS NULL OR length(ae.vector) = 0)
-                      AND {IN_CLAUSE}
-                    """,
-                    "a.id",
-                    asset_ids,
-                )
-                if not rows.ok or not rows.data:
+                raw_rows = await self._query_unindexed_vector_rows(asset_ids)
+                if raw_rows is None:
                     return
 
-                entries = _vector_rows_to_entries(rows.data)
+                entries = _vector_rows_to_entries(raw_rows)
                 if not entries:
                     return
 
@@ -461,51 +532,58 @@ class IndexScanner:
                 if updated_asset_ids:
                     await self._notify_vector_asset_updates(asset_ids=updated_asset_ids)
 
-                if timed_out > 0:
-                    sample = ", ".join(str(x) for x in timed_out_ids[:8]) or "n/a"
-                    logger.warning(
-                        "Scanner vector indexing timed out for %d/%d new media assets "
-                        "(indexed=%d skipped=%d errors=%d timeout_per_asset=%.0fs sample_asset_ids=%s)",
-                        timed_out,
-                        len(entries),
-                        indexed,
-                        skipped,
-                        errors,
-                        _VECTOR_INDEX_PER_ASSET_TIMEOUT_S,
-                        sample,
-                    )
-                elif errors > 0:
-                    logger.warning(
-                        "Scanner vector indexing completed with errors for %d new media assets "
-                        "(indexed=%d skipped=%d errors=%d)",
-                        len(entries),
-                        indexed,
-                        skipped,
-                        errors,
-                    )
-                else:
-                    logger.debug(
-                        "Scanner vector indexing complete for %d new media assets "
-                        "(indexed=%d skipped=%d)",
-                        len(entries),
-                        indexed,
-                        skipped,
-                    )
+                self._log_vector_index_result(
+                    entries=entries,
+                    indexed=indexed,
+                    skipped=skipped,
+                    errors=errors,
+                    timed_out=timed_out,
+                    timed_out_ids=timed_out_ids,
+                )
         except Exception as exc:
             logger.debug("Scanner vector indexing failed for new images: %s", exc)
 
-    async def _notify_vector_asset_updates(self, *, asset_ids: list[int]) -> None:
-        normalized_ids: list[int] = []
-        seen_ids: set[int] = set()
+    def _normalize_asset_ids(self, asset_ids: list[int]) -> list[int]:
+        normalized: list[int] = []
+        seen: set[int] = set()
         for raw_id in asset_ids:
             try:
                 asset_id = int(raw_id)
             except (TypeError, ValueError):
                 continue
-            if asset_id <= 0 or asset_id in seen_ids:
+            if asset_id <= 0 or asset_id in seen:
                 continue
-            seen_ids.add(asset_id)
-            normalized_ids.append(asset_id)
+            seen.add(asset_id)
+            normalized.append(asset_id)
+        return normalized
+
+    def _parse_row_auto_tags(self, payload: dict[str, Any]) -> None:
+        auto_tags = payload.get("auto_tags")
+        if not isinstance(auto_tags, str):
+            return
+        try:
+            parsed = json.loads(auto_tags)
+            if isinstance(parsed, list):
+                payload["auto_tags"] = parsed
+        except (TypeError, ValueError, json.JSONDecodeError):
+            pass
+
+    def _emit_vector_asset_update(self, row: Any, PromptServer: Any) -> None:
+        if not isinstance(row, dict):
+            return
+        payload = dict(row)
+        self._parse_row_auto_tags(payload)
+        try:
+            PromptServer.instance.send_sync("mjr-asset-updated", sanitize_for_json(payload))
+        except Exception as exc:
+            logger.debug(
+                "Failed to emit vector asset update for asset_id=%s: %s",
+                payload.get("id"),
+                exc,
+            )
+
+    async def _notify_vector_asset_updates(self, *, asset_ids: list[int]) -> None:
+        normalized_ids = self._normalize_asset_ids(asset_ids)
         if not normalized_ids:
             return
 
@@ -557,21 +635,7 @@ class IndexScanner:
             return
 
         for row in rows.data:
-            if not isinstance(row, dict):
-                continue
-            payload = dict(row)
-            auto_tags = payload.get("auto_tags")
-            if isinstance(auto_tags, str):
-                try:
-                    parsed = json.loads(auto_tags)
-                    if isinstance(parsed, list):
-                        payload["auto_tags"] = parsed
-                except (TypeError, ValueError, json.JSONDecodeError):
-                    pass
-            try:
-                PromptServer.instance.send_sync("mjr-asset-updated", sanitize_for_json(payload))
-            except Exception as exc:
-                logger.debug("Failed to emit vector asset update for asset_id=%s: %s", payload.get("id"), exc)
+            self._emit_vector_asset_update(row, PromptServer)
 
     _persist_prepared_entries_tx = persist_prepared_entries_tx
     _process_prepared_entry_tx = process_prepared_entry_tx

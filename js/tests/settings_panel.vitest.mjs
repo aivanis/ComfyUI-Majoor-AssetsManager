@@ -10,6 +10,7 @@ const t = vi.fn((k, def) => def || k);
 const startRuntimeStatusDashboard = vi.fn();
 const syncBackendSecuritySettings = vi.fn();
 const syncBackendVectorSearchSettings = vi.fn();
+const syncBackendExecutionGroupingSettings = vi.fn();
 const toggleWatcher = vi.fn().mockResolvedValue({ ok: true });
 
 vi.mock("../utils/events.js", () => ({
@@ -42,6 +43,7 @@ vi.mock("../app/settings/settingsCore.js", () => ({
     saveMajoorSettings,
     syncBackendSecuritySettings,
     syncBackendVectorSearchSettings,
+    syncBackendExecutionGroupingSettings,
 }));
 
 vi.mock("../app/settings/settingsRuntime.js", () => ({

@@ -108,27 +108,95 @@ class PluginLoader:
             logger.info(f"Total plugins loaded: {loaded_count}")
         return loaded_count
 
+    @staticmethod
+    def _iter_plugin_files(directory: Path) -> list[Path]:
+        return [
+            module_file
+            for module_file in directory.glob("*.py")
+            if not module_file.name.startswith("_")
+        ]
+
+    @staticmethod
+    def _iter_plugin_packages(directory: Path) -> list[Path]:
+        packages: list[Path] = []
+        for subdir in directory.iterdir():
+            if not subdir.is_dir():
+                continue
+            if subdir.name.startswith("_"):
+                continue
+            if not (subdir / "__init__.py").exists():
+                continue
+            packages.append(subdir)
+        return packages
+
+    @staticmethod
+    def _is_symlinked_directory(directory: Path) -> bool:
+        try:
+            resolved_dir = directory.resolve(strict=True)
+            return resolved_dir != directory.resolve() and directory.is_symlink()
+        except (OSError, RuntimeError, ValueError):
+            return True
+
+    def _load_validated_module(self, module_file: Path) -> None:
+        if self.validation_mode == "disabled":
+            return
+        is_valid, warnings, _ = PluginValidator.validate(module_file)
+        if not is_valid:
+            raise PluginLoadError(f"Plugin validation failed: {'; '.join(warnings)}")
+        if warnings and self.validation_mode == "strict":
+            logger.warning(f"Plugin {module_file.name} has warnings: {warnings}")
+
+    def _instantiate_extractors_from_module(self, module: Any, module_file: Path) -> int:
+        found_count = 0
+        for attr_name in dir(module):
+            attr = getattr(module, attr_name)
+            if not self._is_valid_extractor_class(attr):
+                continue
+            try:
+                extractor = attr()
+                if (
+                    not hasattr(extractor, "name")
+                    or not hasattr(extractor, "priority")
+                    or not hasattr(extractor, "supported_extensions")
+                ):
+                    logger.warning(
+                        "Skipping misconfigured plugin %s in %s: missing required attributes (name, priority, or supported_extensions)",
+                        attr_name,
+                        module_file,
+                    )
+                    continue
+                self.register_extractor(extractor)
+                meta = getattr(extractor, "metadata", None)
+                self._plugin_info[extractor.name] = {
+                    "module": str(module_file),
+                    "version": getattr(meta, "version", None) if meta else None,
+                    "author": getattr(meta, "author", None) if meta else None,
+                    "priority": extractor.priority,
+                    "extensions": extractor.supported_extensions,
+                }
+                found_count += 1
+            except Exception as e:
+                logger.error(f"Failed to instantiate {attr_name}: {e}")
+                self._load_errors.append((f"{module_file}:{attr_name}", str(e)))
+        return found_count
+
     def _scan_directory(self, directory: Path) -> int:
         """Scan a single directory for plugins."""
         count = 0
 
         # Validate that the directory is not a symlink pointing outside
         # the expected location (prevents loading arbitrary code).
+        if self._is_symlinked_directory(directory):
+            logger.warning(f"Skipping symlinked plugin directory: {directory}")
+            return 0
+
         try:
             resolved_dir = directory.resolve(strict=True)
-            if resolved_dir != directory.resolve() and directory.is_symlink():
-                logger.warning(
-                    f"Skipping symlinked plugin directory: {directory}"
-                )
-                return 0
         except (OSError, RuntimeError, ValueError):
             return 0
 
         # Scan .py files
-        for module_file in resolved_dir.glob("*.py"):
-            if module_file.name.startswith("_"):
-                continue
-
+        for module_file in self._iter_plugin_files(resolved_dir):
             try:
                 self._load_module(module_file)
                 count += 1
@@ -137,14 +205,7 @@ class PluginLoader:
                 self._load_errors.append((str(module_file), str(e)))
 
         # Scan subdirectories as packages
-        for subdir in directory.iterdir():
-            if not subdir.is_dir():
-                continue
-            if subdir.name.startswith("_"):
-                continue
-            if not (subdir / "__init__.py").exists():
-                continue
-
+        for subdir in self._iter_plugin_packages(directory):
             try:
                 count += self._scan_package(subdir)
             except Exception as e:
@@ -177,19 +238,7 @@ class PluginLoader:
         package_name: str | None = None
     ) -> None:
         """Load a single Python module and extract plugins."""
-        # Validate plugin before loading
-        if self.validation_mode != "disabled":
-            is_valid, warnings, info = PluginValidator.validate(module_file)
-
-            if not is_valid:
-                raise PluginLoadError(
-                    f"Plugin validation failed: {'; '.join(warnings)}"
-                )
-
-            if warnings and self.validation_mode == "strict":
-                logger.warning(
-                    f"Plugin {module_file.name} has warnings: {warnings}"
-                )
+        self._load_validated_module(module_file)
 
         module_name = module_file.stem
         full_name = (
@@ -219,37 +268,7 @@ class PluginLoader:
 
         self._loaded_modules.add(full_name)
 
-        # Find and instantiate all extractor classes
-        found_count = 0
-        for attr_name in dir(module):
-            attr = getattr(module, attr_name)
-            if self._is_valid_extractor_class(attr):
-                try:
-                    extractor = attr()
-                    if not hasattr(extractor, "name") or not hasattr(extractor, "priority") \
-                            or not hasattr(extractor, "supported_extensions"):
-                        logger.warning(
-                            "Skipping misconfigured plugin %s in %s: "
-                            "missing required attributes (name, priority, or supported_extensions)",
-                            attr_name, module_file,
-                        )
-                        continue
-                    self.register_extractor(extractor)
-                    meta = getattr(extractor, "metadata", None)
-                    self._plugin_info[extractor.name] = {
-                        "module": str(module_file),
-                        "version": getattr(meta, "version", None) if meta else None,
-                        "author": getattr(meta, "author", None) if meta else None,
-                        "priority": extractor.priority,
-                        "extensions": extractor.supported_extensions,
-                    }
-                    found_count += 1
-                except Exception as e:
-                    logger.error(f"Failed to instantiate {attr_name}: {e}")
-                    self._load_errors.append(
-                        (f"{module_file}:{attr_name}", str(e))
-                    )
-
+        found_count = self._instantiate_extractors_from_module(module, module_file)
         if found_count == 0:
             logger.debug(f"No extractor classes found in {module_file}")
 

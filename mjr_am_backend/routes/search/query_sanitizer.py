@@ -209,50 +209,77 @@ def _apply_date_filters(query: "Mapping[str, Any]", filters: dict[str, Any]) -> 
     return None
 
 
+_NUMERIC_FILTER_SPECS: list[tuple[str, str, type, int | float, str]] = [
+    ("min_size_mb", "min_size_bytes", float, 1024 * 1024, "Invalid min_size_mb"),
+    ("max_size_mb", "max_size_bytes", float, 1024 * 1024, "Invalid max_size_mb"),
+    ("min_width", "min_width", int, 1, "Invalid min_width"),
+    ("min_height", "min_height", int, 1, "Invalid min_height"),
+    ("max_width", "max_width", int, 1, "Invalid max_width"),
+    ("max_height", "max_height", int, 1, "Invalid max_height"),
+]
+
+
+def _apply_kind_filter(
+    query: "Mapping[str, Any]", filters: "dict[str, Any]"
+) -> "Result[dict[str, Any]] | None":
+    if "kind" not in query:
+        return None
+    kind = str(query["kind"] or "").strip().lower()
+    if kind not in VALID_KIND_FILTERS:
+        return Result.Err(
+            "INVALID_INPUT",
+            f"Invalid kind. Must be one of: {', '.join(sorted(VALID_KIND_FILTERS))}",
+        )
+    filters["kind"] = kind
+    return None
+
+
+def _apply_min_rating_filter(
+    query: "Mapping[str, Any]", filters: "dict[str, Any]"
+) -> "Result[dict[str, Any]] | None":
+    if "min_rating" not in query:
+        return None
+    try:
+        filters["min_rating"] = max(0, min(MAX_RATING, int(query["min_rating"])))
+    except Exception:
+        return Result.Err("INVALID_INPUT", "Invalid min_rating")
+    return None
+
+
+def _apply_bool_flags(query: "Mapping[str, Any]", filters: "dict[str, Any]") -> None:
+    for key in ("has_workflow", "group_stacks"):
+        if key in query:
+            filters[key] = str(query[key] or "").strip().lower() in ("true", "1", "yes")
+
+
+def _apply_workflow_type_filter(query: "Mapping[str, Any]", filters: "dict[str, Any]") -> None:
+    if "workflow_type" in query:
+        workflow_type = str(query["workflow_type"] or "").strip().upper()
+        if workflow_type:
+            filters["workflow_type"] = workflow_type
+
+
 def parse_request_filters(
     query: Mapping[str, Any],
     inline_filters: dict[str, Any] | None = None,
 ) -> Result[dict[str, Any]]:
     filters: dict[str, Any] = dict(inline_filters or {})
 
-    if "kind" in query:
-        kind = str(query["kind"] or "").strip().lower()
-        if kind not in VALID_KIND_FILTERS:
-            return Result.Err(
-                "INVALID_INPUT",
-                f"Invalid kind. Must be one of: {', '.join(sorted(VALID_KIND_FILTERS))}",
-            )
-        filters["kind"] = kind
+    kind_err = _apply_kind_filter(query, filters)
+    if kind_err is not None:
+        return kind_err
 
-    if "min_rating" in query:
-        try:
-            filters["min_rating"] = max(0, min(MAX_RATING, int(query["min_rating"])))
-        except Exception:
-            return Result.Err("INVALID_INPUT", "Invalid min_rating")
+    rating_err = _apply_min_rating_filter(query, filters)
+    if rating_err is not None:
+        return rating_err
 
-    numeric_specs = [
-        ("min_size_mb", "min_size_bytes", float, 1024 * 1024, "Invalid min_size_mb"),
-        ("max_size_mb", "max_size_bytes", float, 1024 * 1024, "Invalid max_size_mb"),
-        ("min_width", "min_width", int, 1, "Invalid min_width"),
-        ("min_height", "min_height", int, 1, "Invalid min_height"),
-        ("max_width", "max_width", int, 1, "Invalid max_width"),
-        ("max_height", "max_height", int, 1, "Invalid max_height"),
-    ]
-    for raw_key, filter_key, caster, scale, error_text in numeric_specs:
+    for raw_key, filter_key, caster, scale, error_text in _NUMERIC_FILTER_SPECS:
         err = _apply_numeric_filter(query, raw_key, filter_key, caster, scale, error_text, filters)
         if err is not None:
             return err
 
-    if "workflow_type" in query:
-        workflow_type = str(query["workflow_type"] or "").strip().upper()
-        if workflow_type:
-            filters["workflow_type"] = workflow_type
-
-    if "has_workflow" in query:
-        filters["has_workflow"] = str(query["has_workflow"] or "").strip().lower() in ("true", "1", "yes")
-
-    if "group_stacks" in query:
-        filters["group_stacks"] = str(query["group_stacks"] or "").strip().lower() in ("true", "1", "yes")
+    _apply_workflow_type_filter(query, filters)
+    _apply_bool_flags(query, filters)
 
     date_err = _apply_date_filters(query, filters)
     if date_err is not None:

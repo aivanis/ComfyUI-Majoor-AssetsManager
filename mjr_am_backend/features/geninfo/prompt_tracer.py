@@ -348,6 +348,32 @@ def _first_non_none_scalar(source: dict[str, Any], keys: tuple[str, ...]) -> Any
 
 
 
+_SCALAR_FIELD_KEYS = ("seed", "value", "number", "int", "float", "text", "string", "prompt", "input", "text_a", "text_b")
+_FALLBACK_LINK_KEYS = ("base_ctx", "pipe", "pipe_to", "any_1", "any_2", "any_3", "any", "context")
+
+
+def _resolve_scalar_from_field(nodes_by_id: dict[str, dict[str, Any]], ins: dict[str, Any], key: str, memo: set[str]) -> Any | None:
+    v = ins.get(key)
+    if v is None:
+        return None
+    s = _scalar(v)
+    if s is not None:
+        return s
+    if _is_link(v):
+        return _resolve_scalar_from_link(nodes_by_id, v, memo)
+    return None
+
+
+def _resolve_scalar_via_fallback_links(nodes_by_id: dict[str, dict[str, Any]], ins: dict[str, Any], memo: set[str]) -> Any | None:
+    for fallback_key in _FALLBACK_LINK_KEYS:
+        v = ins.get(fallback_key)
+        if _is_link(v):
+            resolved = _resolve_scalar_from_link(nodes_by_id, v, memo)
+            if resolved is not None:
+                return resolved
+    return None
+
+
 def _resolve_scalar_from_link(nodes_by_id: dict[str, dict[str, Any]], value: Any, memo: set[str] | None = None) -> Any | None:
     if memo is None:
         memo = set()
@@ -359,32 +385,11 @@ def _resolve_scalar_from_link(nodes_by_id: dict[str, dict[str, Any]], value: Any
     if not isinstance(node, dict):
         return None
     ins = _inputs(node)
-    
-    # Check explicitly matching fields
-    for k in (
-        "seed", "value", "number", "int", "float", "text",
-        "string", "prompt", "input", "text_a", "text_b"
-    ):
-        v = ins.get(k)
-        if v is None:
-            continue
-        s = _scalar(v)
-        if s is not None:
-            return s
-        if _is_link(v):
-            resolved = _resolve_scalar_from_link(nodes_by_id, v, memo)
-            if resolved is not None:
-                return resolved
-                
-    # Context / Pipe / Switch fallbacks
-    for fallback_key in ("base_ctx", "pipe", "pipe_to", "any_1", "any_2", "any_3", "any", "context"):
-        v = ins.get(fallback_key)
-        if _is_link(v):
-            resolved = _resolve_scalar_from_link(nodes_by_id, v, memo)
-            if resolved is not None:
-                return resolved
-
-    return None
+    for k in _SCALAR_FIELD_KEYS:
+        result = _resolve_scalar_from_field(nodes_by_id, ins, k, memo)
+        if result is not None:
+            return result
+    return _resolve_scalar_via_fallback_links(nodes_by_id, ins, memo)
 
 
 

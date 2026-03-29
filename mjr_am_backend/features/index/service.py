@@ -236,35 +236,12 @@ class IndexService:
             self._enricher.end_scan_pause()
 
         if result.ok:
-            try:
-                # Notify frontend of scan completion
-                from ...routes.registry import PromptServer
-                PromptServer.instance.send_sync("mjr-scan-complete", result.data)
-            except Exception as e:
-                logger.debug("Failed to emit scan-complete event: %s", e)
+            self._emit_scan_complete_event(result.data)
             if not fast:
                 mark_directory_indexed(directory, source, root_id, metadata_complete=True)
 
-        # Handle background enrichment if requested
         if result.ok and fast and background_metadata:
-            result_data = result.data if isinstance(result.data, dict) else {}
-            to_enrich = result_data.get("to_enrich", [])
-            if to_enrich:
-                try:
-                    # H-7: cap enrichment startup at 5 minutes so a hung enricher
-                    # cannot block scan completion indefinitely.
-                    await asyncio.wait_for(
-                        self._enricher.start_enrichment(to_enrich),
-                        timeout=300,
-                    )
-                except asyncio.TimeoutError:
-                    logger.warning(
-                        "start_enrichment timed out after 300 s — enrichment skipped for this scan batch"
-                    )
-                except Exception as exc:
-                    logger.debug("Background enrichment start skipped: %s", exc)
-                # Remove from stats as it's internal
-                result_data.pop("to_enrich", None)
+            await self._start_background_enrichment(result.data)
 
         return result
 
@@ -298,40 +275,7 @@ class IndexService:
             root_id=root_id,
         )
         if res.ok:
-            # Single import shared by both notifications below (MED-05).
-            try:
-                from ...routes.registry import PromptServer as _PS
-            except Exception:
-                _PS = None
-            try:
-                if _PS is not None:
-                    # Notify frontend (useful for drag-drop staging updates)
-                    _PS.instance.send_sync("mjr-scan-complete", res.data)
-                    _PS.instance.send_sync("mjr.scan.progress", sanitize_for_json({
-                        "status": "completed",
-                        "scope": str(source or "output"),
-                        "root_id": root_id,
-                        "stats": dict(res.data or {}),
-                    }))
-            except Exception as e:
-                logger.debug("Failed to emit scan-complete event: %s", e)
-            # Push newly-added assets immediately so the frontend can upsert them
-            # into the grid without waiting for the next polling cycle.
-            # Limit raised to 50 so batch workflows (e.g. grid/xyz nodes) get full
-            # immediate coverage; files beyond 50 still appear on next counter poll.
-            added_ids = (res.data or {}).get("added_ids") or []
-            if added_ids and _PS is not None:
-                try:
-                    batch_res = await self.get_assets_batch(list(added_ids[:BATCH_ASSET_PUSH_LIMIT]))
-                    if batch_res.ok and batch_res.data:
-                        for asset in batch_res.data:
-                            try:
-                                _PS.instance.send_sync("mjr-asset-added", sanitize_for_json(dict(asset)))
-                                _PS.instance.send_sync("mjr.asset.indexed", sanitize_for_json(dict(asset)))
-                            except Exception as exc:
-                                logger.debug("Failed to push mjr-asset-added for one asset: %s", exc)
-                except Exception as e:
-                    logger.warning("Failed to emit mjr-asset-added events: %s", e)
+            await self._emit_index_paths_notifications(res.data, source=source, root_id=root_id)
             mark_directory_indexed(base_dir, source, root_id)
         return res
 
@@ -376,53 +320,119 @@ class IndexService:
             return Result.Ok(True)
 
         try:
-            old_where_sql, old_where_params = _filepath_match_clause(old_fp, column="filepath")
-            new_path = Path(new_fp)
-            filename = new_path.name
-            subfolder = str(new_path.parent)
-            mtime = await _get_rename_mtime(new_path)
-
-            async with self.db.atransaction(mode="immediate"):
-                # PRAGMA defer_foreign_keys is per-connection and per-transaction.
-                # atransaction pins all operations to a single connection via _TX_TOKEN
-                # (see sqlite_facade.py), so the PRAGMA and the subsequent UPDATEs are
-                # guaranteed to run on the same physical connection (LOW-05).
-                defer_fk = await self.db.aexecute("PRAGMA defer_foreign_keys = ON")
-                if not defer_fk.ok:
-                    return Result.Err("DB_ERROR", defer_fk.error or "Failed to defer foreign key checks")
-
-                upd = await _update_assets_filepath_row(
-                    self.db,
-                    old_where_sql,
-                    old_where_params,
-                    new_fp,
-                    filename,
-                    subfolder,
-                    mtime,
-                )
-                if not upd.ok:
-                    return Result.Err("DB_ERROR", upd.error or "Failed to update asset filepath")
-                try:
-                    updated_rows = int(upd.data or 0)
-                except Exception:
-                    updated_rows = 0
-                if updated_rows <= 0:
-                    return Result.Err("NOT_FOUND", "Asset not found")
-
-                side_updates = await _update_path_keyed_index_tables(
-                    self.db,
-                    old_where_sql,
-                    old_where_params,
-                    new_fp,
-                    subfolder,
-                    mtime,
-                )
-                if not side_updates.ok:
-                    return side_updates
+            rename_res = await self._rename_file_transaction(old_fp, new_fp)
+            if not rename_res.ok:
+                return rename_res
         except Exception as exc:
             return Result.Err("DB_ERROR", str(exc))
 
         logger.debug("Renamed in index: %s -> %s", old_fp, new_fp)
+        return Result.Ok(True)
+
+    def _emit_scan_complete_event(self, data: Any) -> None:
+        try:
+            from ...routes.registry import PromptServer
+
+            PromptServer.instance.send_sync("mjr-scan-complete", data)
+        except Exception as exc:
+            logger.debug("Failed to emit scan-complete event: %s", exc)
+
+    async def _start_background_enrichment(self, result_data: Any) -> None:
+        payload = result_data if isinstance(result_data, dict) else {}
+        to_enrich = payload.get("to_enrich", [])
+        if not to_enrich:
+            return
+        try:
+            await asyncio.wait_for(self._enricher.start_enrichment(to_enrich), timeout=300)
+        except asyncio.TimeoutError:
+            logger.warning(
+                "start_enrichment timed out after 300 s ??? enrichment skipped for this scan batch"
+            )
+        except Exception as exc:
+            logger.debug("Background enrichment start skipped: %s", exc)
+        payload.pop("to_enrich", None)
+
+    async def _emit_index_paths_notifications(self, data: Any, *, source: str, root_id: str | None) -> None:
+        try:
+            from ...routes.registry import PromptServer as _PS
+        except Exception:
+            _PS = None
+        if _PS is None:
+            return
+        try:
+            _PS.instance.send_sync("mjr-scan-complete", data)
+            _PS.instance.send_sync(
+                "mjr.scan.progress",
+                sanitize_for_json(
+                    {
+                        "status": "completed",
+                        "scope": str(source or "output"),
+                        "root_id": root_id,
+                        "stats": dict(data or {}),
+                    }
+                ),
+            )
+        except Exception as exc:
+            logger.debug("Failed to emit scan-complete event: %s", exc)
+            return
+        await self._emit_added_assets_notifications(data, _PS)
+
+    async def _emit_added_assets_notifications(self, data: Any, prompt_server: Any) -> None:
+        added_ids = (data or {}).get("added_ids") or []
+        if not added_ids:
+            return
+        try:
+            batch_res = await self.get_assets_batch(list(added_ids[:BATCH_ASSET_PUSH_LIMIT]))
+            if not batch_res.ok or not batch_res.data:
+                return
+            for asset in batch_res.data:
+                try:
+                    prompt_server.instance.send_sync("mjr-asset-added", sanitize_for_json(dict(asset)))
+                    prompt_server.instance.send_sync("mjr.asset.indexed", sanitize_for_json(dict(asset)))
+                except Exception as exc:
+                    logger.debug("Failed to push mjr-asset-added for one asset: %s", exc)
+        except Exception as exc:
+            logger.warning("Failed to emit mjr-asset-added events: %s", exc)
+
+    async def _rename_file_transaction(self, old_fp: str, new_fp: str) -> Result[bool]:
+        old_where_sql, old_where_params = _filepath_match_clause(old_fp, column="filepath")
+        new_path = Path(new_fp)
+        filename = new_path.name
+        subfolder = str(new_path.parent)
+        mtime = await _get_rename_mtime(new_path)
+        async with self.db.atransaction(mode="immediate"):
+            defer_fk = await self.db.aexecute("PRAGMA defer_foreign_keys = ON")
+            if not defer_fk.ok:
+                return Result.Err("DB_ERROR", defer_fk.error or "Failed to defer foreign key checks")
+
+            upd = await _update_assets_filepath_row(
+                self.db,
+                old_where_sql,
+                old_where_params,
+                new_fp,
+                filename,
+                subfolder,
+                mtime,
+            )
+            if not upd.ok:
+                return Result.Err("DB_ERROR", upd.error or "Failed to update asset filepath")
+            try:
+                updated_rows = int(upd.data or 0)
+            except Exception:
+                updated_rows = 0
+            if updated_rows <= 0:
+                return Result.Err("NOT_FOUND", "Asset not found")
+
+            side_updates = await _update_path_keyed_index_tables(
+                self.db,
+                old_where_sql,
+                old_where_params,
+                new_fp,
+                subfolder,
+                mtime,
+            )
+            if not side_updates.ok:
+                return side_updates
         return Result.Ok(True)
 
     # ==================== Search Operations ====================

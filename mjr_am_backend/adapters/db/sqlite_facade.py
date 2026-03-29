@@ -547,12 +547,8 @@ class Sqlite:
     Synchronous API, async execution on a dedicated loop thread.
     """
 
-    def __init__(self, db_path: str, max_connections: int | None = None, timeout: float = 30.0, *, attach: dict[str, str] | None = None):
-        self.db_path = Path(db_path)
-        self._attach_dbs: dict[str, str] = dict(attach) if attach else {}
+    def _init_vec_attach(self) -> None:
         if "vec" not in self._attach_dbs:
-            # Keep vector DB colocated with the primary DB by default so schema
-            # self-heal works even when callers don't pass attach={"vec": ...}.
             default_vec = self.db_path.with_name("vectors.sqlite")
             try:
                 if default_vec.resolve(strict=False) != self.db_path.resolve(strict=False):
@@ -560,24 +556,56 @@ class Sqlite:
             except Exception:
                 if default_vec != self.db_path:
                     self._attach_dbs["vec"] = str(default_vec)
-        user_config = self._load_user_db_config()
+
+    def _resolve_max_connections(self, max_connections: int | None, user_config: dict[str, Any]) -> int:
         max_conn = (
             int(max_connections)
             if max_connections is not None
             else int(user_config.get("maxConnections", DB_MAX_CONNECTIONS or 8))
         )
-        max_conn = max(1, max_conn)
+        return max(1, max_conn)
+
+    def _init_reset_state(self) -> None:
+        self._resetting = False
+        self._active_conns: set[aiosqlite.Connection] = set()
+        self._active_conns_idle = threading.Event()
+        self._active_conns_idle.set()
+
+    def _init_diag(self) -> None:
+        self._diag_lock = threading.Lock()
+        self._diag: dict[str, Any] = {
+            "locked": False,
+            "last_locked_error": None,
+            "last_locked_at": None,
+            "malformed": False,
+            "last_malformed_error": None,
+            "last_malformed_at": None,
+            "recovery_state": "idle",
+            "last_recovery_at": None,
+            "last_recovery_error": None,
+            "recovery_attempts": 0,
+            "recovery_successes": 0,
+            "recovery_failures": 0,
+            "auto_reset_attempts": 0,
+            "auto_reset_successes": 0,
+            "auto_reset_failures": 0,
+            "last_auto_reset_at": None,
+            "last_auto_reset_error": None,
+        }
+
+    def __init__(self, db_path: str, max_connections: int | None = None, timeout: float = 30.0, *, attach: dict[str, str] | None = None):
+        self.db_path = Path(db_path)
+        self._attach_dbs: dict[str, str] = dict(attach) if attach else {}
+        self._init_vec_attach()
+        user_config = self._load_user_db_config()
+        max_conn = self._resolve_max_connections(max_connections, user_config)
         self._max_conn_limit = max_conn
         self._pool: Queue[aiosqlite.Connection] = Queue(maxsize=max_conn)
         self._initialized = False
         self._lock = threading.Lock()
         self._async_sem: asyncio.Semaphore | None = None
 
-        # Reset mechanics
-        self._resetting = False
-        self._active_conns: set[aiosqlite.Connection] = set()
-        self._active_conns_idle = threading.Event()
-        self._active_conns_idle.set()
+        self._init_reset_state()
 
         self._timeout = float(user_config.get("timeout", timeout))
         self._query_timeout = float(user_config.get("queryTimeout", DB_QUERY_TIMEOUT if DB_QUERY_TIMEOUT is not None else 0.0))
@@ -585,7 +613,6 @@ class Sqlite:
         self._lock_retry_base_seconds = 0.05
         self._lock_retry_max_seconds = 0.75
 
-        # Transaction connections live on the loop thread; keyed by token.
         self._tx_conns: dict[str, aiosqlite.Connection] = {}
 
         loop_run_timeout = self._query_timeout if self._query_timeout and self._query_timeout > 0 else ASYNC_LOOP_RUN_TIMEOUT_S
@@ -606,26 +633,7 @@ class Sqlite:
         self._auto_reset_cooldown_s = 30.0
         self._schema_repair_lock = threading.Lock()
         self._schema_repair_last_ts = 0.0
-        self._diag_lock = threading.Lock()
-        self._diag: dict[str, Any] = {
-            "locked": False,
-            "last_locked_error": None,
-            "last_locked_at": None,
-            "malformed": False,
-            "last_malformed_error": None,
-            "last_malformed_at": None,
-            "recovery_state": "idle",  # idle|in_progress|success|failed|skipped_locked
-            "last_recovery_at": None,
-            "last_recovery_error": None,
-            "recovery_attempts": 0,
-            "recovery_successes": 0,
-            "recovery_failures": 0,
-            "auto_reset_attempts": 0,
-            "auto_reset_successes": 0,
-            "auto_reset_failures": 0,
-            "last_auto_reset_at": None,
-            "last_auto_reset_error": None,
-        }
+        self._init_diag()
 
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
@@ -760,6 +768,30 @@ class Sqlite:
                 raise
         return None
 
+    async def _rebuild_assets_fts(self, rec_conn: aiosqlite.Connection) -> None:
+        try:
+            await self._run_recovery_pragma(rec_conn, "INSERT INTO assets_fts(assets_fts) VALUES('rebuild')")
+        except sqlite3.OperationalError as fts_exc:
+            if not tx_is_missing_table_error(fts_exc):
+                logger.warning("FTS rebuild skipped during recovery: %s", fts_exc)
+        except Exception as fts_exc:
+            logger.warning("FTS rebuild error during recovery: %s", fts_exc)
+
+    async def _reindex_asset_metadata_fts(self, rec_conn: aiosqlite.Connection) -> None:
+        try:
+            await self._run_recovery_pragma(rec_conn, "DELETE FROM asset_metadata_fts")
+            await self._run_recovery_pragma(
+                rec_conn,
+                "INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)"
+                " SELECT asset_id, COALESCE(tags, ''), COALESCE(tags_text, ''), COALESCE(metadata_text, '')"
+                " FROM asset_metadata",
+            )
+        except sqlite3.OperationalError as fts_exc:
+            if not tx_is_missing_table_error(fts_exc):
+                logger.warning("FTS reindex skipped during recovery (asset_metadata_fts): %s", fts_exc)
+        except Exception as fts_exc:
+            logger.warning("FTS reindex error during recovery (asset_metadata_fts): %s", fts_exc)
+
     async def _rebuild_fts_during_recovery(self, rec_conn: aiosqlite.Connection) -> None:
         lock = self._write_lock
         fts_lock_acquired = False
@@ -767,29 +799,8 @@ class Sqlite:
             await lock.acquire()
             fts_lock_acquired = True
         try:
-            # Rebuild content-backed FTS (supports the 'rebuild' command).
-            try:
-                await self._run_recovery_pragma(rec_conn, "INSERT INTO assets_fts(assets_fts) VALUES('rebuild')")
-            except sqlite3.OperationalError as fts_exc:
-                if not tx_is_missing_table_error(fts_exc):
-                    logger.warning("FTS rebuild skipped during recovery: %s", fts_exc)
-            except Exception as fts_exc:
-                logger.warning("FTS rebuild error during recovery: %s", fts_exc)
-
-            # Reindex standard FTS table from source data (DELETE + INSERT is valid for non-contentless tables).
-            try:
-                await self._run_recovery_pragma(rec_conn, "DELETE FROM asset_metadata_fts")
-                await self._run_recovery_pragma(
-                    rec_conn,
-                    "INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)"
-                    " SELECT asset_id, COALESCE(tags, ''), COALESCE(tags_text, ''), COALESCE(metadata_text, '')"
-                    " FROM asset_metadata",
-                )
-            except sqlite3.OperationalError as fts_exc:
-                if not tx_is_missing_table_error(fts_exc):
-                    logger.warning("FTS reindex skipped during recovery (asset_metadata_fts): %s", fts_exc)
-            except Exception as fts_exc:
-                logger.warning("FTS reindex error during recovery (asset_metadata_fts): %s", fts_exc)
+            await self._rebuild_assets_fts(rec_conn)
+            await self._reindex_asset_metadata_fts(rec_conn)
         finally:
             if fts_lock_acquired and lock is not None:
                 lock.release()
@@ -1884,6 +1895,101 @@ class Sqlite:
         raw = os.getenv("MJR_AM_DB_FORCE_KILL_LOCKERS", os.getenv("MAJOOR_DB_FORCE_KILL_LOCKERS", "1"))
         return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
 
+    @staticmethod
+    def _build_rm_ctypes_types(wintypes: Any) -> tuple[Any, Any, Any]:
+        class FILETIME(ctypes.Structure):
+            _fields_ = [
+                ("dwLowDateTime", wintypes.DWORD),
+                ("dwHighDateTime", wintypes.DWORD),
+            ]
+
+        class RM_UNIQUE_PROCESS(ctypes.Structure):
+            _fields_ = [
+                ("dwProcessId", wintypes.DWORD),
+                ("ProcessStartTime", FILETIME),
+            ]
+
+        class RM_PROCESS_INFO(ctypes.Structure):
+            _fields_ = [
+                ("Process", RM_UNIQUE_PROCESS),
+                ("strAppName", wintypes.WCHAR * 256),
+                ("strServiceShortName", wintypes.WCHAR * 64),
+                ("ApplicationType", wintypes.DWORD),
+                ("AppStatus", wintypes.ULONG),
+                ("TSSessionId", wintypes.DWORD),
+                ("bRestartable", wintypes.BOOL),
+            ]
+
+        return FILETIME, RM_UNIQUE_PROCESS, RM_PROCESS_INFO
+
+    @staticmethod
+    def _configure_rm_dll(rm: Any, wintypes: Any, RM_PROCESS_INFO: Any) -> None:
+        rm.RmStartSession.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD, wintypes.LPWSTR]
+        rm.RmStartSession.restype = wintypes.DWORD
+        rm.RmRegisterResources.argtypes = [
+            wintypes.DWORD,
+            ctypes.c_uint,
+            ctypes.POINTER(wintypes.LPCWSTR),
+            ctypes.c_uint,
+            ctypes.c_void_p,
+            ctypes.c_uint,
+            ctypes.c_void_p,
+        ]
+        rm.RmRegisterResources.restype = wintypes.DWORD
+        rm.RmGetList.argtypes = [
+            wintypes.DWORD,
+            ctypes.POINTER(ctypes.c_uint),
+            ctypes.POINTER(ctypes.c_uint),
+            ctypes.POINTER(RM_PROCESS_INFO),
+            ctypes.POINTER(wintypes.DWORD),
+        ]
+        rm.RmGetList.restype = wintypes.DWORD
+        rm.RmEndSession.argtypes = [wintypes.DWORD]
+        rm.RmEndSession.restype = wintypes.DWORD
+
+    @staticmethod
+    def _rm_query_pids(rm: Any, session: Any, path: Path, wintypes: Any, RM_PROCESS_INFO: Any) -> list[int]:
+        ERROR_MORE_DATA = 234
+        files = (wintypes.LPCWSTR * 1)(str(path))
+        reg_res = rm.RmRegisterResources(session, 1, files, 0, None, 0, None)
+        if int(reg_res) != 0:
+            return []
+
+        needed = ctypes.c_uint(0)
+        count = ctypes.c_uint(0)
+        reasons = wintypes.DWORD(0)
+        get_res = rm.RmGetList(session, ctypes.byref(needed), ctypes.byref(count), None, ctypes.byref(reasons))
+        if int(get_res) not in (0, ERROR_MORE_DATA):
+            return []
+        if int(needed.value) <= 0:
+            return []
+
+        infos = (RM_PROCESS_INFO * int(needed.value))()
+        count = ctypes.c_uint(int(needed.value))
+        get_res = rm.RmGetList(
+            session,
+            ctypes.byref(needed),
+            ctypes.byref(count),
+            infos,
+            ctypes.byref(reasons),
+        )
+        if int(get_res) != 0:
+            return []
+
+        pids: list[int] = []
+        for i in range(int(count.value)):
+            pid = int(getattr(infos[i].Process, "dwProcessId", 0) or 0)
+            if pid > 0:
+                pids.append(pid)
+        seen: set[int] = set()
+        out: list[int] = []
+        for pid in pids:
+            if pid in seen:
+                continue
+            seen.add(pid)
+            out.append(pid)
+        return out
+
     @classmethod
     def _find_locking_pids_windows(cls, path: Path) -> list[int]:
         if os.name != "nt":
@@ -1892,57 +1998,13 @@ class Sqlite:
             from ctypes import wintypes
 
             CCH_RM_SESSION_KEY = 32
-            ERROR_MORE_DATA = 234
-
-            class FILETIME(ctypes.Structure):
-                _fields_ = [
-                    ("dwLowDateTime", wintypes.DWORD),
-                    ("dwHighDateTime", wintypes.DWORD),
-                ]
-
-            class RM_UNIQUE_PROCESS(ctypes.Structure):
-                _fields_ = [
-                    ("dwProcessId", wintypes.DWORD),
-                    ("ProcessStartTime", FILETIME),
-                ]
-
-            class RM_PROCESS_INFO(ctypes.Structure):
-                _fields_ = [
-                    ("Process", RM_UNIQUE_PROCESS),
-                    ("strAppName", wintypes.WCHAR * 256),
-                    ("strServiceShortName", wintypes.WCHAR * 64),
-                    ("ApplicationType", wintypes.DWORD),
-                    ("AppStatus", wintypes.ULONG),
-                    ("TSSessionId", wintypes.DWORD),
-                    ("bRestartable", wintypes.BOOL),
-                ]
+            _FILETIME, _RM_UNIQUE_PROCESS, RM_PROCESS_INFO = cls._build_rm_ctypes_types(wintypes)
 
             win_dll = getattr(ctypes, "WinDLL", None)
             if win_dll is None:
                 return []
             rm = win_dll("Rstrtmgr")
-            rm.RmStartSession.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD, wintypes.LPWSTR]
-            rm.RmStartSession.restype = wintypes.DWORD
-            rm.RmRegisterResources.argtypes = [
-                wintypes.DWORD,
-                ctypes.c_uint,
-                ctypes.POINTER(wintypes.LPCWSTR),
-                ctypes.c_uint,
-                ctypes.c_void_p,
-                ctypes.c_uint,
-                ctypes.c_void_p,
-            ]
-            rm.RmRegisterResources.restype = wintypes.DWORD
-            rm.RmGetList.argtypes = [
-                wintypes.DWORD,
-                ctypes.POINTER(ctypes.c_uint),
-                ctypes.POINTER(ctypes.c_uint),
-                ctypes.POINTER(RM_PROCESS_INFO),
-                ctypes.POINTER(wintypes.DWORD),
-            ]
-            rm.RmGetList.restype = wintypes.DWORD
-            rm.RmEndSession.argtypes = [wintypes.DWORD]
-            rm.RmEndSession.restype = wintypes.DWORD
+            cls._configure_rm_dll(rm, wintypes, RM_PROCESS_INFO)
 
             session = wintypes.DWORD(0)
             session_key = ctypes.create_unicode_buffer(CCH_RM_SESSION_KEY + 1)
@@ -1950,46 +2012,7 @@ class Sqlite:
             if int(start_res) != 0:
                 return []
             try:
-                files = (wintypes.LPCWSTR * 1)(str(path))
-                reg_res = rm.RmRegisterResources(session, 1, files, 0, None, 0, None)
-                if int(reg_res) != 0:
-                    return []
-
-                needed = ctypes.c_uint(0)
-                count = ctypes.c_uint(0)
-                reasons = wintypes.DWORD(0)
-                get_res = rm.RmGetList(session, ctypes.byref(needed), ctypes.byref(count), None, ctypes.byref(reasons))
-                if int(get_res) not in (0, ERROR_MORE_DATA):
-                    return []
-                if int(needed.value) <= 0:
-                    return []
-
-                infos = (RM_PROCESS_INFO * int(needed.value))()
-                count = ctypes.c_uint(int(needed.value))
-                get_res = rm.RmGetList(
-                    session,
-                    ctypes.byref(needed),
-                    ctypes.byref(count),
-                    infos,
-                    ctypes.byref(reasons),
-                )
-                if int(get_res) != 0:
-                    return []
-
-                pids: list[int] = []
-                for i in range(int(count.value)):
-                    pid = int(getattr(infos[i].Process, "dwProcessId", 0) or 0)
-                    if pid > 0:
-                        pids.append(pid)
-                # Deduplicate while preserving order.
-                seen: set[int] = set()
-                out: list[int] = []
-                for pid in pids:
-                    if pid in seen:
-                        continue
-                    seen.add(pid)
-                    out.append(pid)
-                return out
+                return cls._rm_query_pids(rm, session, path, wintypes, RM_PROCESS_INFO)
             finally:
                 try:
                     rm.RmEndSession(session)

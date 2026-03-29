@@ -157,6 +157,26 @@ class PluginRegistry:
         """Get states for disabled plugins only."""
         return [s for s in self._plugin_states.values() if not s.enabled]
 
+    @staticmethod
+    def _normalize_state_data(name: str, state_data: dict[str, Any]) -> dict[str, Any]:
+        state_data = dict(state_data)
+        state_data.setdefault("name", name)
+        state_data.setdefault("version", "0.0.0")
+        return {
+            k: v
+            for k, v in state_data.items()
+            if k in PluginState.__dataclass_fields__
+        }
+
+    def _merge_imported_state(self, name: str, state_data: dict[str, Any]) -> None:
+        if name in self._plugin_states:
+            self._plugin_states[name].enabled = state_data.get("enabled", True)
+            return
+        self._plugin_states[name] = PluginState(**self._normalize_state_data(name, state_data))
+
+    def _replace_imported_state(self, name: str, state_data: dict[str, Any]) -> None:
+        self._plugin_states[name] = PluginState(**self._normalize_state_data(name, state_data))
+
     def _load_config(self) -> None:
         """Load configuration from disk."""
         try:
@@ -297,19 +317,10 @@ class PluginRegistry:
                     if not isinstance(state_data, dict):
                         logger.warning(f"Skipping invalid plugin state for '{name}'")
                         continue
-                    if name in self._plugin_states:
-                        existing = self._plugin_states[name]
-                        existing.enabled = state_data.get('enabled', True)
-                    else:
-                        try:
-                            state_data.setdefault('name', name)
-                            state_data.setdefault('version', '0.0.0')
-                            self._plugin_states[name] = PluginState(**{
-                                k: v for k, v in state_data.items()
-                                if k in PluginState.__dataclass_fields__
-                            })
-                        except Exception as e:
-                            logger.warning(f"Skipping malformed plugin state for '{name}': {e}")
+                    try:
+                        self._merge_imported_state(name, state_data)
+                    except Exception as e:
+                        logger.warning(f"Skipping malformed plugin state for '{name}': {e}")
             else:
                 self._plugin_states.clear()
                 for name, state_data in plugins_data.items():
@@ -317,12 +328,7 @@ class PluginRegistry:
                         logger.warning(f"Skipping invalid plugin state for '{name}'")
                         continue
                     try:
-                        state_data.setdefault('name', name)
-                        state_data.setdefault('version', '0.0.0')
-                        self._plugin_states[name] = PluginState(**{
-                            k: v for k, v in state_data.items()
-                            if k in PluginState.__dataclass_fields__
-                        })
+                        self._replace_imported_state(name, state_data)
                     except Exception as e:
                         logger.warning(f"Skipping malformed plugin state for '{name}': {e}")
 

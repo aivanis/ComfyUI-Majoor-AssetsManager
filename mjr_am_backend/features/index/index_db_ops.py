@@ -22,6 +22,52 @@ async def _asset_write_transaction(db: Any):
         yield tx_state
 
 
+def _build_asset_insert_params(
+    filename: str,
+    subfolder: str,
+    filepath: str,
+    source: str,
+    root_id: str | None,
+    kind: FileKind,
+    width: Any,
+    height: Any,
+    duration: Any,
+    size: int,
+    mtime: int,
+) -> tuple:
+    return (
+        filename,
+        subfolder,
+        filepath,
+        str(source or "output"),
+        str(root_id) if root_id else None,
+        kind,
+        Path(filename).suffix.lower(),
+        width,
+        height,
+        duration,
+        size,
+        mtime,
+    )
+
+
+async def _execute_asset_insert(db: Any, params: tuple) -> Result:
+    insert_result = await db.aexecute(
+        """
+        INSERT INTO assets
+        (filename, subfolder, filepath, source, root_id, kind, ext, width, height, duration, size, mtime)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        params,
+    )
+    if not insert_result.ok:
+        return Result.Err("INSERT_FAILED", insert_result.error or "Failed to insert asset")
+    asset_id = insert_result.data if insert_result.ok else None
+    if not asset_id:
+        return Result.Err("INSERT_FAILED", "Failed to get inserted asset ID")
+    return Result.Ok(asset_id)
+
+
 async def add_asset(
     scanner: Any,
     *,
@@ -47,34 +93,14 @@ async def add_asset(
         if not tx.ok:
             return Result.Err("INSERT_FAILED", tx.error or "Failed to begin transaction")
 
-        insert_result = await scanner.db.aexecute(
-            """
-            INSERT INTO assets
-            (filename, subfolder, filepath, source, root_id, kind, ext, width, height, duration, size, mtime)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                filename,
-                subfolder,
-                filepath,
-                str(source or "output"),
-                str(root_id) if root_id else None,
-                kind,
-                Path(filename).suffix.lower(),
-                width,
-                height,
-                duration,
-                size,
-                mtime,
-            ),
-        )
+        params = _build_asset_insert_params(filename, subfolder, filepath, source, root_id, kind, width, height, duration, size, mtime)
+        id_result = await _execute_asset_insert(scanner.db, params)
+        if not id_result.ok:
+            return id_result
 
-        if not insert_result.ok:
-            return Result.Err("INSERT_FAILED", insert_result.error or "Failed to insert asset")
-
-        asset_id = insert_result.data if insert_result.ok else None
-        if not asset_id:
-            return Result.Err("INSERT_FAILED", "Failed to get inserted asset ID")
+        asset_id = id_result.data
+        if asset_id is None:
+            return Result.Err("INSERT_FAILED", "Asset insert did not return an asset id")
         await write_asset_metadata_if_needed(
             scanner,
             asset_id=asset_id,

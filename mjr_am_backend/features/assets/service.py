@@ -71,6 +71,109 @@ class _RenameState:
     current_root_id: str
 
 
+def _result_error(result: Result[Any], default_code: str, default_error: str) -> Result[Any]:
+    return Result.Err(result.code or default_code, result.error or default_error)
+
+
+def _rename_state_from_row(row: Mapping[str, Any] | None) -> _RenameState:
+    row_dict = row if isinstance(row, Mapping) else {}
+    return _RenameState(
+        current_filepath=str(row_dict.get("filepath") or ""),
+        current_filename=str(row_dict.get("filename") or ""),
+        current_source=str(row_dict.get("source") or "").strip().lower(),
+        current_root_id=str(row_dict.get("root_id") or "").strip(),
+    )
+
+
+def _parse_asset_ids(raw_ids: list[Any]) -> Result[list[int]]:
+    asset_ids: list[int] = []
+    for raw in raw_ids:
+        try:
+            asset_ids.append(int(raw))
+        except (TypeError, ValueError):
+            return Result.Err("INVALID_INPUT", f"Invalid asset_id: {raw}")
+    if not asset_ids:
+        return Result.Err("INVALID_INPUT", "No valid asset IDs provided")
+    return Result.Ok(asset_ids)
+
+
+def _rename_lookup_details(
+    lookup_row: dict[str, Any] | None,
+    *,
+    current_filename: str,
+    current_source: str,
+    current_root_id: str,
+) -> tuple[int | None, str, str, str]:
+    lookup_dict = lookup_row if isinstance(lookup_row, dict) else {}
+    matched_asset_id: int | None = None
+    try:
+        raw_id = lookup_dict.get("id")
+        if raw_id is not None:
+            matched_asset_id = int(raw_id)
+    except Exception:
+        matched_asset_id = None
+    if not current_filename:
+        current_filename = str(lookup_dict.get("filename") or current_filename)
+    if not current_source:
+        current_source = str(lookup_dict.get("source") or "").strip().lower()
+    if not current_root_id:
+        current_root_id = str(lookup_dict.get("root_id") or "").strip()
+    return matched_asset_id, current_filename, current_source, current_root_id
+
+
+async def _load_services(
+    require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
+) -> Result[dict[str, Any]]:
+    services, error_result = await require_services()
+    if error_result:
+        return _result_error(error_result, "SERVICE_UNAVAILABLE", "Service unavailable")
+    if not isinstance(services, dict):
+        return Result.Err("SERVICE_UNAVAILABLE", "Service unavailable")
+    return Result.Ok(services)
+
+
+async def _check_operation_auth(
+    request: web.Request,
+    *,
+    operation: str,
+    services: dict[str, Any],
+    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+    require_operation_enabled: Callable[..., Result[Any]],
+    require_write_access: Callable[[web.Request], Result[Any]],
+) -> Result[None]:
+    prefs = await resolve_security_prefs(services)
+    op = require_operation_enabled(operation, prefs=prefs)
+    if not op.ok:
+        return _result_error(op, "FORBIDDEN", "Operation not allowed")
+    auth = require_write_access(request)
+    if not auth.ok:
+        return _result_error(auth, "FORBIDDEN", "Write access required")
+    return Result.Ok(None)
+
+
+async def _check_rate_limit_and_read_body(
+    request: web.Request,
+    *,
+    rate_limit_endpoint: str,
+    max_requests: int,
+    window_seconds: int,
+    check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
+    read_json: Callable[[web.Request], Awaitable[Result[dict[str, Any]]]],
+) -> Result[dict[str, Any]]:
+    allowed, retry_after = check_rate_limit(request, rate_limit_endpoint, max_requests, window_seconds)
+    if not allowed:
+        return Result.Err(
+            "RATE_LIMITED",
+            "Rate limit exceeded. Please wait before retrying.",
+            retry_after=retry_after,
+    )
+    body_res = await read_json(request)
+    if not body_res.ok:
+        return _result_error(body_res, "INVALID_INPUT", "Invalid request body")
+    body = body_res.data if isinstance(body_res.data, dict) else {}
+    return Result.Ok(body)
+
+
 async def prepare_asset_route_context(
     request: web.Request,
     *,
@@ -90,38 +193,55 @@ async def prepare_asset_route_context(
     if csrf:
         return Result.Err("CSRF", csrf)
 
-    services, error_result = await require_services()
-    if error_result:
-        return Result.Err(
-            error_result.code or "SERVICE_UNAVAILABLE",
-            error_result.error or "Service unavailable",
-        )
-    if not isinstance(services, dict):
-        return Result.Err("SERVICE_UNAVAILABLE", "Service unavailable")
+    svc_res = await _load_services(require_services)
+    if not svc_res.ok:
+        return _result_error(svc_res, "SERVICE_UNAVAILABLE", "Service unavailable")
+    services = svc_res.data or {}
 
-    prefs = await resolve_security_prefs(services)
-    op = require_operation_enabled(operation, prefs=prefs)
-    if not op.ok:
-        return Result.Err(op.code or "FORBIDDEN", op.error or "Operation not allowed")
+    auth_res = await _check_operation_auth(
+        request,
+        operation=operation,
+        services=services,
+        resolve_security_prefs=resolve_security_prefs,
+        require_operation_enabled=require_operation_enabled,
+        require_write_access=require_write_access,
+    )
+    if not auth_res.ok:
+        return _result_error(auth_res, "FORBIDDEN", "Forbidden")
 
-    auth = require_write_access(request)
-    if not auth.ok:
-        return Result.Err(auth.code or "FORBIDDEN", auth.error or "Write access required")
-
-    allowed, retry_after = check_rate_limit(request, rate_limit_endpoint, max_requests, window_seconds)
-    if not allowed:
-        return Result.Err(
-            "RATE_LIMITED",
-            "Rate limit exceeded. Please wait before retrying.",
-            retry_after=retry_after,
-        )
-
-    body_res = await read_json(request)
+    body_res = await _check_rate_limit_and_read_body(
+        request,
+        rate_limit_endpoint=rate_limit_endpoint,
+        max_requests=max_requests,
+        window_seconds=window_seconds,
+        check_rate_limit=check_rate_limit,
+        read_json=read_json,
+    )
     if not body_res.ok:
-        return Result.Err(body_res.code or "INVALID_INPUT", body_res.error or "Invalid request body")
+        return _result_error(body_res, "INVALID_INPUT", "Invalid request body")
 
-    body = body_res.data if isinstance(body_res.data, dict) else {}
-    return Result.Ok(AssetRouteContext(services=services, body=body))
+    return Result.Ok(AssetRouteContext(services=services, body=body_res.data or {}))
+
+
+async def _resolve_asset_id_and_path(
+    body: dict[str, Any],
+    *,
+    services: dict[str, Any],
+    normalize_path: Callable[[str], Path | None],
+    resolve_body_filepath: Callable[[dict[str, Any] | None], Path | None],
+    load_asset_filepath: Callable[[dict[str, Any], int], Awaitable[Result[str]]],
+) -> Result[tuple[int | None, Path | None]]:
+    raw_asset_id = body.get("asset_id")
+    if raw_asset_id is not None and str(raw_asset_id).strip() != "":
+        try:
+            asset_id = int(raw_asset_id)
+        except (TypeError, ValueError):
+            return Result.Err("INVALID_INPUT", "Invalid asset_id")
+        filepath_res = await load_asset_filepath(services, asset_id)
+        if not filepath_res.ok:
+            return Result.Err(filepath_res.code or "NOT_FOUND", filepath_res.error or "Asset path not available")
+        return Result.Ok((asset_id, normalize_path(str(filepath_res.data or ""))))
+    return Result.Ok((None, resolve_body_filepath(body)))
 
 
 async def prepare_asset_path_context(
@@ -157,26 +277,22 @@ async def prepare_asset_path_context(
         csrf_error=csrf_error,
     )
     if not context_res.ok:
-        return Result.Err(context_res.code or "INVALID_INPUT", context_res.error or "Invalid request")
+        return _result_error(context_res, "INVALID_INPUT", "Invalid request")
 
     context = context_res.data
     services = context.services if context else {}
     body = context.body if context else {}
 
-    raw_asset_id = body.get("asset_id")
-    asset_id: int | None
-    if raw_asset_id is not None and str(raw_asset_id).strip() != "":
-        try:
-            asset_id = int(raw_asset_id)
-        except (TypeError, ValueError):
-            return Result.Err("INVALID_INPUT", "Invalid asset_id")
-        filepath_res = await load_asset_filepath(services, asset_id)
-        if not filepath_res.ok:
-            return Result.Err(filepath_res.code or "NOT_FOUND", filepath_res.error or "Asset path not available")
-        candidate_path = normalize_path(str(filepath_res.data or ""))
-    else:
-        asset_id = None
-        candidate_path = resolve_body_filepath(body)
+    path_res = await _resolve_asset_id_and_path(
+        body,
+        services=services,
+        normalize_path=normalize_path,
+        resolve_body_filepath=resolve_body_filepath,
+        load_asset_filepath=load_asset_filepath,
+    )
+    if not path_res.ok:
+        return _result_error(path_res, "INVALID_INPUT", "Invalid request")
+    asset_id, candidate_path = path_res.data or (None, None)
 
     if candidate_path is None:
         return Result.Err("INVALID_INPUT", "Missing filepath or asset_id")
@@ -188,6 +304,34 @@ async def prepare_asset_path_context(
             candidate_path=candidate_path,
         )
     )
+
+
+def _validate_new_name(
+    body: dict[str, Any],
+    *,
+    max_name_length: int,
+    validate_filename: Callable[[str], tuple[bool, str]],
+) -> Result[str]:
+    raw_new_name = body.get("new_name")
+    if not raw_new_name:
+        return Result.Err("INVALID_INPUT", "Missing new_name")
+    new_name = str(raw_new_name).strip()
+    valid, message = validate_filename(new_name)
+    if not valid:
+        return Result.Err("INVALID_INPUT", message)
+    if len(new_name) > max_name_length:
+        return Result.Err("INVALID_INPUT", f"New name is too long (max {max_name_length} chars)")
+    return Result.Ok(new_name)
+
+
+def _parse_optional_asset_id(body: dict[str, Any]) -> Result[int | None]:
+    raw_asset_id = body.get("asset_id")
+    if raw_asset_id is not None and str(raw_asset_id).strip() != "":
+        try:
+            return Result.Ok(int(raw_asset_id))
+        except (TypeError, ValueError):
+            return Result.Err("INVALID_INPUT", "Invalid asset_id")
+    return Result.Ok(None)
 
 
 async def prepare_asset_rename_context(
@@ -218,38 +362,26 @@ async def prepare_asset_rename_context(
         csrf_error=csrf_error,
     )
     if not context_res.ok:
-        return Result.Err(context_res.code or "INVALID_INPUT", context_res.error or "Invalid request")
+        return _result_error(context_res, "INVALID_INPUT", "Invalid request")
 
     context = context_res.data
     services = context.services if context else {}
     body = context.body if context else {}
 
-    raw_new_name = body.get("new_name")
-    if not raw_new_name:
-        return Result.Err("INVALID_INPUT", "Missing new_name")
-    new_name = str(raw_new_name).strip()
-    valid, message = validate_filename(new_name)
-    if not valid:
-        return Result.Err("INVALID_INPUT", message)
-    if len(new_name) > max_name_length:
-        return Result.Err("INVALID_INPUT", f"New name is too long (max {max_name_length} chars)")
+    name_res = _validate_new_name(body, max_name_length=max_name_length, validate_filename=validate_filename)
+    if not name_res.ok:
+        return _result_error(name_res, "INVALID_INPUT", "Invalid name")
 
-    raw_asset_id = body.get("asset_id")
-    asset_id: int | None
-    if raw_asset_id is not None and str(raw_asset_id).strip() != "":
-        try:
-            asset_id = int(raw_asset_id)
-        except (TypeError, ValueError):
-            return Result.Err("INVALID_INPUT", "Invalid asset_id")
-    else:
-        asset_id = None
+    id_res = _parse_optional_asset_id(body)
+    if not id_res.ok:
+        return _result_error(id_res, "INVALID_INPUT", "Invalid asset_id")
 
     return Result.Ok(
         AssetRenameContext(
             services=services,
             body=body,
-            asset_id=asset_id,
-            new_name=new_name,
+            asset_id=id_res.data,
+            new_name=name_res.data or "",
         )
     )
 
@@ -285,7 +417,7 @@ async def prepare_asset_ids_context(
         csrf_error=csrf_error,
     )
     if not context_res.ok:
-        return Result.Err(context_res.code or "INVALID_INPUT", context_res.error or "Invalid request")
+        return _result_error(context_res, "INVALID_INPUT", "Invalid request")
 
     context = context_res.data
     services = context.services if context else {}
@@ -294,17 +426,11 @@ async def prepare_asset_ids_context(
     if not raw_ids or not isinstance(raw_ids, list):
         return Result.Err("INVALID_INPUT", "Missing or invalid 'ids' array")
 
-    asset_ids: list[int] = []
-    for raw in raw_ids:
-        try:
-            asset_ids.append(int(raw))
-        except (TypeError, ValueError):
-            return Result.Err("INVALID_INPUT", f"Invalid asset_id: {raw}")
+    asset_ids_res = _parse_asset_ids(raw_ids)
+    if not asset_ids_res.ok:
+        return _result_error(asset_ids_res, "INVALID_INPUT", "Invalid asset IDs")
 
-    if not asset_ids:
-        return Result.Err("INVALID_INPUT", "No valid asset IDs provided")
-
-    return Result.Ok(AssetIdsContext(services=services, body=body, asset_ids=asset_ids))
+    return Result.Ok(AssetIdsContext(services=services, body=body, asset_ids=asset_ids_res.data or []))
 
 
 async def resolve_delete_target(
@@ -361,16 +487,8 @@ async def _load_initial_rename_state(
     if context.asset_id is not None:
         row_res = await load_asset_row_by_id(context.services, context.asset_id)
         if not row_res.ok:
-            return Result.Err(row_res.code or "NOT_FOUND", row_res.error or "Asset not found")
-        row = row_res.data or {}
-        return Result.Ok(
-            _RenameState(
-                current_filepath=str(row.get("filepath") or ""),
-                current_filename=str(row.get("filename") or ""),
-                current_source=str(row.get("source") or "").strip().lower(),
-                current_root_id=str(row.get("root_id") or "").strip(),
-            )
-        )
+            return _result_error(row_res, "NOT_FOUND", "Asset not found")
+        return Result.Ok(_rename_state_from_row(row_res.data))
 
     fp = resolve_body_filepath(context.body)
     current_filepath = str(fp) if fp else ""
@@ -404,20 +522,35 @@ async def _resolve_rename_lookup_overrides(
             return Result.Err("TIMEOUT", "Asset lookup timed out")
         return Result.Err("DB_ERROR", f"Failed to resolve asset id: {exc}")
 
-    lookup_dict = lookup_row if isinstance(lookup_row, dict) else {}
+    return Result.Ok(
+        _rename_lookup_details(
+            lookup_row,
+            current_filename=current_filename,
+            current_source=current_source,
+            current_root_id=current_root_id,
+        )
+    )
+
+
+def _resolve_existing_rename_path(
+    current_filepath: str,
+    *,
+    normalize_path: Callable[[str], Path | None],
+    is_resolved_path_allowed: Callable[[Path], bool],
+) -> Result[Path]:
+    current_path = normalize_path(current_filepath)
+    if not current_path:
+        return Result.Err("INVALID_INPUT", "Invalid current asset path")
+
     try:
-        raw_id = lookup_dict.get("id")
-        if raw_id is not None:
-            matched_asset_id = int(raw_id)
+        current_resolved = current_path.resolve(strict=True)
     except Exception:
-        matched_asset_id = None
-    if not current_filename:
-        current_filename = str(lookup_dict.get("filename") or current_filename)
-    if not current_source:
-        current_source = str(lookup_dict.get("source") or "").strip().lower()
-    if not current_root_id:
-        current_root_id = str(lookup_dict.get("root_id") or "").strip()
-    return Result.Ok((matched_asset_id, current_filename, current_source, current_root_id))
+        return Result.Err("NOT_FOUND", "Current file does not exist")
+    if not is_resolved_path_allowed(current_resolved):
+        return Result.Err("FORBIDDEN", "Path is not within allowed roots")
+    if not current_resolved.exists() or not current_resolved.is_file():
+        return Result.Err("NOT_FOUND", "Current file does not exist")
+    return Result.Ok(current_resolved)
 
 
 async def resolve_rename_target(
@@ -437,7 +570,7 @@ async def resolve_rename_target(
         load_asset_row_by_id=load_asset_row_by_id,
     )
     if not state_res.ok:
-        return Result.Err(state_res.code or "NOT_FOUND", state_res.error or "Asset not found")
+        return _result_error(state_res, "NOT_FOUND", "Asset not found")
     state = state_res.data or _RenameState("", "", "", "")
     current_filepath = state.current_filepath
     current_filename = state.current_filename
@@ -446,17 +579,15 @@ async def resolve_rename_target(
     if not current_filepath:
         return Result.Err("INVALID_INPUT", "Missing filepath or asset_id")
 
-    current_path = normalize_path(current_filepath)
-    if not current_path:
-        return Result.Err("INVALID_INPUT", "Invalid current asset path")
-
-    try:
-        current_resolved = current_path.resolve(strict=True)
-    except Exception:
-        return Result.Err("NOT_FOUND", "Current file does not exist")
-    if not is_resolved_path_allowed(current_resolved):
-        return Result.Err("FORBIDDEN", "Path is not within allowed roots")
-    if not current_resolved.exists() or not current_resolved.is_file():
+    current_resolved_res = _resolve_existing_rename_path(
+        current_filepath,
+        normalize_path=normalize_path,
+        is_resolved_path_allowed=is_resolved_path_allowed,
+    )
+    if not current_resolved_res.ok:
+        return _result_error(current_resolved_res, "NOT_FOUND", "Current file does not exist")
+    current_resolved = current_resolved_res.data
+    if current_resolved is None:
         return Result.Err("NOT_FOUND", "Current file does not exist")
 
     current_resolved_str = str(current_resolved)
@@ -472,7 +603,7 @@ async def resolve_rename_target(
         find_asset_row_by_filepath=find_asset_row_by_filepath,
     )
     if not lookup_res.ok:
-        return Result.Err(lookup_res.code or "DB_ERROR", lookup_res.error or "Failed to resolve asset id")
+        return _result_error(lookup_res, "DB_ERROR", "Failed to resolve asset id")
     matched_asset_id, current_filename, current_source, current_root_id = lookup_res.data or (
         context.asset_id,
         current_filename,

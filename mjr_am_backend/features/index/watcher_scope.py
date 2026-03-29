@@ -65,6 +65,31 @@ def _read_candidate_keys(key: str, *, user_id: str | None = None) -> tuple[str, 
     return (scoped_key, key)
 
 
+def _scope_result(scope_mapping: Mapping) -> dict[str, str]:
+    scope = normalize_scope(scope_mapping.get("scope"))
+    custom_root_id = str(scope_mapping.get("custom_root_id") or "").strip()
+    return {"scope": scope, "custom_root_id": custom_root_id if scope == "custom" else ""}
+
+
+def _resolve_user_scope(
+    services: Mapping[str, object],
+    effective_user_id: str,
+) -> dict[str, str] | None:
+    scope_map = services.get("watcher_scope_by_user")
+    if not isinstance(scope_map, Mapping):
+        return None
+    user_scope = scope_map.get(effective_user_id)
+    if not isinstance(user_scope, Mapping):
+        return None
+    if "scope" not in user_scope:
+        logger.warning(
+            "watcher_scope_by_user entry for user %r is missing 'scope' key; "
+            "defaulting to 'output'",
+            effective_user_id,
+        )
+    return _scope_result(user_scope)
+
+
 def resolve_service_watcher_scope(
     services: Mapping[str, object] | None,
     *,
@@ -72,31 +97,13 @@ def resolve_service_watcher_scope(
 ) -> dict[str, str]:
     effective_user_id = _effective_user_id(user_id)
     if effective_user_id and isinstance(services, Mapping):
-        scope_map = services.get("watcher_scope_by_user")
-        if isinstance(scope_map, Mapping):
-            user_scope = scope_map.get(effective_user_id)
-            if isinstance(user_scope, Mapping):
-                if "scope" not in user_scope:
-                    logger.warning(
-                        "watcher_scope_by_user entry for user %r is missing 'scope' key; "
-                        "defaulting to 'output'",
-                        effective_user_id,
-                    )
-                scope = normalize_scope(user_scope.get("scope"))
-                custom_root_id = str(user_scope.get("custom_root_id") or "").strip()
-                return {
-                    "scope": scope,
-                    "custom_root_id": custom_root_id if scope == "custom" else "",
-                }
+        user_result = _resolve_user_scope(services, effective_user_id)
+        if user_result is not None:
+            return user_result
 
     scope_cfg = services.get("watcher_scope") if isinstance(services, Mapping) else None
     if isinstance(scope_cfg, Mapping):
-        scope = normalize_scope(scope_cfg.get("scope"))
-        custom_root_id = str(scope_cfg.get("custom_root_id") or "").strip()
-        return {
-            "scope": scope,
-            "custom_root_id": custom_root_id if scope == "custom" else "",
-        }
+        return _scope_result(scope_cfg)
     return {"scope": "output", "custom_root_id": ""}
 
 

@@ -287,32 +287,39 @@ class StacksService:
 
     # ── Auto-stacking ────────────────────────────────────────────────────
 
+    async def _query_pending_job_ids_res(self, exact_job_id: str) -> Result[list[dict[str, Any]]]:
+        if exact_job_id:
+            return await self.db.aquery(
+                "SELECT DISTINCT job_id FROM assets "
+                "WHERE job_id = ? AND stack_id IS NULL",
+                (exact_job_id,),
+            )
+        return await self.db.aquery(
+            "SELECT DISTINCT job_id FROM assets "
+            "WHERE job_id IS NOT NULL AND job_id != '' AND stack_id IS NULL"
+        )
+
+    @staticmethod
+    def _collect_job_ids(rows: list | None) -> list[str]:
+        job_ids: list[str] = []
+        for row in rows or []:
+            current_job_id = str(row.get("job_id") or "").strip()
+            if current_job_id:
+                job_ids.append(current_job_id)
+        return job_ids
+
     async def auto_stack_by_job_id(self, job_id: str | None = None) -> Result[dict[str, Any]]:
         """Scan for assets with a job_id but no stack_id, and group them.
 
         When *job_id* is provided, only that exact execution job is finalized.
         """
-        job_ids: list[str] = []
         exact_job_id = str(job_id or "").strip()
 
-        if exact_job_id:
-            res = await self.db.aquery(
-                "SELECT DISTINCT job_id FROM assets "
-                "WHERE job_id = ? AND stack_id IS NULL",
-                (exact_job_id,),
-            )
-        else:
-            res = await self.db.aquery(
-                "SELECT DISTINCT job_id FROM assets "
-                "WHERE job_id IS NOT NULL AND job_id != '' AND stack_id IS NULL"
-            )
+        res = await self._query_pending_job_ids_res(exact_job_id)
         if not res.ok:
             return Result.Err("DB_ERROR", res.error or "Failed to query pending stacks")
 
-        for row in res.data or []:
-            current_job_id = str(row.get("job_id") or "").strip()
-            if current_job_id:
-                job_ids.append(current_job_id)
+        job_ids = self._collect_job_ids(res.data)
 
         created = 0
         finalized: list[dict[str, Any]] = []
