@@ -11,15 +11,26 @@ let _loaded = false;
 let _messages = [];
 const BUILTIN_PANEL_MESSAGES = Object.freeze([
     {
-        id: "whats-new-2026-03-17-version-2-4-2",
-        title: "New Version 2.4.2",
-        titleKey: "msg.whatsNew.title.version242",
+        id: "whats-new-2026-03-29-version-2-4-3",
+        title: "New Version 2.4.3",
+        titleKey: "msg.whatsNew.title.version243",
         category: "Release",
         categoryKey: "msg.category.release",
         level: "success",
-        createdAt: Date.parse("2026-03-17T09:00:00Z"),
-        body: "Version 2.4.2 released: 3D model viewing support with thumbnail rendering, toast history tab in message popover, enhanced floating viewer with Picture-in-Picture pop-out. Fixed timeout leaks, optimized drag interactions, improved plugin hot-reload safety. See CHANGELOG for details.",
-        bodyKey: "msg.whatsNew.body.version242",
+        createdAt: Date.parse("2026-03-29T09:00:00Z"),
+        body: "Version 2.4.3 released: Improved assets metadata parsing, Grid Compare capability in floating viewer up to 4 Assets, ping pong loop in main Viewer player, job id and stack id in DB for better assets management, stack assets generated from same workflow job with same job ID, generated feed feature, lite version of grid in bottom tab. Code refactor for maintainability and various bug fixes. See CHANGELOG for details.",
+        bodyKey: "msg.whatsNew.body.version243",
+    },
+    {
+        id: "whats-new-2026-03-29-version-2-4-3",
+        title: "New Version 2.4.3",
+        titleKey: "msg.whatsNew.title.version243",
+        category: "Release",
+        categoryKey: "msg.category.release",
+        level: "success",
+        createdAt: Date.parse("2026-03-29T09:00:00Z"),
+        body: "Version 2.4.3 released: Improved assets metadata parsing, Grid Compare capability in floating viewer up to 4 Assets, ping pong loop in main Viewer player, job id and stack id in DB for better assets management, stack assets generated from same workflow job with same job ID, generated feed feature, lite version of grid in bottom tab. Code refactor for maintainability and various bug fixes. See CHANGELOG for details.",
+        bodyKey: "msg.whatsNew.body.version243",
     },
     {
         id: "whats-new-2026-03-09-version-2-4-1",

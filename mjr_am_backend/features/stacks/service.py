@@ -253,38 +253,33 @@ class StacksService:
 
     async def auto_select_cover(self, stack_id: int) -> Result[int | None]:
         """Pick the best cover asset for a stack (largest image, or last file)."""
-        res = await self.db.aquery(
+        preferred_queries = (
             "SELECT id FROM assets "
             "WHERE stack_id = ? AND kind = 'image' "
             "ORDER BY size DESC, mtime DESC LIMIT 1",
-            (stack_id,),
-        )
-        if res.ok and res.data:
-            cover_id = int(res.data[0]["id"])
-            set_cover_res = await self.set_cover(stack_id, cover_id)
-            if not set_cover_res.ok:
-                return Result.Err(
-                    set_cover_res.code or "DB_ERROR",
-                    set_cover_res.error or "Failed to set cover",
-                )
-            return Result.Ok(cover_id)
-
-        # Fallback: last created file of any kind
-        res = await self.db.aquery(
             "SELECT id FROM assets WHERE stack_id = ? ORDER BY mtime DESC LIMIT 1",
-            (stack_id,),
         )
-        if res.ok and res.data:
-            cover_id = int(res.data[0]["id"])
-            set_cover_res = await self.set_cover(stack_id, cover_id)
-            if not set_cover_res.ok:
-                return Result.Err(
-                    set_cover_res.code or "DB_ERROR",
-                    set_cover_res.error or "Failed to set cover",
-                )
-            return Result.Ok(cover_id)
-
+        for query in preferred_queries:
+            selected_cover = await self._select_cover_candidate(stack_id, query)
+            if selected_cover.ok and selected_cover.data is not None:
+                return selected_cover
+            if not selected_cover.ok:
+                return selected_cover
         return Result.Ok(None)
+
+    async def _select_cover_candidate(self, stack_id: int, query: str) -> Result[int | None]:
+        res = await self.db.aquery(query, (stack_id,))
+        if not res.ok or not res.data:
+            return Result.Ok(None)
+
+        cover_id = int(res.data[0]["id"])
+        set_cover_res = await self.set_cover(stack_id, cover_id)
+        if not set_cover_res.ok:
+            return Result.Err(
+                set_cover_res.code or "DB_ERROR",
+                set_cover_res.error or "Failed to set cover",
+            )
+        return Result.Ok(cover_id)
 
     # ── Dissolve / merge ─────────────────────────────────────────────────
 

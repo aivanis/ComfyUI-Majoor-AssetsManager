@@ -145,18 +145,56 @@ def _resolve_stack_assignment(existing_stack_id: Any, candidate_stack_id: Any) -
     return _normalize_stack_id(existing_stack_id)
 
 
+def _normalize_job_ids_for_finalization(
+    job_ids: set[str] | list[str] | tuple[str, ...],
+) -> list[str]:
+    return [
+        job_id
+        for job_id in dict.fromkeys(_normalize_job_id(item) for item in (job_ids or []))
+        if job_id
+    ]
+
+
+def _resolve_finalization_db(services: dict[str, Any]) -> Any | None:
+    if not isinstance(services, dict):
+        return None
+    return services.get("db")
+
+
+def _extend_finalized_stacks(finalized: list[dict[str, Any]], result: Result[Any]) -> bool:
+    if not result.ok or not isinstance(result.data, dict):
+        return False
+    stacks = result.data.get("stacks") or []
+    if not isinstance(stacks, list):
+        return False
+    finalized.extend(item for item in stacks if isinstance(item, dict))
+    return True
+
+
+def _emit_finalized_stacks_event(normalized_job_ids: list[str], finalized: list[dict[str, Any]]) -> None:
+    if not finalized:
+        return
+    _send_prompt_event(
+        "mjr.stacks.updated",
+        sanitize_for_json(
+            {
+                "targeted_job_id": normalized_job_ids[0] if len(normalized_job_ids) == 1 else None,
+                "stacks": finalized,
+            }
+        ),
+    )
+
+
 async def _finalize_indexed_execution_stacks(
     services: dict[str, Any],
     job_ids: set[str] | list[str] | tuple[str, ...],
 ) -> None:
     if not is_execution_grouping_enabled():
         return
-    normalized_job_ids = [
-        job_id for job_id in dict.fromkeys(_normalize_job_id(item) for item in (job_ids or [])) if job_id
-    ]
+    normalized_job_ids = _normalize_job_ids_for_finalization(job_ids)
     if not normalized_job_ids:
         return
-    db = services.get("db") if isinstance(services, dict) else None
+    db = _resolve_finalization_db(services)
     if db is None:
         return
     try:
@@ -166,22 +204,9 @@ async def _finalize_indexed_execution_stacks(
         finalized: list[dict[str, Any]] = []
         for job_id in normalized_job_ids:
             result = await stack_service.auto_stack_by_job_id(job_id)
-            if not result.ok or not isinstance(result.data, dict):
+            if not _extend_finalized_stacks(finalized, result):
                 logger.debug("Late stack finalization skipped for job_id=%s: %s", job_id, result.error)
-                continue
-            stacks = result.data.get("stacks") or []
-            if isinstance(stacks, list):
-                finalized.extend(item for item in stacks if isinstance(item, dict))
-        if finalized:
-            _send_prompt_event(
-                "mjr.stacks.updated",
-                sanitize_for_json(
-                    {
-                        "targeted_job_id": normalized_job_ids[0] if len(normalized_job_ids) == 1 else None,
-                        "stacks": finalized,
-                    }
-                ),
-            )
+        _emit_finalized_stacks_event(normalized_job_ids, finalized)
     except Exception as exc:
         logger.debug("Failed to finalize indexed execution stacks: %s", exc)
 

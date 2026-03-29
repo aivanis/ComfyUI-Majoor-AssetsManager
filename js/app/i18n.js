@@ -583,9 +583,9 @@ const DICTIONARY = {
         "msg.shortcuts.section.mfv": "Floating Viewer",
         "msg.shortcuts.section.video": "Video Playback",
         "msg.category.release": "Release",
-        "msg.whatsNew.title.version242": "New Version 2.4.2",
-        "msg.whatsNew.body.version242":
-            "Version 2.4.2 released: 3D model viewing support with thumbnail rendering, toast history tab in message popover, enhanced floating viewer with Picture-in-Picture pop-out. Fixed timeout leaks, optimized drag interactions, improved plugin hot-reload safety. See CHANGELOG for details.",
+        "msg.whatsNew.title.version243": "New Version 2.4.3",
+        "msg.whatsNew.body.version243":
+            "Version 2.4.3 released: Improved assets metadata parsing, Grid Compare capability in floating viewer up to 4 Assets, ping pong loop in main Viewer player, job id and stack id in DB for better assets management, stack assets generated from same workflow job with same job ID, generated feed feature, lite version of grid in bottom tab. Code refactor for maintainability and various bug fixes. See CHANGELOG for details.",
         "msg.whatsNew.title.version241": "New Version 2.4.1",
         "msg.whatsNew.body.version241":
             "Version 2.4.1 released: CLIP-based semantic search with AI toggle, rgthree/easy node support, shortcut guide tab, upscaler model extraction. Fixed MFV memory leaks, workflow filters, SQL placeholders. Enhanced geninfo extraction, tag handling, calendar. See CHANGELOG for details.",
@@ -1071,9 +1071,9 @@ const DICTIONARY = {
         "msg.shortcuts.section.mfv": "Floating Viewer",
         "msg.shortcuts.section.video": "Lecture video",
         "msg.category.release": "Version",
-        "msg.whatsNew.title.version242": "Nouvelle Version 2.4.2",
-        "msg.whatsNew.body.version242":
-            "Version 2.4.2 publiee : support affichage modeles 3D avec rendu vignettes, onglet historique toast dans message popover, floating viewer ameliore avec Picture-in-Picture pop-out. Correction fuites timeout, optimisation interactions drag, securite plugin hot-reload amelioree. Voir CHANGELOG pour details.",
+        "msg.whatsNew.title.version243": "Nouvelle Version 2.4.3",
+        "msg.whatsNew.body.version243":
+            "Version 2.4.3 publiee : analyse des metadonnees des assets amelioree, capacite Grid Compare dans le floating viewer jusqu'a 4 Assets, boucle ping pong dans le Viewer principal, job id et stack id dans la BDD pour une meilleure gestion des assets, empilement des assets generes depuis le meme workflow avec le meme job ID, fonctionnalite de feed genere, version legere de la grille dans l'onglet bottom. Refactorisation du code pour la maintenabilite et divers correctifs de bugs. Voir CHANGELOG pour details.",
         "msg.whatsNew.title.version241": "Nouvelle Version 2.4.1",
         "msg.whatsNew.body.version241":
             "Version 2.4.1 publiee : recherche semantique CLIP avec AI toggle, support rgthree/easy node, onglet shortcut guide, extraction de modele upscaler. Correction de fuites memoire MFV, filtres workflow, SQL placeholders. Amelioration extraction geninfo, gestion tags, calendrier. Voir CHANGELOG pour details.",
