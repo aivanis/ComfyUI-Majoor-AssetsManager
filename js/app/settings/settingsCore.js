@@ -37,6 +37,7 @@ export const DEFAULT_SETTINGS = {
         showDate: APP_DEFAULTS.GRID_SHOW_DETAILS_DATE,
         showDimensions: APP_DEFAULTS.GRID_SHOW_DETAILS_DIMENSIONS,
         showGenTime: APP_DEFAULTS.GRID_SHOW_DETAILS_GENTIME,
+        showHoverInfo: APP_DEFAULTS.GRID_SHOW_HOVER_INFO,
         showWorkflowDot: APP_DEFAULTS.GRID_SHOW_WORKFLOW_DOT,
         videoAutoplayMode: APP_DEFAULTS.GRID_VIDEO_AUTOPLAY_MODE,
         starColor: APP_DEFAULTS.BADGE_STAR_COLOR,
@@ -336,6 +337,9 @@ export const applySettingsToConfig = (settings) => {
     );
     APP_CONFIG.GRID_SHOW_DETAILS_GENTIME = !!(
         settings.grid?.showGenTime ?? APP_DEFAULTS.GRID_SHOW_DETAILS_GENTIME
+    );
+    APP_CONFIG.GRID_SHOW_HOVER_INFO = !!(
+        settings.grid?.showHoverInfo ?? APP_DEFAULTS.GRID_SHOW_HOVER_INFO
     );
     APP_CONFIG.GRID_SHOW_WORKFLOW_DOT = !!(
         settings.grid?.showWorkflowDot ?? APP_DEFAULTS.GRID_SHOW_WORKFLOW_DOT

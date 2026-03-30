@@ -488,6 +488,7 @@ function _applyFeedSettingsClasses(grid) {
     toggle("mjr-feed-show-dimensions", APP_CONFIG.FEED_SHOW_DIMENSIONS);
     toggle("mjr-feed-show-date", APP_CONFIG.FEED_SHOW_DATE);
     toggle("mjr-feed-show-gentime", APP_CONFIG.FEED_SHOW_GENTIME);
+    toggle("mjr-show-hover-info", APP_CONFIG.GRID_SHOW_HOVER_INFO);
     toggle("mjr-feed-show-dot", APP_CONFIG.FEED_SHOW_WORKFLOW_DOT);
     toggle("mjr-feed-show-badges-ext", APP_CONFIG.FEED_SHOW_BADGES_EXTENSION);
     toggle("mjr-feed-show-badges-rating", APP_CONFIG.FEED_SHOW_BADGES_RATING);

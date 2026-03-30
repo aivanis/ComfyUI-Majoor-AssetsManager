@@ -1684,11 +1684,7 @@ export async function updateStatus(
                         `${totalAssets.toLocaleString()} assets indexed (${scopeLabel})`,
                         { count: totalAssets.toLocaleString(), scope: scopeLabel },
                     ),
-                    t(
-                        "status.imagesVideos",
-                        `Images: ${counters.images || 0}  -  Videos: ${counters.videos || 0}`,
-                        { images: counters.images || 0, videos: counters.videos || 0 },
-                    ),
+                    _buildKindCountsLine(counters),
                     t(
                         "status.withWorkflows",
                         `With workflows: ${withWorkflows}  -  Generation data: ${withGenerationData}`,
@@ -1851,6 +1847,16 @@ function _statusHasActiveWork(counters) {
     return values.some((value) => Number(value) > 0);
 }
 
+function _buildKindCountsLine(counters) {
+    const parts = [];
+    if (counters.images) parts.push(`Images: ${counters.images}`);
+    if (counters.videos) parts.push(`Videos: ${counters.videos}`);
+    if (counters.audio) parts.push(`Audio: ${counters.audio}`);
+    const model3d = counters.model3d || counters.by_kind?.model3d || 0;
+    if (model3d) parts.push(`3D: ${model3d}`);
+    return parts.length ? parts.join("  -  ") : `Images: 0  -  Videos: 0`;
+}
+
 function _buildStatusSignature(counters) {
     if (!counters || typeof counters !== "object") return "";
     const pick = (value) => {
@@ -1867,6 +1873,8 @@ function _buildStatusSignature(counters) {
         enrichment_queue_length: pick(counters.enrichment_queue_length),
         images: pick(counters.images),
         videos: pick(counters.videos),
+        audio: pick(counters.audio),
+        model3d: pick(counters.model3d ?? counters.by_kind?.model3d),
         watcher: {
             enabled: pick(counters?.watcher?.enabled),
             scope: pick(counters?.watcher?.scope),

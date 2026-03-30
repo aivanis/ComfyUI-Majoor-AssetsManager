@@ -52,6 +52,34 @@ def hydrate_search_rows(rows: list[dict[str, Any]], *, include_highlight: bool) 
     return [hydrate_search_row(row, include_highlight=include_highlight) for row in rows]
 
 
+def _resolve_positive_prompt(metadata_obj: dict[str, Any]) -> str:
+    """Pick positive prompt text from metadata_raw, trying both storage formats."""
+    raw_pp = metadata_obj.get("positive_prompt")
+    if not raw_pp:
+        geninfo = metadata_obj.get("geninfo") or {}
+        raw_pp = (geninfo.get("positive") or {}).get("value")
+    return raw_pp[:250] if raw_pp and isinstance(raw_pp, str) else ""
+
+
+def _apply_metadata_obj_fields(asset: dict[str, Any], metadata_obj: dict[str, Any]) -> None:
+    """Backfill asset fields from the parsed metadata_raw dict."""
+    if asset.get("generation_time_ms") in (None, "", 0):
+        raw_generation_time = metadata_obj.get("generation_time_ms")
+        try:
+            if raw_generation_time is not None and raw_generation_time != "":
+                asset["generation_time_ms"] = int(raw_generation_time)
+        except (TypeError, ValueError):
+            pass
+    asset.setdefault("prompt", metadata_obj.get("prompt"))
+    asset.setdefault("workflow", metadata_obj.get("workflow"))
+    asset.setdefault("exif", metadata_obj.get("exif") or metadata_obj.get("raw"))
+    asset.setdefault("geninfo", metadata_obj.get("geninfo"))
+    if not asset.get("positive_prompt"):
+        resolved = _resolve_positive_prompt(metadata_obj)
+        if resolved:
+            asset["positive_prompt"] = resolved
+
+
 def hydrate_asset_payload(asset: dict[str, Any]) -> dict[str, Any]:
     asset["tags"] = _json_list_field(asset.get("tags") or "")
     asset["auto_tags"] = _json_list_field(asset.get("auto_tags") or "")
@@ -59,15 +87,5 @@ def hydrate_asset_payload(asset: dict[str, Any]) -> dict[str, Any]:
     metadata_obj = _json_object_field(asset.get("metadata_raw") or "{}")
     asset["metadata_raw"] = metadata_obj
     if isinstance(metadata_obj, dict):
-        if asset.get("generation_time_ms") in (None, "", 0):
-            raw_generation_time = metadata_obj.get("generation_time_ms")
-            try:
-                if raw_generation_time is not None and raw_generation_time != "":
-                    asset["generation_time_ms"] = int(raw_generation_time)
-            except (TypeError, ValueError):
-                pass
-        asset.setdefault("prompt", metadata_obj.get("prompt"))
-        asset.setdefault("workflow", metadata_obj.get("workflow"))
-        asset.setdefault("exif", metadata_obj.get("exif") or metadata_obj.get("raw"))
-        asset.setdefault("geninfo", metadata_obj.get("geninfo"))
+        _apply_metadata_obj_fields(asset, metadata_obj)
     return asset

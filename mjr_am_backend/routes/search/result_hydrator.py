@@ -92,6 +92,17 @@ async def query_browser_rows(db: Any, filepaths: list[str]) -> list[dict] | None
                     json_extract(m.metadata_raw, '$.engine.type'),
                     ''
                 )) AS workflow_type,
+                CASE WHEN json_valid(COALESCE(m.metadata_raw, ''))
+                    THEN SUBSTR(COALESCE(
+                        NULLIF(TRIM(COALESCE(json_extract(m.metadata_raw, '$.positive_prompt'), '')), ''),
+                        NULLIF(TRIM(COALESCE(json_extract(m.metadata_raw, '$.geninfo.positive.value'), '')), '')
+                    ), 1, 250)
+                    ELSE NULL
+                END AS positive_prompt,
+                CASE WHEN json_valid(COALESCE(m.metadata_raw, ''))
+                    THEN json_extract(m.metadata_raw, '$.generation_time_ms')
+                    ELSE NULL
+                END AS generation_time_ms,
                 CASE
                     WHEN LENGTH(TRIM(COALESCE(a.enhanced_caption, ''))) > 0 THEN 1
                     ELSE 0

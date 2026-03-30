@@ -169,6 +169,22 @@ export function registerGridSettings(safeAddSetting, settings, notifyApplied) {
     });
 
     safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Grid.ShowHoverInfo`,
+        category: cardCat("Show prompt on hover"),
+        name: "Show prompt on hover",
+        tooltip:
+            "Show positive prompt and generation time as a tooltip overlay when hovering over a card thumbnail. Does not block video play-on-hover.",
+        type: "boolean",
+        defaultValue: !!(settings.grid?.showHoverInfo ?? APP_DEFAULTS.GRID_SHOW_HOVER_INFO),
+        onChange: (value) => {
+            settings.grid.showHoverInfo = !!value;
+            saveMajoorSettings(settings);
+            applySettingsToConfig(settings);
+            notifyApplied("grid.showHoverInfo");
+        },
+    });
+
+    safeAddSetting({
         id: `${SETTINGS_PREFIX}.Grid.ShowWorkflowDot`,
         category: cardCat("Show workflow dot"),
         name: "Show workflow indicator",

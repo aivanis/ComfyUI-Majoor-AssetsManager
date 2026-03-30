@@ -408,6 +408,7 @@ function _updateGridSettingsClasses(container) {
     toggle("mjr-show-dimensions", APP_CONFIG.GRID_SHOW_DETAILS_DIMENSIONS);
     toggle("mjr-show-date", APP_CONFIG.GRID_SHOW_DETAILS_DATE);
     toggle("mjr-show-gentime", APP_CONFIG.GRID_SHOW_DETAILS_GENTIME);
+    toggle("mjr-show-hover-info", APP_CONFIG.GRID_SHOW_HOVER_INFO);
     // toggle("mjr-show-time", APP_CONFIG.GRID_SHOW_DETAILS_TIME); // If we add explicit time setting
     toggle("mjr-show-dot", APP_CONFIG.GRID_SHOW_WORKFLOW_DOT);
 

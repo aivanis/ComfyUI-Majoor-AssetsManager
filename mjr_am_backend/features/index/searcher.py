@@ -184,20 +184,45 @@ def _append_numeric_range_filters(filters: dict[str, Any], alias: str, clauses: 
             params.append(int(filters[key]))
 
 
-def _safe_metadata_json_extract(path: str) -> str:
+def _safe_metadata_json_extract(path: str, max_len: int | None = None) -> str:
     """Guard json_extract against malformed metadata_raw payloads.
 
     Some databases contain legacy rows where metadata_raw is not valid JSON.
     Direct json_extract(...) on those rows raises a SQLite error and breaks the
     whole query; CASE+json_valid keeps filtering resilient.
+
+    Pass max_len to truncate the extracted value (useful for long text fields
+    like positive_prompt to keep result rows compact).
     """
     safe_path = str(path or "")
+    extract = f"json_extract(m.metadata_raw, '{safe_path}')"
+    if max_len is not None and int(max_len) > 0:
+        extract = f"SUBSTR({extract}, 1, {int(max_len)})"
     return (
         "CASE "
         "WHEN json_valid(COALESCE(m.metadata_raw, '')) "
-        f"THEN json_extract(m.metadata_raw, '{safe_path}') "
+        f"THEN {extract} "
         "ELSE NULL "
         "END"
+    )
+
+
+def _safe_positive_prompt_extract(max_len: int = 250) -> str:
+    """Extract positive prompt from metadata_raw across multiple storage formats.
+
+    - ComfyUI workflow images store it at $.positive_prompt
+    - A1111/geninfo images store it at $.geninfo.positive.value
+    COALESCE tries both; NULLIF+TRIM skips empty strings so a blank
+    $.positive_prompt doesn't shadow a valid $.geninfo.positive.value.
+    """
+    n = int(max_len)
+    return (
+        "CASE WHEN json_valid(COALESCE(m.metadata_raw, '')) THEN "
+        f"SUBSTR(COALESCE("
+        f"NULLIF(TRIM(COALESCE(json_extract(m.metadata_raw, '$.positive_prompt'), '')), ''), "
+        f"NULLIF(TRIM(COALESCE(json_extract(m.metadata_raw, '$.geninfo.positive.value'), '')), '')"
+        f"), 1, {n}) "
+        "ELSE NULL END"
     )
 
 
@@ -804,6 +829,7 @@ class IndexSearcher:
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 CASE WHEN json_valid(COALESCE(m.metadata_raw, '')) THEN json_extract(m.metadata_raw, '$.generation_time_ms') ELSE NULL END as generation_time_ms,
+                {_safe_positive_prompt_extract(250)} as positive_prompt,
                 NULL as file_creation_time,
                 NULL as file_birth_time
             FROM assets a
@@ -907,6 +933,7 @@ class IndexSearcher:
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 CASE WHEN json_valid(COALESCE(m.metadata_raw, '')) THEN json_extract(m.metadata_raw, '$.generation_time_ms') ELSE NULL END as generation_time_ms,
+                {_safe_positive_prompt_extract(250)} as positive_prompt,
                 NULL as file_creation_time,
                 NULL as file_birth_time,
                 best.rank as rank
@@ -973,6 +1000,7 @@ class IndexSearcher:
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 {_safe_metadata_json_extract('$.generation_time_ms')} as generation_time_ms,
+                {_safe_positive_prompt_extract(250)} as positive_prompt,
                 NULL as file_creation_time,
                 NULL as file_birth_time
             FROM assets a
@@ -1055,6 +1083,7 @@ class IndexSearcher:
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 {_safe_metadata_json_extract('$.generation_time_ms')} as generation_time_ms,
+                {_safe_positive_prompt_extract(250)} as positive_prompt,
                 NULL as file_creation_time,
                 NULL as file_birth_time,                    best.rank as rank
             FROM best
@@ -1550,6 +1579,7 @@ class IndexSearcher:
                     ELSE 0
                 END as has_ai_info,
                 {_safe_metadata_json_extract('$.generation_time_ms')} as generation_time_ms,
+                {_safe_positive_prompt_extract(250)} as positive_prompt,
                 COALESCE(m.metadata_raw, '{{}}') AS metadata_raw
             FROM assets a
             LEFT JOIN asset_metadata m ON m.asset_id = a.id

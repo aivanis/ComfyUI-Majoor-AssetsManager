@@ -212,6 +212,7 @@ class HealthService:
                 "images": by_kind.get("image", 0),
                 "videos": by_kind.get("video", 0),
                 "audio": by_kind.get("audio", 0),
+                "model3d": by_kind.get("model3d", 0),
                 "by_kind": by_kind,  # Keep for backward compatibility
                 "rated": rated_count,
                 "with_workflow": workflow_count,

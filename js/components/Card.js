@@ -963,6 +963,31 @@ export function createAssetCard(asset) {
         thumb.appendChild(genTimeBadge);
     }
 
+    // Hover info overlay — positive prompt + generation time
+    // Sits at bottom of thumb via CSS gradient, pointer-events:none so it
+    // never blocks video hover/play. Only rendered when data is available.
+    const posPrompt = String(asset.positive_prompt || "").trim();
+    const hoverGenMs = asset.generation_time_ms ?? asset.metadata?.generation_time_ms ?? null;
+    const hoverGenValid =
+        hoverGenMs != null && Number.isFinite(Number(hoverGenMs)) && Number(hoverGenMs) > 0 && Number(hoverGenMs) < 86400000;
+    if (posPrompt || hoverGenValid) {
+        const hoverInfo = document.createElement("div");
+        hoverInfo.className = "mjr-card-hover-info";
+        if (posPrompt) {
+            const promptEl = document.createElement("div");
+            promptEl.className = "mjr-hover-prompt";
+            promptEl.textContent = posPrompt;
+            hoverInfo.appendChild(promptEl);
+        }
+        if (hoverGenValid) {
+            const genEl = document.createElement("div");
+            genEl.className = "mjr-hover-gentime";
+            genEl.textContent = `\u23f1 ${(Number(hoverGenMs) / 1000).toFixed(1)}s`;
+            hoverInfo.appendChild(genEl);
+        }
+        thumb.appendChild(hoverInfo);
+    }
+
     // Store asset reference for sidebar
     card._mjrAsset = asset;
 

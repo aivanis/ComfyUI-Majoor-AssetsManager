@@ -29,6 +29,7 @@ export const APP_DEFAULTS = Object.freeze({
     GRID_SHOW_DETAILS_DATE: true,
     GRID_SHOW_DETAILS_DIMENSIONS: true,
     GRID_SHOW_DETAILS_GENTIME: true,
+    GRID_SHOW_HOVER_INFO: true,
     GRID_SHOW_WORKFLOW_DOT: true,
     GRID_VIDEO_AUTOPLAY_MODE: "hover", // "off" | "hover" | "always"
 
