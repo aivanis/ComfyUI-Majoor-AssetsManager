@@ -1,5 +1,6 @@
 import { normalizeQuery } from "./query.js";
 import { APP_CONFIG } from "../../../app/config.js";
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
 
 const _safeSetValue = (el, value) => {
     if (!el) return;
@@ -46,6 +47,49 @@ export function createContextController({
     extraActions = null,
     getExtraContext = null,
 } = {}) {
+    const legacyState = state && typeof state === "object" ? state : {};
+    const { read, write, controllerState } = createPanelStateBridge(state, [
+        "searchQuery",
+        "scope",
+        "collectionId",
+        "collectionName",
+        "customRootId",
+        "customRootLabel",
+        "currentFolderRelativePath",
+        "kindFilter",
+        "workflowOnly",
+        "minRating",
+        "minSizeMB",
+        "maxSizeMB",
+        "minWidth",
+        "minHeight",
+        "maxWidth",
+        "maxHeight",
+        "resolutionCompare",
+        "workflowType",
+        "dateRangeFilter",
+        "dateExactFilter",
+        "sort",
+        "viewScope",
+        "similarResults",
+        "similarTitle",
+        "similarSourceAssetId",
+    ]);
+
+    const setStateValue = (key, value) => {
+        write(key, value);
+    };
+
+    const getStateValue = (key, fallback = "") => {
+        return read(key, fallback);
+    };
+
+    const getContextState = () => ({
+        ...(legacyState || {}),
+        ...(controllerState?.() || {}),
+        customRootLabel: getStateValue("customRootLabel", ""),
+    });
+
     const resetBrowserHistory = () => {
         try {
             extraActions?.resetBrowserHistory?.();
@@ -94,7 +138,7 @@ export function createContextController({
         clearQuery: async () => {
             try {
                 _safeSetValue(searchInputEl, "");
-                state.searchQuery = "";
+                setStateValue("searchQuery", "");
             } catch (e) {
                 console.debug?.(e);
             }
@@ -106,8 +150,8 @@ export function createContextController({
         },
         clearCollection: async () => {
             try {
-                state.collectionId = "";
-                state.collectionName = "";
+                setStateValue("collectionId", "");
+                setStateValue("collectionName", "");
             } catch (e) {
                 console.debug?.(e);
             }
@@ -133,16 +177,16 @@ export function createContextController({
             }
             let didSetScope = false;
             try {
-                state.customRootId = "";
-                state.customRootLabel = "";
-                state.currentFolderRelativePath = "";
+                setStateValue("customRootId", "");
+                setStateValue("customRootLabel", "");
+                setStateValue("currentFolderRelativePath", "");
                 delete gridContainer?.dataset?.mjrSubfolder;
                 resetBrowserHistory();
                 if (typeof scopeController?.setScope === "function") {
                     await scopeController.setScope("output");
                     didSetScope = true;
                 } else {
-                    state.scope = "output";
+                    setStateValue("scope", "output");
                     scopeController?.setActiveTabStyles?.();
                 }
             } catch (e) {
@@ -156,9 +200,9 @@ export function createContextController({
         },
         clearCustomRoot: async () => {
             try {
-                state.customRootId = "";
-                state.customRootLabel = "";
-                state.currentFolderRelativePath = "";
+                setStateValue("customRootId", "");
+                setStateValue("customRootLabel", "");
+                setStateValue("currentFolderRelativePath", "");
                 delete gridContainer?.dataset?.mjrSubfolder;
                 resetBrowserHistory();
             } catch (e) {
@@ -173,7 +217,7 @@ export function createContextController({
         clearFolder: async () => {
             try {
                 // Ensure state is cleared so it doesn't get restored
-                state.currentFolderRelativePath = "";
+                setStateValue("currentFolderRelativePath", "");
                 delete gridContainer?.dataset?.mjrSubfolder;
                 resetBrowserHistory();
             } catch (e) {
@@ -187,7 +231,7 @@ export function createContextController({
         },
         clearKind: async () => {
             try {
-                state.kindFilter = "";
+                setStateValue("kindFilter", "");
                 _safeSetValue(kindSelect, "");
             } catch (e) {
                 console.debug?.(e);
@@ -200,7 +244,7 @@ export function createContextController({
         },
         clearMinRating: async () => {
             try {
-                state.minRating = 0;
+                setStateValue("minRating", 0);
                 _safeSetValue(ratingSelect, "0");
             } catch (e) {
                 console.debug?.(e);
@@ -213,7 +257,7 @@ export function createContextController({
         },
         clearWorkflowOnly: async () => {
             try {
-                state.workflowOnly = false;
+                setStateValue("workflowOnly", false);
                 _safeSetChecked(wfCheckbox, false);
             } catch (e) {
                 console.debug?.(e);
@@ -226,7 +270,7 @@ export function createContextController({
         },
         clearWorkflowType: async () => {
             try {
-                state.workflowType = "";
+                setStateValue("workflowType", "");
                 _safeSetValue(workflowTypeSelect, "");
             } catch (e) {
                 console.debug?.(e);
@@ -239,8 +283,8 @@ export function createContextController({
         },
         clearSize: async () => {
             try {
-                state.minSizeMB = 0;
-                state.maxSizeMB = 0;
+                setStateValue("minSizeMB", 0);
+                setStateValue("maxSizeMB", 0);
                 _safeSetValue(minSizeInput, "");
                 _safeSetValue(maxSizeInput, "");
             } catch (e) {
@@ -254,10 +298,10 @@ export function createContextController({
         },
         clearResolution: async () => {
             try {
-                state.minWidth = 0;
-                state.minHeight = 0;
-                state.maxWidth = 0;
-                state.maxHeight = 0;
+                setStateValue("minWidth", 0);
+                setStateValue("minHeight", 0);
+                setStateValue("maxWidth", 0);
+                setStateValue("maxHeight", 0);
                 _safeSetValue(minWidthInput, "");
                 _safeSetValue(minHeightInput, "");
                 _safeSetValue(maxWidthInput, "");
@@ -274,7 +318,7 @@ export function createContextController({
         },
         clearDateRange: async () => {
             try {
-                state.dateRangeFilter = "";
+                setStateValue("dateRangeFilter", "");
                 _safeSetValue(dateRangeSelect, "");
             } catch (e) {
                 console.debug?.(e);
@@ -287,7 +331,7 @@ export function createContextController({
         },
         clearDateExact: async () => {
             try {
-                state.dateExactFilter = "";
+                setStateValue("dateExactFilter", "");
                 _safeSetValue(dateExactInput, "");
             } catch (e) {
                 console.debug?.(e);
@@ -300,8 +344,8 @@ export function createContextController({
         },
         clearSort: async () => {
             try {
-                state.sort = "mtime_desc";
-                sortController?.setSortIcon?.(state.sort);
+                setStateValue("sort", "mtime_desc");
+                sortController?.setSortIcon?.(getStateValue("sort", "mtime_desc"));
                 sortController?.renderSortMenu?.();
             } catch (e) {
                 console.debug?.(e);
@@ -320,25 +364,25 @@ export function createContextController({
                 console.debug?.(e);
             }
             try {
-                state.collectionId = "";
-                state.collectionName = "";
-                state.kindFilter = "";
-                state.workflowOnly = false;
-                state.minRating = 0;
-                state.minSizeMB = 0;
-                state.maxSizeMB = 0;
-                state.minWidth = 0;
-                state.minHeight = 0;
-                state.maxWidth = 0;
-                state.maxHeight = 0;
-                state.resolutionCompare = "gte";
-                state.workflowType = "";
-                state.dateRangeFilter = "";
-                state.dateExactFilter = "";
-                state.sort = "mtime_desc";
-                state.customRootId = "";
-                state.customRootLabel = "";
-                state.currentFolderRelativePath = "";
+                setStateValue("collectionId", "");
+                setStateValue("collectionName", "");
+                setStateValue("kindFilter", "");
+                setStateValue("workflowOnly", false);
+                setStateValue("minRating", 0);
+                setStateValue("minSizeMB", 0);
+                setStateValue("maxSizeMB", 0);
+                setStateValue("minWidth", 0);
+                setStateValue("minHeight", 0);
+                setStateValue("maxWidth", 0);
+                setStateValue("maxHeight", 0);
+                setStateValue("resolutionCompare", "gte");
+                setStateValue("workflowType", "");
+                setStateValue("dateRangeFilter", "");
+                setStateValue("dateExactFilter", "");
+                setStateValue("sort", "mtime_desc");
+                setStateValue("customRootId", "");
+                setStateValue("customRootLabel", "");
+                setStateValue("currentFolderRelativePath", "");
                 delete gridContainer?.dataset?.mjrSubfolder;
                 resetBrowserHistory();
                 try {
@@ -350,7 +394,7 @@ export function createContextController({
                     await scopeController.setScope("output");
                     didSetScope = true;
                 } else {
-                    state.scope = "output";
+                    setStateValue("scope", "output");
                     scopeController?.setActiveTabStyles?.();
                 }
             } catch (e) {
@@ -374,7 +418,7 @@ export function createContextController({
                 console.debug?.(e);
             }
             try {
-                sortController?.setSortIcon?.(state.sort);
+                sortController?.setSortIcon?.(getStateValue("sort", "mtime_desc"));
                 sortController?.renderSortMenu?.();
             } catch (e) {
                 console.debug?.(e);
@@ -397,26 +441,27 @@ export function createContextController({
     const update = () => {
         const rawQuery = String(searchInputEl?.value || "").trim();
         const normalizedQuery = normalizeQuery(searchInputEl);
+        const currentState = getContextState();
 
         const filterActive = !!(
-            state?.kindFilter ||
+            getStateValue("kindFilter", "") ||
             "" ||
-            state?.workflowOnly ||
-            (Number(state?.minRating || 0) || 0) > 0 ||
-            (Number(state?.minSizeMB || 0) || 0) > 0 ||
-            (Number(state?.maxSizeMB || 0) || 0) > 0 ||
-            (Number(state?.minWidth || 0) || 0) > 0 ||
-            (Number(state?.minHeight || 0) || 0) > 0 ||
-            (Number(state?.maxWidth || 0) || 0) > 0 ||
-            (Number(state?.maxHeight || 0) || 0) > 0 ||
-            String(state?.workflowType || "").trim().length > 0 ||
-            state?.dateRangeFilter ||
+            getStateValue("workflowOnly", false) ||
+            (Number(getStateValue("minRating", 0) || 0) || 0) > 0 ||
+            (Number(getStateValue("minSizeMB", 0) || 0) || 0) > 0 ||
+            (Number(getStateValue("maxSizeMB", 0) || 0) || 0) > 0 ||
+            (Number(getStateValue("minWidth", 0) || 0) || 0) > 0 ||
+            (Number(getStateValue("minHeight", 0) || 0) || 0) > 0 ||
+            (Number(getStateValue("maxWidth", 0) || 0) || 0) > 0 ||
+            (Number(getStateValue("maxHeight", 0) || 0) || 0) > 0 ||
+            String(getStateValue("workflowType", "") || "").trim().length > 0 ||
+            getStateValue("dateRangeFilter", "") ||
             "" ||
-            state?.dateExactFilter ||
+            getStateValue("dateExactFilter", "") ||
             ""
         );
-        const sortActive = String(state?.sort || "mtime_desc") !== "mtime_desc";
-        const collectionsActive = !!(state?.collectionId || "");
+        const sortActive = String(getStateValue("sort", "mtime_desc") || "mtime_desc") !== "mtime_desc";
+        const collectionsActive = !!(getStateValue("collectionId", "") || "");
 
         try {
             filterBtn?.classList?.toggle?.("mjr-context-active", filterActive);
@@ -430,7 +475,7 @@ export function createContextController({
             const extraContext =
                 (typeof getExtraContext === "function" ? getExtraContext() || {} : {}) || {};
             updateSummaryBar?.({
-                state,
+                state: currentState,
                 gridContainer,
                 context: { rawQuery: rawQuery || normalizedQuery, ...extraContext },
                 actions,

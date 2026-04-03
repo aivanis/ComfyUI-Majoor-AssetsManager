@@ -1,8 +1,13 @@
+import vue from "@vitejs/plugin-vue";
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
+  plugins: [vue()],
   test: {
     environment: "node",
+    transformMode: {
+      web: [/\.vue$/],
+    },
     include: ["js/tests/**/*.vitest.mjs"],
     reporters: ["default"],
     coverage: {

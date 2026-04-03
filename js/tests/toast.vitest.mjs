@@ -142,10 +142,8 @@ describe("toast", () => {
 
         toastModule.comfyToast("Heads up", "warn", 1500);
 
-        const container = document.getElementById("mjr-toast-container");
-        expect(container).not.toBeNull();
-        expect(container.childNodes).toHaveLength(1);
-        expect(container.childNodes[0].className).toContain("mjr-toast-warning");
+        // No DOM fallback container is created — native-only path when no API is available
+        expect(document.getElementById("mjr-toast-container")).toBeNull();
         expect(historyModule.listToastHistory()[0]).toMatchObject({
             message: "Heads up",
             type: "warning",
@@ -163,19 +161,16 @@ describe("toast", () => {
         });
     });
 
-    it("dismisses persistent fallback error toasts when a success toast arrives later", async () => {
-        const { toastModule } = await loadToastModules();
+    it("records both persistent and timed toasts in history when native API is unavailable", async () => {
+        const { toastModule, historyModule } = await loadToastModules();
 
         toastModule.comfyToast("Broken", "error", 0);
-        const container = document.getElementById("mjr-toast-container");
-        expect(container.childNodes).toHaveLength(1);
-
-        vi.advanceTimersByTime(31000);
         toastModule.comfyToast("Recovered", "success", 2000);
-        vi.advanceTimersByTime(350);
 
-        const messages = container.childNodes.map((node) => readNodeText(node));
-        expect(messages).not.toContain("Broken");
+        // No DOM fallback container — both toasts are captured in history only
+        expect(document.getElementById("mjr-toast-container")).toBeNull();
+        const messages = historyModule.listToastHistory().map((h) => h.message);
+        expect(messages).toContain("Broken");
         expect(messages).toContain("Recovered");
     });
 

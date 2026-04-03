@@ -262,7 +262,7 @@ export const saveMajoorSettings = (settings) => {
             const last = Number(window?._mjrSettingsSaveFailAt || 0) || 0;
             if (now - last > 30_000) {
                 window._mjrSettingsSaveFailAt = now;
-                import("./dialogs.js")
+                import("../dialogs.js")
                     .then(({ comfyAlert }) =>
                         comfyAlert(
                             t(

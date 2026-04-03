@@ -18,6 +18,7 @@ import { getDownloadMimeForFilename } from "../utils/video.js";
 import { pickRootId } from "../../../utils/ids.js";
 import { comfyConfirm } from "../../../app/dialogs.js";
 import { t } from "../../../app/i18n.js";
+import { consumeInternalDropOccurred } from "../runtimeState.js";
 
 const _abs = (url) => {
     try {
@@ -234,12 +235,7 @@ export const handleDragEnd = (event, { asset, containerEl, card }) => {
 
         // If an internal drop handler fired (ComfyUI canvas), skip the popup.
         // The flag is set in onDrop (DragDrop.js) for internal drops.
-        try {
-            if (window.__mjrInternalDropOccurred) {
-                window.__mjrInternalDropOccurred = false;
-                return;
-            }
-        } catch {}
+        if (consumeInternalDropOccurred()) return;
 
         // Determine assets involved (single or multi-selection).
         const selected = _getSelectedAssets(containerEl, card);

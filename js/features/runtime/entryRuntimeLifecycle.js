@@ -148,6 +148,7 @@ export function installEntryRuntimeController({
     teardownLiveStreamTracker,
     teardownNodeStream,
     teardownFloatingViewerManager,
+    teardownGlobalRuntime,
     reportError,
 }) {
     try {
@@ -170,6 +171,11 @@ export function installEntryRuntimeController({
             }
             try {
                 teardownFloatingViewerManager?.();
+            } catch (e) {
+                console.warn("[MJR teardown]", e);
+            }
+            try {
+                teardownGlobalRuntime?.();
             } catch (e) {
                 console.warn("[MJR teardown]", e);
             }

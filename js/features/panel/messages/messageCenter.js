@@ -90,6 +90,20 @@ const BUILTIN_PANEL_MESSAGES = Object.freeze([
         actionLabelKey: "label.userGuide",
         actionUrl: LOCAL_USER_GUIDE_URL,
     },
+    {
+        id: "development-2026-04-03-vue-refactoring",
+        title: "Vue 3 Refactoring",
+        titleKey: "msg.development.title.vueRefactoring",
+        category: "Development",
+        categoryKey: "msg.category.development",
+        level: "info",
+        createdAt: Date.parse("2026-04-03T10:00:00Z"),
+        body: "Frontend modernization ongoing: Core UI components are being migrated to Vue 3 for better maintainability and compatibility with new ComfyUI frontend. This ensures long-term support and cleaner architecture.",
+        bodyKey: "msg.development.body.vueRefactoring",
+        actionLabel: "View Progress",
+        actionLabelKey: "label.viewProgress",
+        actionUrl: "docs/VUE_MIGRATION_PLAN.md",
+    },
 ]);
 const BUILTIN_MESSAGE_IDS = new Set(
     BUILTIN_PANEL_MESSAGES.map((msg) => String(msg?.id || "").trim()).filter(Boolean),

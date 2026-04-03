@@ -111,10 +111,13 @@ function setTabState({
     try {
         messageTabBtn?.classList.toggle("is-active", isMessages);
         messageTabBtn?.setAttribute("aria-selected", isMessages ? "true" : "false");
+        messageTabBtn?.setAttribute("tabindex", isMessages ? "0" : "-1");
         historyTabBtn?.classList.toggle("is-active", isHistory);
         historyTabBtn?.setAttribute("aria-selected", isHistory ? "true" : "false");
+        historyTabBtn?.setAttribute("tabindex", isHistory ? "0" : "-1");
         shortcutsTabBtn?.classList.toggle("is-active", isShortcuts);
         shortcutsTabBtn?.setAttribute("aria-selected", isShortcuts ? "true" : "false");
+        shortcutsTabBtn?.setAttribute("tabindex", isShortcuts ? "0" : "-1");
     } catch (e) {
         console.debug?.(e);
     }
@@ -149,9 +152,11 @@ export function bindMessagePopoverController({
     messageList = null,
     historyTabBtn = null,
     historyTabBadge = null,
+    historyTabCount = null,
     historyPanel = null,
     shortcutsPanel = null,
     messageTabBtn = null,
+    messageTabBadge = null,
     shortcutsTabBtn = null,
     markReadBtn = null,
     popovers = null,
@@ -339,10 +344,24 @@ export function bindMessagePopoverController({
         }
     };
 
+    const setCountBadge = (node, count) => {
+        if (!node) return;
+        const unread = Math.max(0, Number(count || 0) || 0);
+        if (unread <= 0) {
+            node.style.display = "none";
+            node.textContent = "";
+            return;
+        }
+        node.style.display = "inline-flex";
+        node.textContent = unread > 99 ? "99+" : String(unread);
+    };
+
     const updateHistoryTabBadge = () => {
-        if (!historyTabBadge) return;
         const unread = getToastHistoryUnreadCount();
-        historyTabBadge.style.display = unread > 0 ? "inline-block" : "none";
+        if (historyTabBadge) {
+            historyTabBadge.style.display = unread > 0 ? "inline-block" : "none";
+        }
+        setCountBadge(historyTabCount, unread);
     };
 
     const renderShortcutsPanel = () => {
@@ -351,27 +370,42 @@ export function bindMessagePopoverController({
         shortcutsPanel.replaceChildren(createShortcutGuidePanel());
     };
 
-    const updateMessageButtonState = () => {
-        if (!messageBtn) return;
-        const unreadCount = Number(getPanelUnreadCount() || 0);
-        const badge = messageBtn.querySelector(".mjr-message-badge");
-        const titleText =
-            unreadCount > 0
-                ? t("tooltip.openMessagesUnread", "Messages ({count} unread)", {
-                      count: unreadCount,
-                  })
-                : t("tooltip.openMessages", "Messages and updates");
-        messageBtn.classList.toggle("mjr-message-has-unread", unreadCount > 0);
-        messageBtn.title = titleText;
-        messageBtn.setAttribute("aria-label", titleText);
-        if (!badge) return;
-        if (unreadCount <= 0) {
-            badge.style.display = "none";
-            badge.textContent = "";
+    const updateMarkReadButtonState = () => {
+        if (!markReadBtn) return;
+        const unreadCount = Math.max(0, Number(getPanelUnreadCount() || 0) || 0);
+        markReadBtn.disabled = unreadCount <= 0;
+        if (unreadCount > 0) {
+            markReadBtn.title = t("tooltip.markMessagesRead", "Mark all messages as read");
             return;
         }
-        badge.style.display = "inline-flex";
-        badge.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+        markReadBtn.title = t("tooltip.noUnreadMessages", "No unread messages");
+    };
+
+    const updateMessageButtonState = () => {
+        const unreadCount = Math.max(0, Number(getPanelUnreadCount() || 0) || 0);
+        if (messageBtn) {
+            const badge = messageBtn.querySelector(".mjr-message-badge");
+            const titleText =
+                unreadCount > 0
+                    ? t("tooltip.openMessagesUnread", "Messages ({count} unread)", {
+                          count: unreadCount,
+                      })
+                    : t("tooltip.openMessages", "Messages and updates");
+            messageBtn.classList.toggle("mjr-message-has-unread", unreadCount > 0);
+            messageBtn.title = titleText;
+            messageBtn.setAttribute("aria-label", titleText);
+            if (badge) {
+                if (unreadCount <= 0) {
+                    badge.style.display = "none";
+                    badge.textContent = "";
+                } else {
+                    badge.style.display = "inline-flex";
+                    badge.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+                }
+            }
+        }
+        setCountBadge(messageTabBadge, unreadCount);
+        updateMarkReadButtonState();
     };
 
     const refreshMessagesUI = () => {
@@ -503,6 +537,64 @@ export function bindMessagePopoverController({
         renderShortcutsPanel();
     };
 
+    const showTabByName = (tabName) => {
+        if (tabName === "messages") {
+            showMessagesTab();
+            return;
+        }
+        if (tabName === "history") {
+            showHistoryTab();
+            return;
+        }
+        showShortcutsTab();
+    };
+
+    const tabOrder = ["messages", "history", "shortcuts"];
+    const onTabKeydown = (event, tabName) => {
+        const key = String(event?.key || "").toLowerCase();
+        const index = tabOrder.indexOf(String(tabName || "").toLowerCase());
+        if (index < 0) return;
+
+        if (key === "arrowright") {
+            event.preventDefault();
+            const next = tabOrder[(index + 1) % tabOrder.length];
+            showTabByName(next);
+            if (next === "messages") messageTabBtn?.focus?.();
+            if (next === "history") historyTabBtn?.focus?.();
+            if (next === "shortcuts") shortcutsTabBtn?.focus?.();
+            return;
+        }
+
+        if (key === "arrowleft") {
+            event.preventDefault();
+            const next = tabOrder[(index + tabOrder.length - 1) % tabOrder.length];
+            showTabByName(next);
+            if (next === "messages") messageTabBtn?.focus?.();
+            if (next === "history") historyTabBtn?.focus?.();
+            if (next === "shortcuts") shortcutsTabBtn?.focus?.();
+            return;
+        }
+
+        if (key === "home") {
+            event.preventDefault();
+            showMessagesTab();
+            messageTabBtn?.focus?.();
+            return;
+        }
+
+        if (key === "end") {
+            event.preventDefault();
+            showShortcutsTab();
+            shortcutsTabBtn?.focus?.();
+            return;
+        }
+
+        if (key === " " || key === "enter") {
+            event.preventDefault();
+            showTabByName(tabName);
+        }
+    };
+
     messageBtn?.addEventListener(
         "click",
         (e) => {
@@ -547,6 +639,11 @@ export function bindMessagePopoverController({
         },
         listenerOptions,
     );
+    messageTabBtn?.addEventListener(
+        "keydown",
+        (e) => onTabKeydown(e, "messages"),
+        listenerOptions,
+    );
 
     historyTabBtn?.addEventListener(
         "click",
@@ -557,6 +654,11 @@ export function bindMessagePopoverController({
         },
         listenerOptions,
     );
+    historyTabBtn?.addEventListener(
+        "keydown",
+        (e) => onTabKeydown(e, "history"),
+        listenerOptions,
+    );
 
     shortcutsTabBtn?.addEventListener(
         "click",
@@ -565,6 +667,11 @@ export function bindMessagePopoverController({
             e.stopPropagation();
             showShortcutsTab();
         },
+        listenerOptions,
+    );
+    shortcutsTabBtn?.addEventListener(
+        "keydown",
+        (e) => onTabKeydown(e, "shortcuts"),
         listenerOptions,
     );
 

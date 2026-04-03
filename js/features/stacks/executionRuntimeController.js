@@ -29,7 +29,7 @@ export function createExecutionRuntimeController({
     ensureExecutionRuntime,
     emitRuntimeStatus,
     refreshGeneratedFeedHosts,
-    getActiveGridContainer,
+    getActiveGridContainer: _getActiveGridContainer,
 }) {
     const recentFiles = createTTLCache({ ttlMs: DEDUPE_TTL_MS, maxSize: RECENT_FILES_MAX });
     const executionStarts = createTTLCache({

@@ -2,6 +2,7 @@
 Response utilities for route handlers.
 """
 
+from dataclasses import asdict, is_dataclass
 import math
 
 from aiohttp import web
@@ -71,14 +72,29 @@ def _sanitize_json_payload(value):
     """
     Normalize payload values so they are always valid strict JSON.
     - Converts NaN/Infinity floats to None.
+    - Converts dataclass instances to dictionaries.
     - Recurses through dict/list/tuple containers.
     """
+    dataclass_payload = _coerce_dataclass_payload(value)
+    if dataclass_payload is not None:
+        return _sanitize_json_payload(dataclass_payload)
     if isinstance(value, float):
         return value if math.isfinite(value) else None
     if isinstance(value, dict):
         return {k: _sanitize_json_payload(v) for k, v in value.items()}
-    if isinstance(value, list):
-        return [_sanitize_json_payload(v) for v in value]
-    if isinstance(value, tuple):
-        return [_sanitize_json_payload(v) for v in value]
+    if isinstance(value, (list, tuple)):
+        return _sanitize_sequence(value)
     return value
+
+
+def _coerce_dataclass_payload(value):
+    if not is_dataclass(value):
+        return None
+    try:
+        return asdict(value)
+    except Exception:
+        return getattr(value, "__dict__", {})
+
+
+def _sanitize_sequence(value):
+    return [_sanitize_json_payload(item) for item in value]

@@ -1,3 +1,5 @@
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
+
 const parseLooseNumber = (value) => {
     const raw = String(value ?? "").trim();
     if (!raw) return 0;
@@ -26,6 +28,20 @@ export function bindFilters({
     onFiltersChanged = null,
     lifecycleSignal = null,
 }) {
+    const { write } = createPanelStateBridge(state, [
+        "kindFilter",
+        "workflowOnly",
+        "minRating",
+        "workflowType",
+        "minSizeMB",
+        "maxSizeMB",
+        "minWidth",
+        "minHeight",
+        "maxWidth",
+        "maxHeight",
+        "dateRangeFilter",
+        "dateExactFilter",
+    ]);
     // Shared debounce: batch rapid filter changes into a single grid reload.
     // The gridController already coalesces concurrent reloads, but this prevents
     // the "one extra reload" that happens when a previous reload completes between
@@ -80,7 +96,7 @@ export function bindFilters({
         kindSelect,
         "change",
         () => {
-            state.kindFilter = kindSelect.value || "";
+            write("kindFilter", kindSelect.value || "");
             try {
                 onFiltersChanged?.();
             } catch (e) {
@@ -94,7 +110,7 @@ export function bindFilters({
         wfCheckbox,
         "change",
         () => {
-            state.workflowOnly = Boolean(wfCheckbox.checked);
+            write("workflowOnly", Boolean(wfCheckbox.checked));
             try {
                 onFiltersChanged?.();
             } catch (e) {
@@ -108,7 +124,7 @@ export function bindFilters({
         ratingSelect,
         "change",
         () => {
-            state.minRating = Number(ratingSelect.value || 0) || 0;
+            write("minRating", Number(ratingSelect.value || 0) || 0);
             try {
                 onFiltersChanged?.();
             } catch (e) {
@@ -123,9 +139,12 @@ export function bindFilters({
             workflowTypeSelect,
             "change",
             () => {
-                state.workflowType = String(workflowTypeSelect.value || "")
+                write(
+                    "workflowType",
+                    String(workflowTypeSelect.value || "")
                     .trim()
-                    .toUpperCase();
+                        .toUpperCase(),
+                );
                 try {
                     onFiltersChanged?.();
                 } catch (e) {
@@ -140,12 +159,14 @@ export function bindFilters({
     const applySizeFilter = () => {
         const minVal = parseLooseNumber(minSizeInput?.value || 0);
         const maxVal = parseLooseNumber(maxSizeInput?.value || 0);
-        state.minSizeMB = Number.isFinite(minVal) && minVal > 0 ? minVal : 0;
-        state.maxSizeMB = Number.isFinite(maxVal) && maxVal > 0 ? maxVal : 0;
-        if (state.maxSizeMB > 0 && state.minSizeMB > 0 && state.maxSizeMB < state.minSizeMB) {
-            state.maxSizeMB = state.minSizeMB;
-            if (maxSizeInput) maxSizeInput.value = String(state.maxSizeMB);
+        const nextMin = Number.isFinite(minVal) && minVal > 0 ? minVal : 0;
+        let nextMax = Number.isFinite(maxVal) && maxVal > 0 ? maxVal : 0;
+        if (nextMax > 0 && nextMin > 0 && nextMax < nextMin) {
+            nextMax = nextMin;
+            if (maxSizeInput) maxSizeInput.value = String(nextMax);
         }
+        write("minSizeMB", nextMin);
+        write("maxSizeMB", nextMax);
         try {
             onFiltersChanged?.();
         } catch (e) {
@@ -184,10 +205,10 @@ export function bindFilters({
             maxH = minH;
             if (maxHeightInput) maxHeightInput.value = String(maxH);
         }
-        state.minWidth = minW;
-        state.minHeight = minH;
-        state.maxWidth = maxW;
-        state.maxHeight = maxH;
+        write("minWidth", minW);
+        write("minHeight", minH);
+        write("maxWidth", maxW);
+        write("maxHeight", maxH);
         try {
             if (resolutionPresetSelect) {
                 const map = {
@@ -250,10 +271,10 @@ export function bindFilters({
                 const h = Number(pair[1] || 0);
                 // Presets represent minimum resolution only, so stale max bounds
                 // must be cleared to avoid silently constraining the result set.
-                state.minWidth = w;
-                state.minHeight = h;
-                state.maxWidth = 0;
-                state.maxHeight = 0;
+                write("minWidth", w);
+                write("minHeight", h);
+                write("maxWidth", 0);
+                write("maxHeight", 0);
                 if (minWidthInput) minWidthInput.value = w > 0 ? String(w) : "";
                 if (minHeightInput) minHeightInput.value = h > 0 ? String(h) : "";
                 if (maxWidthInput) maxWidthInput.value = "";
@@ -273,9 +294,9 @@ export function bindFilters({
             dateRangeSelect,
             "change",
             () => {
-                state.dateRangeFilter = dateRangeSelect.value || "";
+                write("dateRangeFilter", dateRangeSelect.value || "");
                 if (state.dateRangeFilter && state.dateExactFilter) {
-                    state.dateExactFilter = "";
+                    write("dateExactFilter", "");
                     if (dateExactInput) {
                         dateExactInput.value = "";
                     }
@@ -299,9 +320,12 @@ export function bindFilters({
             dateExactInput,
             "change",
             () => {
-                state.dateExactFilter = dateExactInput.value ? String(dateExactInput.value) : "";
+                write(
+                    "dateExactFilter",
+                    dateExactInput.value ? String(dateExactInput.value) : "",
+                );
                 if (state.dateExactFilter && state.dateRangeFilter) {
-                    state.dateRangeFilter = "";
+                    write("dateRangeFilter", "");
                     if (dateRangeSelect) {
                         dateRangeSelect.value = "";
                     }

@@ -120,7 +120,7 @@ vi.mock("../api/client.js", () => ({
     getAssetsBatch: state.getAssetsBatchMock,
 }));
 
-vi.mock("../features/panel/AssetsManagerPanel.js", () => ({
+vi.mock("../features/panel/panelRuntimeRefs.js", () => ({
     getActiveGridContainer: () => state.getActiveGridContainer(),
 }));
 
@@ -376,8 +376,9 @@ describe("floatingViewerManager", () => {
     });
 
     it("toggles live stream with L while the floating viewer is visible", async () => {
-        const { floatingViewerManager } =
+        const { floatingViewerManager, installFloatingViewerGlobalHandlers } =
             await import("../features/viewer/floatingViewerManager.js");
+        installFloatingViewerGlobalHandlers();
         await floatingViewerManager.open();
 
         const viewer = state.getLastViewer();
@@ -400,8 +401,9 @@ describe("floatingViewerManager", () => {
     });
 
     it("toggles the floating viewer off with V while it is visible", async () => {
-        const { floatingViewerManager } =
+        const { floatingViewerManager, installFloatingViewerGlobalHandlers } =
             await import("../features/viewer/floatingViewerManager.js");
+        installFloatingViewerGlobalHandlers();
         await floatingViewerManager.open();
 
         const viewer = state.getLastViewer();
@@ -426,14 +428,19 @@ describe("floatingViewerManager", () => {
     });
 
     it("reinstalls global listeners after teardown so toggle can open a new viewer again", async () => {
-        const { floatingViewerManager, teardownFloatingViewerManager } =
+        const {
+            floatingViewerManager,
+            installFloatingViewerGlobalHandlers,
+            teardownFloatingViewerManager,
+        } =
             await import("../features/viewer/floatingViewerManager.js");
+        installFloatingViewerGlobalHandlers();
         await floatingViewerManager.open();
 
         const firstViewer = state.getLastViewer();
         expect(firstViewer).toBeTruthy();
 
-        teardownFloatingViewerManager();
+        teardownFloatingViewerManager({ reinstallGlobalHandlers: true });
         expect(firstViewer.dispose).toHaveBeenCalledTimes(1);
 
         window.dispatchEvent(new CustomEvent("mjr:mfv-toggle"));
@@ -446,8 +453,9 @@ describe("floatingViewerManager", () => {
     });
 
     it("toggles sampler preview with K while the floating viewer is visible", async () => {
-        const { floatingViewerManager } =
+        const { floatingViewerManager, installFloatingViewerGlobalHandlers } =
             await import("../features/viewer/floatingViewerManager.js");
+        installFloatingViewerGlobalHandlers();
         await floatingViewerManager.open();
 
         const viewer = state.getLastViewer();
@@ -469,6 +477,26 @@ describe("floatingViewerManager", () => {
         expect(event.preventDefault).toHaveBeenCalledTimes(1);
     });
 
+    it("re-attaches an existing detached MFV node on reopen", async () => {
+        const { floatingViewerManager } =
+            await import("../features/viewer/floatingViewerManager.js");
+
+        await floatingViewerManager.open();
+        const viewer = state.getLastViewer();
+        expect(viewer).toBeTruthy();
+
+        floatingViewerManager.close();
+
+        const callsBefore = document.body.appendChild.mock.calls.length;
+        viewer.element = { isConnected: false };
+
+        await floatingViewerManager.open();
+        await flushAsyncWork();
+
+        expect(state.getLastViewer()).toBe(viewer);
+        expect(document.body.appendChild.mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
     it("cycles compare modes with C as A/B, side-by-side, then compare off without closing", async () => {
         state.setActiveGrid(createGrid(["410", "411"]));
         state.getSelectedIdSetMock.mockReturnValue(new Set(["410"]));
@@ -480,8 +508,9 @@ describe("floatingViewerManager", () => {
             ],
         });
 
-        const { floatingViewerManager } =
+        const { floatingViewerManager, installFloatingViewerGlobalHandlers } =
             await import("../features/viewer/floatingViewerManager.js");
+        installFloatingViewerGlobalHandlers();
         await floatingViewerManager.open();
         await flushAsyncWork();
 

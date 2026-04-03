@@ -10,50 +10,8 @@ import { getComfyApp, getExtensionToastApi } from "./comfyApiBridge.js";
 import { t } from "./i18n.js";
 import { addToastHistory } from "../features/panel/messages/toastHistory.js";
 
-const TOAST_CONTAINER_ID = "mjr-toast-container";
-const MAX_VISIBLE_TOASTS = 5;
-
-// Tracks active fallback DOM error toasts so success toasts can clear them.
-const _fallbackErrorToasts = new Set();
-
-// Periodic cleanup timer for orphaned dismissers
-let _cleanerTimer = null;
-
-/**
- * Start periodic cleanup of orphaned dismissers.
- * Runs every 30 seconds to remove dismissers for removed DOM elements.
- */
-function _startCleanerTimer() {
-    if (_cleanerTimer) return;
-    _cleanerTimer = setInterval(() => {
-        const toRemove = [];
-        for (const entry of _fallbackErrorToasts) {
-            const element = entry?.element || null;
-            if (!element?.isConnected || !element.parentNode) {
-                toRemove.push(entry);
-            }
-        }
-        for (const entry of toRemove) {
-            _fallbackErrorToasts.delete(entry);
-        }
-        // Stop the interval when no active toasts remain (prevents a timer leak).
-        if (_fallbackErrorToasts.size === 0) {
-            clearInterval(_cleanerTimer);
-            _cleanerTimer = null;
-        }
-    }, 30000);
-}
-
 function _dismissAllFallbackErrorToasts() {
-    const toRemove = Array.from(_fallbackErrorToasts);
-    _fallbackErrorToasts.clear();
-    for (const entry of toRemove) {
-        try {
-            entry?.dismiss?.();
-        } catch (e) {
-            console.debug?.(e);
-        }
-    }
+    // Legacy compatibility: no-op since DOM fallback toasts were removed.
 }
 
 function normalizeToastType(type) {
@@ -83,25 +41,6 @@ function serializeToastMessage(message) {
 }
 
 /**
- * Get icon for toast type (Unicode symbols for maximum compatibility).
- * @param {string} type - Toast type
- * @returns {string} Icon character
- */
-function getToastIcon(type) {
-    switch (type) {
-        case "success":
-            return "✓";
-        case "error":
-            return "✕";
-        case "warning":
-            return "⚠";
-        case "info":
-        default:
-            return "ℹ";
-    }
-}
-
-/**
  * Get standard duration for toast type.
  * @param {string} type - Toast type
  * @returns {number} Duration in ms
@@ -118,23 +57,6 @@ function getStandardDuration(type) {
             return 5000;
         default:
             return 5000;
-    }
-}
-
-/**
- * Enforce maximum visible toasts limit.
- * @param {HTMLElement} container - Toast container element
- */
-function enforceToastLimit(container) {
-    const toasts = Array.from(container.querySelectorAll(".mjr-toast"));
-    while (toasts.length > MAX_VISIBLE_TOASTS) {
-        const oldest = toasts.shift();
-        if (oldest && oldest.parentNode) {
-            oldest.classList.remove("is-visible");
-            setTimeout(() => {
-                if (oldest.parentNode) oldest.parentNode.removeChild(oldest);
-            }, 300);
-        }
     }
 }
 
@@ -458,24 +380,9 @@ function translateToastMessage(message) {
 }
 
 /**
- * Ensures the toast container exists in the DOM.
- * @returns {HTMLElement} Toast container element
- */
-function getToastContainer() {
-    let container = document.getElementById(TOAST_CONTAINER_ID);
-    if (!container) {
-        container = document.createElement("div");
-        container.id = TOAST_CONTAINER_ID;
-        container.className = "mjr-toast-container";
-        document.body.appendChild(container);
-    }
-    return container;
-}
-
-/**
  * Shows a toast notification.
  * Integrates with ComfyUI extensionManager.toast when available.
- * Falls back to custom DOM toasts for older ComfyUI versions.
+ * Falls back to ComfyUI app.ui.toast for older runtime variants.
  *
  * @param {string|object} message - The message to display (or object with summary/detail)
  * @param {'info'|'success'|'warning'|'error'} type - The type of message
@@ -504,14 +411,6 @@ export function comfyToast(message, type = "info", duration, opts) {
     // Treat as persistent only when caller explicitly passes 0 or a non-finite value.
     const persistent = !(Number.isFinite(Number(duration)) && Number(duration) > 0);
     const app = getComfyApp();
-
-    // On success: dismiss any open error toasts (fallback DOM path).
-    if (type === "success") {
-        _dismissAllFallbackErrorToasts();
-    }
-
-    // Start cleaner timer on first call
-    _startCleanerTimer();
 
     // 1. Try ComfyUI extensionManager toast (ComfyUI v1.3+ standard)
     try {
@@ -552,72 +451,15 @@ export function comfyToast(message, type = "info", duration, opts) {
         try {
             return app.ui.toast(message, type);
         } catch (e) {
-            console.debug("Native app.ui.toast failed, falling back", e);
+            console.debug("Native app.ui.toast failed", e);
         }
     }
 
-    // 3. Fallback: Custom DOM toast
-    const container = getToastContainer();
-
-    // Enforce maximum visible toasts
-    enforceToastLimit(container);
-
-    // Fallback if message is an object/error
-    if (typeof message !== "string") {
-        message = serializeToastMessage(message);
-    }
-
-    const el = document.createElement("div");
-    const icon = getToastIcon(type);
-
-    el.className = `mjr-toast mjr-toast-${type}`;
-    el.setAttribute("role", type === "error" || type === "warning" ? "alert" : "status");
-    el.setAttribute("aria-live", type === "error" || type === "warning" ? "assertive" : "polite");
-    el.setAttribute("aria-atomic", "true");
-
-    const textSpan = document.createElement("span");
-    textSpan.className = "mjr-toast-text";
-    textSpan.setAttribute("data-icon", icon);
-    textSpan.textContent = message;
-
-    el.appendChild(textSpan);
-
-    // Auto Remove
-    let trackedErrorEntry = null;
-    const timer = persistent
-        ? null
-        : setTimeout(() => {
-              removeToast(el);
-          }, duration);
-
-    // Helpers
-    function removeToast(element) {
-        if (!element.parentNode) return;
-        element.classList.remove("is-visible");
-        element.onclick = null;
-        if (trackedErrorEntry) _fallbackErrorToasts.delete(trackedErrorEntry);
-        if (timer) clearTimeout(timer);
-        setTimeout(() => {
-            if (element.parentNode) element.parentNode.removeChild(element);
-        }, 300);
-    }
-
-    const dismissThis = () => removeToast(el);
-
-    // Click to dismiss
-    el.onclick = dismissThis;
-
-    // Track error toasts for success-triggered auto-dismissal.
-    if (type === "error") {
-        trackedErrorEntry = { element: el, dismiss: dismissThis };
-        _fallbackErrorToasts.add(trackedErrorEntry);
-    }
-
-    container.appendChild(el);
-
-    // Animate In
-    requestAnimationFrame(() => {
-        el.classList.add("is-visible");
+    // No custom DOM toast fallback: keep notifications on Comfy native channels only.
+    console.warn("[Majoor Toast] Native toast API unavailable", {
+        type,
+        message: serializeToastMessage(message),
+        duration: persistent ? 0 : duration,
     });
 }
 

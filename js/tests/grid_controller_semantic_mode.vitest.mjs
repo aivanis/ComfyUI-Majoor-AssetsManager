@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+import { usePanelStore } from "../stores/usePanelStore.js";
 
 const apiState = vi.hoisted(() => ({
     hybridSearch: vi.fn(),
@@ -47,6 +49,31 @@ describe("gridController semantic mode", () => {
     });
 
     it("uses hybrid AI search when the semantic toggle is active", async () => {
+        setActivePinia(createPinia());
+        const panelStore = usePanelStore();
+        panelStore.scope = "output";
+        panelStore.customRootId = "";
+        panelStore.currentFolderRelativePath = "animals";
+        panelStore.kindFilter = "image";
+        panelStore.workflowOnly = true;
+        panelStore.minRating = 4;
+        panelStore.minSizeMB = 2;
+        panelStore.maxSizeMB = 5;
+        panelStore.resolutionCompare = "gte";
+        panelStore.minWidth = 1920;
+        panelStore.minHeight = 1080;
+        panelStore.maxWidth = 3840;
+        panelStore.maxHeight = 2160;
+        panelStore.workflowType = "T2I";
+        panelStore.dateRangeFilter = "this_month";
+        panelStore.dateExactFilter = "";
+        panelStore.sort = "mtime_desc";
+        panelStore.selectedAssetIds = [];
+        panelStore.activeAssetId = "";
+        panelStore.collectionId = "";
+        panelStore.collectionName = "";
+        panelStore.viewScope = "";
+
         const { createGridController } =
             await import("../features/panel/controllers/gridController.js");
 
@@ -72,30 +99,7 @@ describe("gridController semantic mode", () => {
             disposeGrid: vi.fn(),
             getQuery: () => "dinosaure",
             searchInputEl: { dataset: { mjrSemanticMode: "1" } },
-            state: {
-                scope: "output",
-                customRootId: "",
-                currentFolderRelativePath: "animals",
-                kindFilter: "image",
-                workflowOnly: true,
-                minRating: 4,
-                minSizeMB: 2,
-                maxSizeMB: 5,
-                resolutionCompare: "gte",
-                minWidth: 1920,
-                minHeight: 1080,
-                maxWidth: 3840,
-                maxHeight: 2160,
-                workflowType: "T2I",
-                dateRangeFilter: "this_month",
-                dateExactFilter: "",
-                sort: "mtime_desc",
-                selectedAssetIds: [],
-                activeAssetId: "",
-                collectionId: "",
-                collectionName: "",
-                viewScope: "",
-            },
+            state: panelStore,
         });
 
         await controller.reloadGrid();

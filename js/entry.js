@@ -1,6 +1,19 @@
 /**
- * Entry Point - Majoor Assets Manager
- * Registers extension with ComfyUI and mounts UI.
+ * Entry Point — Majoor Assets Manager
+ *
+ * Registers the ComfyUI extension and wires up the Vue-based UI.
+ *
+ * Vue migration summary
+ * ─────────────────────
+ * • Sidebar and bottom-panel tabs mount isolated Vue 3 + Pinia applications
+ *   (see js/vue/App.vue and js/vue/GeneratedFeedApp.vue).
+ * • Keep-alive is handled by mountKeepAlive() in createVueApp.js — no more
+ *   _mjrKeepAliveMounted DOM flags.
+ * • Commands are declared on the extension object (declarative API) so ComfyUI
+ *   surfaces them in the palette and shortcut editor automatically.
+ * • Toast notifications route through app.extensionManager.toast (ComfyUI's
+ *   PrimeVue toast) with a DOM fallback — no changes needed in toast.js as it
+ *   already prefers the native API.
  */
 
 import { runStartupWarmup, testAPI, triggerStartupScan } from "./app/bootstrap.js";
@@ -15,7 +28,6 @@ import {
     waitForComfyApp,
 } from "./app/comfyApiBridge.js";
 import { EVENTS } from "./app/events.js";
-import { initDragDrop } from "./features/dnd/DragDrop.js";
 import {
     teardownFloatingViewerManager,
     floatingViewerManager,
@@ -24,12 +36,9 @@ import {
     NODE_STREAM_FEATURE_ENABLED,
     NODE_STREAM_REACTIVATION_DOC,
 } from "./features/viewer/nodeStream/nodeStreamFeatureFlag.js";
-import { loadAssets, upsertAsset, removeAssetsFromGrid } from "./features/grid/GridView.js";
-import { getActiveGridContainer } from "./features/panel/AssetsManagerPanel.js";
-import {
-    pushGeneratedAsset,
-    refreshGeneratedFeedHosts,
-} from "./features/bottomPanel/GeneratedFeedTab.js";
+import { loadAssets, upsertAsset, removeAssetsFromGrid } from "./features/grid/gridApi.js";
+import { getActiveGridContainer } from "./features/panel/panelRuntimeRefs.js";
+import { pushGeneratedAsset, refreshGeneratedFeedHosts } from "./features/bottomPanel/feed/feedHost.js";
 import { createExecutionRuntimeController } from "./features/stacks/executionRuntimeController.js";
 import { extractOutputFiles } from "./utils/extractOutputFiles.js";
 import { post } from "./api/client.js";
@@ -45,30 +54,33 @@ import {
     buildBottomPanelTabs,
     buildNativeCommands,
     getMajoorNodeMenuItems,
+    mountGlobalRuntime,
     registerAssetsSidebar,
-    registerGeneratedBottomPanel,
     registerNativeCommands,
+    teardownGlobalRuntime,
 } from "./features/runtime/entryUiRegistration.js";
 import {
     ENTRY_RUNTIME_KEY,
     cleanupEntryRuntime,
     installEntryRuntimeController,
-    registerCleanableListener as registerCleanableListener,
+    registerCleanableListener,
     removeApiHandlers,
     removeRuntimeWindowHandlers,
 } from "./features/runtime/entryRuntimeLifecycle.js";
+
+// ── lazy module handles ───────────────────────────────────────────────────────
 
 /** @type {import("./features/viewer/LiveStreamTracker.js") | null} */
 let liveStreamModule = null;
 /** @type {import("./features/viewer/nodeStream/NodeStreamController.js") | null} */
 let nodeStreamModule = null;
 
-const UI_FLAGS = {
-    useComfyThemeUI: true,
-};
+// ── constants ─────────────────────────────────────────────────────────────────
 
 const SIDEBAR_TAB_ID = "majoor-assets";
 const EXECUTION_RUNTIME_KEY = "__MJR_EXECUTION_RUNTIME__";
+
+// ── execution runtime helpers ─────────────────────────────────────────────────
 
 function ensureExecutionRuntime() {
     try {
@@ -109,6 +121,8 @@ function emitRuntimeStatus(partial = {}) {
     }
 }
 
+// ── lazy module initialisation ─────────────────────────────────────────────────
+
 function setupLazyModules(runtimeApp) {
     void import("./features/viewer/LiveStreamTracker.js")
         .then((mod) => {
@@ -142,6 +156,8 @@ function setupLazyModules(runtimeApp) {
         })
         .catch((e) => console.warn("[MJR setup] NodeStream load failed:", e));
 }
+
+// ── API listener setup ────────────────────────────────────────────────────────
 
 async function setupApiListeners(runtimeApp, executionRuntime) {
     const api =
@@ -184,6 +200,8 @@ async function setupApiListeners(runtimeApp, executionRuntime) {
     });
 }
 
+// ── execution runtime controller ──────────────────────────────────────────────
+
 const executionRuntime = createExecutionRuntimeController({
     post,
     ENDPOINTS,
@@ -195,23 +213,48 @@ const executionRuntime = createExecutionRuntimeController({
     getActiveGridContainer,
 });
 
+// ── extension registration ─────────────────────────────────────────────────────
+
 app.registerExtension({
     name: "Majoor.AssetsManager",
+
+    /**
+     * Declarative settings — registered with ComfyUI's settings panel.
+     * Replaces the imperative registerMajoorSettings() call for the settings UI.
+     */
     settings: buildMajoorSettings(app),
+
+    /**
+     * Declarative commands — ComfyUI surfaces these in the command palette
+     * and the shortcut editor without additional imperative calls.
+     */
     commands: buildNativeCommands(app, {
         sidebarTabId: SIDEBAR_TAB_ID,
         triggerStartupScan,
     }),
+
+    /**
+     * Declarative bottom-panel tabs — processed by ComfyUI's extension service.
+     * Each tab's render/destroy callbacks mount/unmount the Vue app via
+     * mountKeepAlive() so state survives panel collapse/expand cycles.
+     */
+    bottomPanelTabs: buildBottomPanelTabs(),
+
+    // ── lifecycle ──────────────────────────────────────────────────────────────
+
     async setup() {
+        // 1. Runtime lifecycle controller (handles extension cleanup on reload).
         installEntryRuntimeController({
             cleanupEntryRuntimeFn: cleanupEntryRuntime,
             teardownLiveStreamTracker: (runtimeApp) =>
                 liveStreamModule?.teardownLiveStreamTracker(runtimeApp),
             teardownNodeStream: (runtimeApp) => nodeStreamModule?.teardownNodeStream(runtimeApp),
             teardownFloatingViewerManager,
+            teardownGlobalRuntime,
             reportError,
         });
 
+        // 2. Resolve the ComfyUI app reference (may take a few frames to be ready).
         setComfyApp(app);
         const runtimeApp = (await waitForComfyApp({ timeoutMs: 12000 })) || app;
         setComfyApp(runtimeApp);
@@ -221,58 +264,60 @@ app.registerExtension({
             console.debug?.(e);
         }
 
+        // 3. Baseline checks.
         testAPI();
-        ensureStyleLoaded({ enabled: UI_FLAGS.useComfyThemeUI });
+        ensureStyleLoaded({ enabled: true });
+        mountGlobalRuntime();
 
-        try {
-            initDragDrop();
-        } catch (e) {
-            console.warn("[MJR setup] initDragDrop failed:", e);
-        }
+        // 4. Global runtime — viewer + DnD stay mounted from the always-on Vue runtime.
 
+        // 5. Lazy viewer modules (non-blocking).
         setupLazyModules(runtimeApp);
 
+        // 6. Settings runtime init (applies settings to APP_CONFIG, starts watcher sync…).
         registerMajoorSettings(runtimeApp, () => {
             const grid = getActiveGridContainer();
             if (grid) loadAssets(grid);
         });
+
+        // 7. Fallback command registration for older ComfyUI versions that don't
+        //    process the declarative `commands` array on the extension object.
         registerNativeCommands(runtimeApp, {
             sidebarTabId: SIDEBAR_TAB_ID,
             triggerStartupScan,
         });
 
+        // 8. Version check (deferred so it doesn't slow startup).
         setTimeout(() => {
             void checkMajoorVersion();
         }, 5000);
 
+        // 9. WebSocket / realtime listeners.
         void setupApiListeners(runtimeApp, executionRuntime).catch((e) =>
             reportError(e, "entry.api_setup"),
         );
 
+        // 10. Register sidebar tab (Vue app mounts on first open via mountKeepAlive).
         if (
             registerAssetsSidebar(runtimeApp, {
                 sidebarTabId: SIDEBAR_TAB_ID,
-                useComfyThemeUI: UI_FLAGS.useComfyThemeUI,
             })
         ) {
-            console.debug("[Majoor] Sidebar tab registered");
+            console.debug("[Majoor] Sidebar tab registered (Vue)");
         } else {
             console.warn(
                 "Majoor Assets Manager: extensionManager.registerSidebarTab is unavailable",
             );
         }
 
-        try {
-            registerGeneratedBottomPanel(runtimeApp);
-        } catch (e) {
-            console.debug?.("[Majoor] Bottom panel tab registration unavailable", e);
-        }
+        // 11. Bottom panel tab is registered declaratively via `bottomPanelTabs`.
 
-        // Explicit warmup sequence: API/DB/counters first, then index scan only if idle.
+        // 12. Startup warmup: API/DB/counters first, then idle index scan.
         void runStartupWarmup({ delayMs: 200, idleOnly: true }).catch((e) =>
             reportError(e, "entry.startup_warmup"),
         );
 
+        // 13. Debug API surface (development/support).
         exposeDebugApis({
             resolveNodeStreamModule: async () => {
                 if (!nodeStreamModule) {
@@ -285,9 +330,12 @@ app.registerExtension({
         });
     },
 
+    // ── hooks ──────────────────────────────────────────────────────────────────
+
     /**
-     * ComfyUI v1.42+ hook: fires when individual node outputs are updated during execution.
-     * @param {Map<string, object>} nodeOutputs
+     * ComfyUI v1.42+ — fires when individual node outputs are updated during
+     * a workflow execution.  Feeds the execution-stack runtime so the bottom
+     * feed panel receives live assets.
      */
     onNodeOutputsUpdated(nodeOutputs) {
         try {
@@ -297,8 +345,8 @@ app.registerExtension({
         }
     },
 
+    /** Context-menu items injected into ComfyUI node right-click menus. */
     getNodeMenuItems(node) {
         return getMajoorNodeMenuItems(node, app, { sidebarTabId: SIDEBAR_TAB_ID });
     },
-    bottomPanelTabs: buildBottomPanelTabs(),
 });

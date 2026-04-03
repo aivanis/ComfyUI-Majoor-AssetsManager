@@ -520,7 +520,9 @@ def _group_priority(asset: dict[str, Any]) -> tuple[int, int, int, int]:
     has_generation = 1 if int(asset.get("has_generation_data") or 0) else 0
     size = int(asset.get("size") or 0)
     mtime = int(asset.get("mtime") or 0)
-    return (is_image, has_generation, size, mtime)
+    # Prioritize: image > most recent (DESC) > generation data > size
+    # For DESC sorting, newer mtime should rank higher, so use mtime directly
+    return (is_image, mtime, has_generation, size)
 
 
 def _select_group_representative(current: dict[str, Any], candidate: dict[str, Any]) -> dict[str, Any]:

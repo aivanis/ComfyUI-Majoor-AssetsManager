@@ -120,6 +120,16 @@ export function getExtensionManager(app) {
     return runtimeApp?.extensionManager || runtimeApp?.ui?.extensionManager || null;
 }
 
+function _getSidebarController(manager) {
+    if (!_isObject(manager)) return null;
+    return manager?.sidebarTab || manager?.sidebarTabStore || null;
+}
+
+function _getBottomPanelController(manager) {
+    if (!_isObject(manager)) return null;
+    return manager?.bottomPanel || manager?.bottomPanelStore || null;
+}
+
 export function getExtensionToastApi(app) {
     const manager = getExtensionManager(app);
     const toastApi = manager?.toast || null;
@@ -140,6 +150,7 @@ export function getExtensionDialogApi(app) {
 export function activateSidebarTabCompat(app, tabId) {
     const runtimeApp = _isObject(app) ? app : getComfyApp();
     const manager = getExtensionManager(runtimeApp);
+    const sidebarController = _getSidebarController(manager);
     const safeTabId = String(tabId || "").trim();
     if (!manager || !safeTabId) return false;
     const candidates = [
@@ -149,22 +160,30 @@ export function activateSidebarTabCompat(app, tabId) {
         "setActiveSidebarTab",
         "showSidebarTab",
     ];
-    for (const name of candidates) {
-        try {
-            if (typeof manager?.[name] === "function") {
-                manager[name](safeTabId);
-                return true;
+    for (const host of [manager, sidebarController]) {
+        if (!host) continue;
+        for (const name of candidates) {
+            try {
+                if (typeof host?.[name] === "function") {
+                    host[name](safeTabId);
+                    return true;
+                }
+            } catch (e) {
+                console.debug?.(e);
             }
-        } catch (e) {
-            console.debug?.(e);
         }
     }
     try {
-        if (
-            manager?.sidebarTabStore &&
-            typeof manager.sidebarTabStore.setActiveTab === "function"
-        ) {
-            manager.sidebarTabStore.setActiveTab(safeTabId);
+        const activeId = String(
+            sidebarController?.activeSidebarTabId ||
+                sidebarController?.activeSidebarTab?.id ||
+                manager?.activeSidebarTabId ||
+                manager?.activeSidebarTab?.id ||
+                "",
+        ).trim();
+        if (activeId === safeTabId) return true;
+        if (typeof sidebarController?.toggleSidebarTab === "function") {
+            sidebarController.toggleSidebarTab(safeTabId);
             return true;
         }
     } catch (e) {
@@ -214,9 +233,12 @@ export function registerSidebarTabCompat(app, tabDef) {
     try {
         const runtimeApp = _isObject(app) ? app : getComfyApp();
         const manager = runtimeApp?.extensionManager || runtimeApp?.ui?.extensionManager || null;
-        if (manager && typeof manager.registerSidebarTab === "function") {
-            manager.registerSidebarTab(tabDef);
-            return true;
+        const sidebarController = _getSidebarController(manager);
+        for (const host of [manager, sidebarController]) {
+            if (host && typeof host.registerSidebarTab === "function") {
+                host.registerSidebarTab(tabDef);
+                return true;
+            }
         }
     } catch (e) {
         console.debug?.(e);
@@ -228,9 +250,12 @@ export function registerBottomPanelTabCompat(app, tabDef) {
     try {
         const runtimeApp = _isObject(app) ? app : getComfyApp();
         const manager = getExtensionManager(runtimeApp);
-        if (manager && typeof manager.registerBottomPanelTab === "function") {
-            manager.registerBottomPanelTab(tabDef);
-            return true;
+        const bottomPanelController = _getBottomPanelController(manager);
+        for (const host of [manager, bottomPanelController]) {
+            if (host && typeof host.registerBottomPanelTab === "function") {
+                host.registerBottomPanelTab(tabDef);
+                return true;
+            }
         }
     } catch (e) {
         console.debug?.(e);

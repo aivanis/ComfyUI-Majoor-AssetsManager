@@ -211,6 +211,69 @@ describe("FloatingViewer", () => {
         );
     });
 
+    it("does not hijack wheel scrolling inside scrollable overlay content", async () => {
+        const { FloatingViewer } = await import("../features/viewer/FloatingViewer.js");
+
+        const wheelHandlers = [];
+        const contentEl = {
+            addEventListener: vi.fn((type, handler) => {
+                if (type === "wheel") wheelHandlers.push(handler);
+            }),
+        };
+        const scrollableOverlay = {
+            scrollTop: 20,
+            scrollHeight: 200,
+            clientHeight: 100,
+            scrollLeft: 0,
+            scrollWidth: 100,
+            clientWidth: 100,
+            parentElement: null,
+        };
+        const target = {
+            nodeType: 1,
+            parentElement: scrollableOverlay,
+            closest: vi.fn(() => null),
+        };
+        const viewer = {
+            _zoom: 1,
+            _destroyPanZoom: vi.fn(),
+            _setMfvZoom: vi.fn(),
+        };
+
+        const originalGetComputedStyle = globalThis.window?.getComputedStyle;
+        globalThis.window = {
+            ...(globalThis.window || {}),
+            getComputedStyle: vi.fn((element) => {
+                if (element === scrollableOverlay) {
+                    return { overflowY: "auto", overflowX: "hidden" };
+                }
+                return { overflowY: "visible", overflowX: "visible" };
+            }),
+        };
+
+        try {
+            FloatingViewer.prototype._initPanZoom.call(viewer, contentEl);
+            expect(wheelHandlers).toHaveLength(1);
+
+            const preventDefault = vi.fn();
+            wheelHandlers[0]({
+                target,
+                deltaY: 30,
+                deltaX: 0,
+                preventDefault,
+                clientX: 10,
+                clientY: 10,
+            });
+
+            expect(preventDefault).not.toHaveBeenCalled();
+            expect(viewer._setMfvZoom).not.toHaveBeenCalled();
+        } finally {
+            if (originalGetComputedStyle) {
+                globalThis.window.getComputedStyle = originalGetComputedStyle;
+            }
+        }
+    });
+
     it("includes shortcut hints in MFV tooltips", async () => {
         const { FloatingViewer, MFV_MODES } = await import("../features/viewer/FloatingViewer.js");
 

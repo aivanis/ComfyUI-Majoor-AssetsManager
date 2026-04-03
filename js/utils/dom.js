@@ -28,6 +28,22 @@ export function safeClosest(target, selector) {
 }
 
 /**
+ * Safely escape a string for use inside CSS selectors.
+ * Falls back to conservative character escaping when CSS.escape is unavailable.
+ * @param {any} value
+ * @returns {string}
+ */
+export function safeEscapeSelector(value) {
+    const str = String(value ?? "");
+    try {
+        if (typeof CSS?.escape === "function") return CSS.escape(str);
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return str.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
+}
+
+/**
  * Clipboard helper with safe fallback behavior.
  * Returns true on success, false otherwise.
  */

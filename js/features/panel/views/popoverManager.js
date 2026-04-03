@@ -22,6 +22,7 @@ export function createPopoverManager(container) {
     let windowScrollHandlerBound = false;
     let windowResizeHandlerBound = false;
     let repositionController = new AbortController();
+    let documentListenerController = new AbortController();
     let disposed = false;
 
     const POPOVER_GAP_PX = 8;
@@ -364,16 +365,25 @@ export function createPopoverManager(container) {
     };
 
     const init = () => {
-        document.addEventListener("mousedown", onDocMouseDown);
+        try {
+            documentListenerController?.abort?.();
+        } catch (e) {
+            console.debug?.(e);
+        }
+        documentListenerController = new AbortController();
+        document.addEventListener("mousedown", onDocMouseDown, {
+            signal: documentListenerController.signal,
+        });
     };
 
     const dispose = () => {
         disposed = true;
         try {
-            document.removeEventListener("mousedown", onDocMouseDown);
+            documentListenerController?.abort?.();
         } catch (e) {
             console.debug?.(e);
         }
+        documentListenerController = null;
         try {
             maybeRemoveRepositionListeners();
         } catch (e) {

@@ -107,6 +107,39 @@ function _attemptAutoplay(mediaEl) {
     }
 }
 
+function _findScrollableAncestor(target, boundary) {
+    let node = target && target.nodeType === 1 ? target : target?.parentElement || null;
+    while (node && node !== boundary) {
+        try {
+            const style = window.getComputedStyle?.(node);
+            const canScrollY = /(auto|scroll|overlay)/.test(String(style?.overflowY || ""));
+            const canScrollX = /(auto|scroll|overlay)/.test(String(style?.overflowX || ""));
+            if (canScrollY || canScrollX) {
+                return node;
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        node = node.parentElement || null;
+    }
+    return null;
+}
+
+function _canWheelScrollElement(element, deltaX, deltaY) {
+    if (!element) return false;
+    if (Math.abs(Number(deltaY) || 0) >= Math.abs(Number(deltaX) || 0)) {
+        const top = Number(element.scrollTop || 0);
+        const maxTop = Math.max(0, Number(element.scrollHeight || 0) - Number(element.clientHeight || 0));
+        if (deltaY < 0 && top > 0) return true;
+        if (deltaY > 0 && top < maxTop) return true;
+    }
+    const left = Number(element.scrollLeft || 0);
+    const maxLeft = Math.max(0, Number(element.scrollWidth || 0) - Number(element.clientWidth || 0));
+    if (deltaX < 0 && left > 0) return true;
+    if (deltaX > 0 && left < maxLeft) return true;
+    return false;
+}
+
 function _pauseMediaIn(rootEl) {
     if (!rootEl) return;
     try {
@@ -231,8 +264,10 @@ function _canvasLabel(ctx, text, x, y) {
 // ── FloatingViewer class ──────────────────────────────────────────────────────
 
 export class FloatingViewer {
-    constructor() {
+    constructor({ controller = null } = {}) {
         this._instanceId = ++_mfvInstanceSeq;
+        this._controller =
+            controller && typeof controller === "object" ? { ...controller } : null;
         this.element = null;
         this.isVisible = false;
         this._contentEl = null;
@@ -298,6 +333,51 @@ export class FloatingViewer {
         this._genDropdownId = `mjr-mfv-gen-dropdown-${this._instanceId}`;
         this._docClickHost = null;
         this._handleDocClick = null;
+    }
+
+    _dispatchControllerAction(methodName, fallbackEventType) {
+        try {
+            const handler = this._controller?.[methodName];
+            if (typeof handler === "function") {
+                return handler();
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        if (!fallbackEventType) return undefined;
+        try {
+            window.dispatchEvent(new Event(fallbackEventType));
+        } catch (e) {
+            console.debug?.(e);
+        }
+        return undefined;
+    }
+
+    _forwardKeydownToController(event) {
+        try {
+            const handler = this._controller?.handleForwardedKeydown;
+            if (typeof handler === "function") {
+                handler(event);
+                return;
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        try {
+            window.dispatchEvent(
+                new KeyboardEvent("keydown", {
+                    key: event?.key,
+                    code: event?.code,
+                    keyCode: event?.keyCode,
+                    ctrlKey: event?.ctrlKey,
+                    shiftKey: event?.shiftKey,
+                    altKey: event?.altKey,
+                    metaKey: event?.metaKey,
+                }),
+            );
+        } catch (e) {
+            console.debug?.(e);
+        }
     }
 
     // ── Build DOM ─────────────────────────────────────────────────────────────
@@ -500,7 +580,7 @@ export class FloatingViewer {
         this._closeBtn?.addEventListener(
             "click",
             () => {
-                window.dispatchEvent(new CustomEvent(EVENTS.MFV_CLOSE));
+                this._dispatchControllerAction("close", EVENTS.MFV_CLOSE);
             },
             { signal },
         );
@@ -525,7 +605,7 @@ export class FloatingViewer {
         this._liveBtn?.addEventListener(
             "click",
             () => {
-                window.dispatchEvent(new CustomEvent(EVENTS.MFV_LIVE_TOGGLE));
+                this._dispatchControllerAction("toggleLive", EVENTS.MFV_LIVE_TOGGLE);
             },
             { signal },
         );
@@ -533,7 +613,7 @@ export class FloatingViewer {
         this._previewBtn?.addEventListener(
             "click",
             () => {
-                window.dispatchEvent(new CustomEvent(EVENTS.MFV_PREVIEW_TOGGLE));
+                this._dispatchControllerAction("togglePreview", EVENTS.MFV_PREVIEW_TOGGLE);
             },
             { signal },
         );
@@ -541,7 +621,10 @@ export class FloatingViewer {
         this._nodeStreamBtn?.addEventListener(
             "click",
             () => {
-                window.dispatchEvent(new CustomEvent(EVENTS.MFV_NODESTREAM_TOGGLE));
+                this._dispatchControllerAction(
+                    "toggleNodeStream",
+                    EVENTS.MFV_NODESTREAM_TOGGLE,
+                );
             },
             { signal },
         );
@@ -562,7 +645,7 @@ export class FloatingViewer {
         this._popoutBtn?.addEventListener(
             "click",
             () => {
-                window.dispatchEvent(new CustomEvent(EVENTS.MFV_POPOUT));
+                this._dispatchControllerAction("popOut", EVENTS.MFV_POPOUT);
             },
             { signal },
         );
@@ -1266,6 +1349,17 @@ export class FloatingViewer {
             (e) => {
                 if (e.target?.closest?.("audio")) return;
                 if (isModel3DInteractionTarget(e.target)) return;
+                const scrollableAncestor = _findScrollableAncestor(e.target, contentEl);
+                if (
+                    scrollableAncestor &&
+                    _canWheelScrollElement(
+                        scrollableAncestor,
+                        Number(e.deltaX || 0),
+                        Number(e.deltaY || 0),
+                    )
+                ) {
+                    return;
+                }
                 e.preventDefault();
                 const delta = e.deltaY || e.deltaX || 0;
                 const factor = 1 - delta * MFV_ZOOM_FACTOR;
@@ -1755,18 +1849,7 @@ export class FloatingViewer {
                             tag === "select"
                         )
                             return;
-                        const _lower = String(e?.key || "").toLowerCase();
-                        window.dispatchEvent(
-                            new KeyboardEvent("keydown", {
-                                key: e.key,
-                                code: e.code,
-                                keyCode: e.keyCode,
-                                ctrlKey: e.ctrlKey,
-                                shiftKey: e.shiftKey,
-                                altKey: e.altKey,
-                                metaKey: e.metaKey,
-                            }),
-                        );
+                        this._forwardKeydownToController(e);
                     };
                     pipWindow.addEventListener("keydown", this._popoutKeydownHandler, {
                         signal: popoutSignal,
@@ -1877,20 +1960,10 @@ export class FloatingViewer {
                 e.preventDefault();
                 e.stopPropagation?.();
                 e.stopImmediatePropagation?.();
-                window.dispatchEvent(new Event(EVENTS.MFV_TOGGLE));
+                this._dispatchControllerAction("toggle", EVENTS.MFV_TOGGLE);
                 return;
             }
-            window.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                    key: e.key,
-                    code: e.code,
-                    keyCode: e.keyCode,
-                    ctrlKey: e.ctrlKey,
-                    shiftKey: e.shiftKey,
-                    altKey: e.altKey,
-                    metaKey: e.metaKey,
-                }),
-            );
+            this._forwardKeydownToController(e);
         };
         popup.addEventListener("keydown", this._popoutKeydownHandler, { signal: popoutSignal });
     }

@@ -1,3 +1,20 @@
+/**
+ * UI registration — sidebar, bottom panel, commands, node menu items.
+ *
+ * Vue migration notes
+ * ───────────────────
+ * Sidebar and bottom-panel tabs are now registered with `type: 'custom'` backed
+ * by a full Vue 3 + Pinia application mounted inside the container element.
+ * This replaces both the old DOM-manipulation approach AND the keep-alive hack
+ * (`_mjrKeepAliveMounted`): `mountKeepAlive` mounts the Vue app only once and
+ * re-uses the live DOM on subsequent `render()` calls, preserving all grid
+ * state and scroll positions across tab-switch cycles.
+ *
+ * Commands are declared as a plain array on the extension object (declarative
+ * API) so ComfyUI surfaces them in the command palette and the shortcut editor
+ * without any extra imperative registration calls.
+ */
+
 import {
     activateSidebarTabCompat,
     registerBottomPanelTabCompat,
@@ -7,8 +24,54 @@ import {
 import { EVENTS } from "../../app/events.js";
 import { comfyToast } from "../../app/toast.js";
 import { t } from "../../app/i18n.js";
-import { renderAssetsManager } from "../panel/AssetsManagerPanel.js";
-import { getGeneratedFeedBottomPanelTab } from "../bottomPanel/GeneratedFeedTab.js";
+import { mountKeepAlive, unmountKeepAlive } from "../../vue/createVueApp.js";
+import GlobalRuntimeApp from "../../vue/GlobalRuntime.vue";
+import AssetsManagerApp from "../../vue/App.vue";
+import GeneratedFeedApp from "../../vue/GeneratedFeedApp.vue";
+
+// ── keep-alive mount keys ─────────────────────────────────────────────────────
+const GLOBAL_RUNTIME_ROOT_ID = "mjr-global-runtime-root";
+const GLOBAL_RUNTIME_MOUNT_KEY = "_mjrGlobalRuntimeVueApp";
+const SIDEBAR_MOUNT_KEY = "_mjrSidebarVueApp";
+const FEED_MOUNT_KEY = "_mjrFeedVueApp";
+
+function ensureGlobalRuntimeRoot() {
+    if (typeof document === "undefined" || !document?.body) return null;
+    let root = document.getElementById(GLOBAL_RUNTIME_ROOT_ID);
+    if (root) return root;
+
+    root = document.createElement("div");
+    root.id = GLOBAL_RUNTIME_ROOT_ID;
+    root.setAttribute("role", "presentation");
+    root.style.cssText =
+        // Keep runtime hosts above panel layers so main viewer overlay cannot render underneath.
+        "position:fixed;inset:0;overflow:visible;pointer-events:none;z-index:10020;";
+    document.body.appendChild(root);
+    return root;
+}
+
+export function mountGlobalRuntime() {
+    try {
+        const root = ensureGlobalRuntimeRoot();
+        if (!root) return false;
+        return mountKeepAlive(root, GlobalRuntimeApp, GLOBAL_RUNTIME_MOUNT_KEY);
+    } catch {
+        return false;
+    }
+}
+
+export function teardownGlobalRuntime() {
+    try {
+        const root = document.getElementById(GLOBAL_RUNTIME_ROOT_ID);
+        if (!root) return;
+        unmountKeepAlive(root, GLOBAL_RUNTIME_MOUNT_KEY);
+        root.remove?.();
+    } catch {
+        /* ignore */
+    }
+}
+
+// ── sidebar helpers ───────────────────────────────────────────────────────────
 
 export function openAssetsManagerPanel(runtimeApp, sidebarTabId) {
     const opened = activateSidebarTabCompat(runtimeApp, sidebarTabId);
@@ -32,6 +95,8 @@ export function triggerRefreshGrid() {
     }
 }
 
+// ── commands (declarative array for ComfyUI extension API) ────────────────────
+
 export function buildNativeCommands(runtimeApp, { sidebarTabId, triggerStartupScan }) {
     return [
         {
@@ -50,7 +115,13 @@ export function buildNativeCommands(runtimeApp, { sidebarTabId, triggerStartupSc
             id: "mjr.toggleFloatingViewer",
             label: t("command.toggleFloatingViewer", "Toggle floating viewer"),
             icon: "pi pi-images",
-            function: () => window.dispatchEvent(new Event(EVENTS.MFV_TOGGLE)),
+            function: () => {
+                try {
+                    window.dispatchEvent(new Event(EVENTS.MFV_TOGGLE));
+                } catch (e) {
+                    console.debug?.(e);
+                }
+            },
         },
         {
             id: "mjr.refreshAssetsGrid",
@@ -61,13 +132,25 @@ export function buildNativeCommands(runtimeApp, { sidebarTabId, triggerStartupSc
     ];
 }
 
+/** Imperatively registers commands — used as a fallback for older ComfyUI. */
 export function registerNativeCommands(runtimeApp, options) {
     for (const command of buildNativeCommands(runtimeApp, options)) {
         registerCommandCompat(runtimeApp, command);
     }
 }
 
-export function registerAssetsSidebar(runtimeApp, { sidebarTabId, useComfyThemeUI }) {
+// ── sidebar registration ──────────────────────────────────────────────────────
+
+/**
+ * Registers the Majoor Assets Manager sidebar tab.
+ *
+ * The tab uses `type: 'custom'` so we control the full lifecycle.
+ * On `render()` a Vue 3 app (AssetsManagerApp) is mounted — or kept alive if
+ * already mounted.  `destroy()` is intentionally a no-op so the Vue app (and
+ * therefore the grid, scroll position, and selections) survive tab-switches.
+ * Full teardown only happens when the extension is unregistered.
+ */
+export function registerAssetsSidebar(runtimeApp, { sidebarTabId }) {
     return registerSidebarTabCompat(runtimeApp, {
         id: sidebarTabId,
         icon: "pi pi-folder",
@@ -75,36 +158,69 @@ export function registerAssetsSidebar(runtimeApp, { sidebarTabId, useComfyThemeU
         label: t("manager.sidebarLabel"),
         tooltip: t("tooltip.sidebarTab"),
         type: "custom",
-        render: (el) => {
-            try {
-                if (el?._mjrKeepAliveMounted) {
-                    return;
-                }
-                el._mjrKeepAliveMounted = true;
-            } catch (e) {
-                console.debug?.(e);
-            }
-            void renderAssetsManager(el, { useComfyThemeUI });
+
+        render(el) {
+            // Mount the Vue app once; subsequent calls reuse the live instance.
+            mountKeepAlive(el, AssetsManagerApp, SIDEBAR_MOUNT_KEY);
         },
-        destroy: (el) => {
-            // Keep the panel mounted between sidebar open/close cycles so the grid
-            // state and DOM survive and reopening the tab does not force a reload.
-            try {
-                el?._mjrKeepAliveMounted;
-            } catch (e) {
-                console.debug?.(e);
-            }
+
+        destroy(el) {
+            // Keep-alive: intentionally do NOT call unmountKeepAlive here.
+            // The Vue app stays mounted so the grid survives tab-switches.
+            // unmountKeepAlive is only called on full extension teardown (see below).
+            void el; // suppress lint warning
         },
     });
+}
+
+/**
+ * Teardown the sidebar Vue app entirely (called only from the entry lifecycle
+ * controller on extension cleanup / ComfyUI reload).
+ */
+export function teardownAssetsSidebar() {
+    try {
+        const el = document.querySelector(`[data-tab-id="majoor-assets"]`);
+        if (el) unmountKeepAlive(el, SIDEBAR_MOUNT_KEY);
+    } catch {
+        /* ignore */
+    }
+}
+
+// ── bottom panel registration ─────────────────────────────────────────────────
+
+/**
+ * Returns the bottom-panel tab definition.
+ * Used both as the declarative `bottomPanelTabs` array entry on the extension
+ * object and as the argument to registerBottomPanelTabCompat() for older
+ * ComfyUI versions.
+ */
+export function getGeneratedFeedBottomPanelTab() {
+    return {
+        id: "majoor-generated-feed",
+        title: t("bottomFeed.title", "Generated Feed"),
+        icon: "pi pi-images",
+        type: "custom",
+
+        render(el) {
+            mountKeepAlive(el, GeneratedFeedApp, FEED_MOUNT_KEY);
+        },
+
+        destroy(el) {
+            // Keep-alive: do not unmount on every hide.
+            void el;
+        },
+    };
+}
+
+export function buildBottomPanelTabs() {
+    return [getGeneratedFeedBottomPanelTab()];
 }
 
 export function registerGeneratedBottomPanel(runtimeApp) {
     return registerBottomPanelTabCompat(runtimeApp, getGeneratedFeedBottomPanelTab());
 }
 
-export function buildBottomPanelTabs() {
-    return [getGeneratedFeedBottomPanelTab()];
-}
+// ── node context-menu items ───────────────────────────────────────────────────
 
 export function isMajoorTrackableNode(node) {
     const comfyClass = String(
@@ -115,10 +231,7 @@ export function isMajoorTrackableNode(node) {
 }
 
 function nodeMenuEntry(label, callback) {
-    return {
-        content: label,
-        callback,
-    };
+    return { content: label, callback };
 }
 
 export function getMajoorNodeMenuItems(node, runtimeApp, { sidebarTabId }) {

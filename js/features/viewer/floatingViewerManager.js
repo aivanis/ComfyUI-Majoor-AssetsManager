@@ -3,7 +3,8 @@
  *
  * Responsibilities:
  *  - Instantiate/reuse the FloatingViewer DOM element (lazy).
- *  - Handle MFV_OPEN / MFV_CLOSE / MFV_TOGGLE / MFV_LIVE_TOGGLE global events.
+ *  - Expose install/remove helpers for MFV global events; Vue now owns when
+ *    those handlers are active.
  *  - On open: immediately load the currently-selected assets from the grid.
  *  - Subscribe to window "mjr:selection-changed" and update the viewer when open.
  *  - Expose `upsertWithContent(fileData)` for LiveStreamTracker.
@@ -11,11 +12,12 @@
 
 import { EVENTS } from "../../app/events.js";
 import { getAssetsBatch } from "../../api/client.js";
-import { getActiveGridContainer } from "../panel/AssetsManagerPanel.js";
+import { getActiveGridContainer } from "../panel/panelRuntimeRefs.js";
 import { getSelectedIdSet } from "../grid/GridSelectionManager.js";
 import { getHotkeysState, isHotkeysSuspended } from "../panel/controllers/hotkeysState.js";
 import { reportError } from "../../utils/logging.js";
 import { NODE_STREAM_FEATURE_ENABLED } from "./nodeStream/nodeStreamFeatureFlag.js";
+import { appendFloatingViewerNode } from "./viewerRuntimeHosts.js";
 
 // Lazy-loaded modules — loaded on first use to avoid blocking startup.
 /** @type {typeof import("./FloatingViewer.js").FloatingViewer | null} */
@@ -68,9 +70,27 @@ async function _getInstance() {
         const FV = await _loadFloatingViewer();
         if (!_instance) {
             // re-check after await
-            _instance = new FV();
-            document.body.appendChild(_instance.render());
+            _instance = new FV({
+                controller: {
+                    close: () => floatingViewerManager.close(),
+                    toggle: () => floatingViewerManager.toggle(),
+                    toggleLive: () => floatingViewerManager.toggleLive(),
+                    togglePreview: () => floatingViewerManager.togglePreview(),
+                    toggleNodeStream: () => floatingViewerManager.toggleNodeStream(),
+                    popOut: () => floatingViewerManager.popOut(),
+                    handleForwardedKeydown: (event) => _onGlobalKeydown(event),
+                },
+            });
+            appendFloatingViewerNode(_instance.render());
         }
+    }
+    try {
+        const node = _instance?.element || null;
+        if (node?.isConnected === false) {
+            appendFloatingViewerNode(node);
+        }
+    } catch (e) {
+        console.debug?.(e);
     }
     return _instance;
 }
@@ -588,8 +608,9 @@ const _onGlobalKeydown = (event) => {
     }
 };
 
-function _installGlobalHandlers() {
+export function installFloatingViewerGlobalHandlers() {
     if (_globalHandlersInstalled) return;
+    if (typeof window === "undefined" || !window?.addEventListener) return;
     window.addEventListener(EVENTS.MFV_OPEN, _onMfvOpen);
     window.addEventListener(EVENTS.MFV_CLOSE, _onMfvClose);
     window.addEventListener(EVENTS.MFV_TOGGLE, _onMfvToggle);
@@ -604,7 +625,11 @@ function _installGlobalHandlers() {
     _globalHandlersInstalled = true;
 }
 
-function _removeGlobalHandlers() {
+export function removeFloatingViewerGlobalHandlers() {
+    if (typeof window === "undefined" || !window?.removeEventListener) {
+        _globalHandlersInstalled = false;
+        return;
+    }
     window.removeEventListener(EVENTS.MFV_OPEN, _onMfvOpen);
     window.removeEventListener(EVENTS.MFV_CLOSE, _onMfvClose);
     window.removeEventListener(EVENTS.MFV_TOGGLE, _onMfvToggle);
@@ -624,7 +649,7 @@ function _removeGlobalHandlers() {
  * Called from entry.js during hot-reload cleanup so the next module instance
  * starts from a clean slate.
  */
-export function teardownFloatingViewerManager() {
+export function teardownFloatingViewerManager({ reinstallGlobalHandlers = false } = {}) {
     const wasVisible = Boolean(_instance?.isVisible);
     // If the viewer is popped out to a separate window, bring it back first
     try {
@@ -632,7 +657,7 @@ export function teardownFloatingViewerManager() {
     } catch (e) {
         console.debug?.(e);
     }
-    _removeGlobalHandlers();
+    removeFloatingViewerGlobalHandlers();
     _unbindSelectionListener();
     _cancelFetch();
     _loadSeq += 1;
@@ -646,9 +671,7 @@ export function teardownFloatingViewerManager() {
     }
     _disposeInstance();
     if (wasVisible) _emitVisibilityChanged(false);
-    // entry.js calls teardown during setup before the current module continues
-    // initializing, so re-arm the current module's global listeners immediately.
-    _installGlobalHandlers();
+    if (reinstallGlobalHandlers) {
+        installFloatingViewerGlobalHandlers();
+    }
 }
-
-_installGlobalHandlers();

@@ -1,3 +1,5 @@
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
+
 export function createScopeController({
     state,
     tabButtons,
@@ -11,14 +13,40 @@ export function createScopeController({
     onBeforeReload = null,
 }) {
     let scopeSwitchSeq = 0;
+    const { panelStore, read: readState, write: writeState, controllerState: getControllerState } =
+        createPanelStateBridge(state, [
+            "scope",
+            "customRootId",
+            "currentFolderRelativePath",
+            "collectionId",
+            "collectionName",
+            "viewScope",
+            "similarResults",
+            "similarTitle",
+            "similarSourceAssetId",
+        ]);
+
+    const syncVirtualSimilarState = ({
+        viewScope = "",
+        similarResults = [],
+        similarTitle = "",
+        similarSourceAssetId = "",
+    } = {}) => {
+        writeState("viewScope", viewScope);
+        writeState("similarResults", similarResults);
+        writeState("similarTitle", similarTitle);
+        writeState("similarSourceAssetId", similarSourceAssetId);
+    };
+
     const hasSimilarResults = () => {
         try {
             return !!(
-                String(state?.viewScope || "")
+                String(readState("viewScope", "") || "")
                     .trim()
                     .toLowerCase() === "similar" ||
-                (Array.isArray(state?.similarResults) && state.similarResults.length > 0) ||
-                String(state?.similarTitle || "").trim()
+                (Array.isArray(readState("similarResults", [])) &&
+                    readState("similarResults", []).length > 0) ||
+                String(readState("similarTitle", "") || "").trim()
             );
         } catch {
             return false;
@@ -26,15 +54,12 @@ export function createScopeController({
     };
 
     const resetSimilarScope = () => {
-        state.viewScope = "";
-        state.similarResults = [];
-        state.similarTitle = "";
-        state.similarSourceAssetId = "";
+        syncVirtualSimilarState();
     };
 
     const setActiveTabStyles = () => {
         const buttons = Object.values(tabButtons || {});
-        const activeScope = String(state?.viewScope || state?.scope || "output").toLowerCase();
+        const activeScope = String(readState("viewScope", "") || readState("scope", "output")).toLowerCase();
         buttons.forEach((b) => {
             const scope = b?.dataset?.scope;
             const active = scope === activeScope;
@@ -83,7 +108,7 @@ export function createScopeController({
 
         if (normalized === "similar") {
             if (!hasSimilarResults()) return;
-            state.viewScope = "similar";
+            writeState("viewScope", "similar");
             setActiveTabStyles();
             try {
                 onChanged?.();
@@ -91,26 +116,36 @@ export function createScopeController({
                 console.debug?.(e);
             }
             try {
-                await onBeforeReload?.(state);
+                await onBeforeReload?.(getControllerState());
             } catch (e) {
                 console.debug?.(e);
             }
-            if (requestedSeq !== scopeSwitchSeq) return;
             await reloadGrid();
             return;
         }
 
         // Switching scope exits any active collection view.
-        state.collectionId = "";
-        state.collectionName = "";
+        writeState("collectionId", "");
+        writeState("collectionName", "");
         resetSimilarScope();
 
-        state.scope =
+        const nextScope =
             normalized === "outputs" ? "output" : normalized === "inputs" ? "input" : normalized;
+        if (panelStore?.navigateToScope) {
+            try {
+                panelStore.navigateToScope(nextScope, { folder: "" });
+            } catch (e) {
+                console.debug?.(e);
+                writeState("scope", nextScope);
+                writeState("currentFolderRelativePath", "");
+            }
+        } else {
+            writeState("scope", nextScope);
+            writeState("currentFolderRelativePath", "");
+        }
         // Scope switch should reset folder context to avoid stale filtering behavior.
-        state.currentFolderRelativePath = "";
-        if (state.scope !== "custom") {
-            state.customRootId = "";
+        if (String(readState("scope", nextScope)) !== "custom") {
+            writeState("customRootId", "");
         }
 
         setActiveTabStyles();
@@ -120,13 +155,13 @@ export function createScopeController({
             console.debug?.(e);
         }
         try {
-            await onScopeChanged?.(state);
+            await onScopeChanged?.(getControllerState());
         } catch (e) {
             console.debug?.(e);
         }
         if (requestedSeq !== scopeSwitchSeq) return;
         try {
-            await onBeforeReload?.(state);
+            await onBeforeReload?.(getControllerState());
         } catch (e) {
             console.debug?.(e);
         }

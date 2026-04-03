@@ -3,8 +3,13 @@
  * Cleans up stale overlays before mounting a new one.
  */
 
+import {
+    appendViewerOverlayNode,
+    getManagedViewerOverlayNodes,
+} from "./viewerRuntimeHosts.js";
+
 export function getViewerInstance(createViewer) {
-    const all = Array.from(document.querySelectorAll?.(".mjr-viewer-overlay") || []);
+    const all = getManagedViewerOverlayNodes();
     if (all.length) {
         const keep = all[all.length - 1];
         for (const el of all) {
@@ -29,6 +34,6 @@ export function getViewerInstance(createViewer) {
     }
 
     const viewer = createViewer();
-    document.body.appendChild(viewer);
+    appendViewerOverlayNode(viewer);
     return viewer._mjrViewerAPI;
 }

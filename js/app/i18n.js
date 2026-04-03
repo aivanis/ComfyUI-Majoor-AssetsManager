@@ -175,6 +175,7 @@ const DICTIONARY = {
         "cat.security": "Security",
         "cat.remote": "Remote Access",
         "cat.search": "Search",
+        "cat.feed": "Generated Feed",
 
         // --- Settings: Grid ---
         "setting.grid.minsize.name": "Majoor: Thumbnail Size (px)",
@@ -301,6 +302,8 @@ const DICTIONARY = {
         "bottomFeed.loading": "Loading recent assets...",
         "bottomFeed.empty": "No generated assets yet.",
         "bottomFeed.loadFailed": "Failed to load generated assets.",
+        "bottomFeed.groupTitle": "Generation group",
+        "bottomFeed.groupOpen": "Show other assets from this generation",
 
         // --- Panel: Buttons ---
         "btn.add": "Add",
@@ -357,6 +360,13 @@ const DICTIONARY = {
         "label.day": "Day",
         "label.collections": "Collections",
         "label.collection": "collection",
+        "rating.title": "Rating: {n}",
+        "rating.label": "Rating",
+        "rating.setN": "Set rating to {n}",
+        "tags.title": "Tags: {tags}",
+        "tags.label": "Tags",
+        "tags.addLabel": "Add tag",
+        "tags.suggestions": "Tag suggestions",
         "label.messages": "Messages",
         "label.readMe": "Read Me",
         "label.userGuide": "User Guide",
@@ -407,6 +417,7 @@ const DICTIONARY = {
         "tooltip.openMessages": "Messages and updates",
         "tooltip.openMessagesUnread": "Messages ({count} unread)",
         "tooltip.markMessagesRead": "Mark all messages as read",
+        "tooltip.noUnreadMessages": "No unread messages",
         "tooltip.deleteDb": "Force-delete database and rebuild from scratch",
         "tooltip.workflowMultiOutput": "Multiple outputs with different prompts",
         "tooltip.generationInputs": "Input files used in generation",
@@ -601,13 +612,16 @@ const DICTIONARY = {
         "msg.whatsNew.title.localUserGuide": "Need help?",
         "msg.whatsNew.body.localUserGuide":
             "Open the local User Guide directly from your Assets Manager custom_nodes folder.",
+        "msg.category.development": "Development",
+        "msg.development.title.vueRefactoring": "Vue 3 Refactoring",
+        "msg.development.body.vueRefactoring":
+            "Frontend modernization ongoing: Core UI components are being migrated to Vue 3 for better maintainability and compatibility with new ComfyUI frontend. This ensures long-term support and cleaner architecture.",
+        "label.viewProgress": "View Progress",
         "msg.collectionAdd.added": 'Added {added} item(s) to "{name}".',
         "msg.collectionAdd.skippedExisting":
             "Skipped {count} item(s): already present in the collection.",
         "msg.collectionAdd.skippedDuplicate": "Ignored {count} duplicate(s) in selection.",
         "msg.collectionAdd.noneAddedExisting": 'No new items added to "{name}" (all exist).',
-        "msg.aiFeaturesNotice":
-            "Warning:\n\nAssets Manager now includes AI features like auto captions, AI search, smart collections, etc.\nThese features are still WIP.\n\nIf you already had Assets Manager installed, delete the DB first.\nWhen enrich is finished, run Vector Backfill for your existing assets.\nAfter clicking Backfill, you can go sleep: it may take a very, very long time if you have many assets.",
         "msg.dbResetNoticeDetail":
             "Majoor Update Notice:\n\nTo avoid database errors with this new version, please delete your existing index. Click the 'Delete DB' button in the Index Status panel to reset it.",
         "msg.nightlyUpdateTitle": "Majoor Assets Manager",
@@ -914,6 +928,7 @@ const DICTIONARY = {
         "tab.similar": "Similaire",
         "manager.title": "Gestionnaire d'assets",
         "manager.sidebarLabel": "Assets\nManager",
+        "cat.feed": "Flux genere",
         "command.scanAssets": "Scanner les assets",
         "command.toggleFloatingViewer": "Basculer le floating viewer",
         "command.refreshAssetsGrid": "Rafraichir la grille d'assets",
@@ -924,6 +939,8 @@ const DICTIONARY = {
         "bottomFeed.loading": "Chargement des assets recents...",
         "bottomFeed.empty": "Aucun asset genere pour le moment.",
         "bottomFeed.loadFailed": "Impossible de charger les assets generes.",
+        "bottomFeed.groupTitle": "Groupe de generation",
+        "bottomFeed.groupOpen": "Afficher les autres assets de cette generation",
 
         "scope.all": "Entrees + Sorties",
         "scope.allFull": "Tout (Entrees + Sorties)",
@@ -948,6 +965,7 @@ const DICTIONARY = {
         "tooltip.openMessages": "Messages et nouveautes",
         "tooltip.openMessagesUnread": "Messages ({count} non lus)",
         "tooltip.markMessagesRead": "Marquer tous les messages comme lus",
+        "tooltip.noUnreadMessages": "Aucun message non lu",
         "label.toastHistory": "Historique",
         "tooltip.tab.similar": "Parcourir les trouvailles similaires courantes",
 
@@ -1046,6 +1064,13 @@ const DICTIONARY = {
 
         "label.computer": "Ordinateur",
         "label.collection": "collection",
+        "rating.title": "Note : {n}",
+        "rating.label": "Note",
+        "rating.setN": "Definir la note a {n}",
+        "tags.title": "Tags : {tags}",
+        "tags.label": "Tags",
+        "tags.addLabel": "Ajouter un tag",
+        "tags.suggestions": "Suggestions de tags",
         "label.thisFile": "ce fichier",
         "label.messages": "Messages",
         "label.readMe": "Read Me",
@@ -1089,14 +1114,17 @@ const DICTIONARY = {
         "msg.whatsNew.title.localUserGuide": "Quoi de neuf",
         "msg.whatsNew.body.localUserGuide":
             "Ouvrez le Guide utilisateur local directement depuis le dossier custom_nodes d'Assets Manager.",
+        "msg.category.development": "Developpement",
+        "msg.development.title.vueRefactoring": "Refactorisation Vue 3",
+        "msg.development.body.vueRefactoring":
+            "Modernisation du frontend en cours : Les composants UI nucleaires sont en cours de migration vers Vue 3 pour une meilleure maintenabilite et compatibilite avec le nouveau frontend ComfyUI. Cela garantit un support a long terme et une architecture plus propre.",
+        "label.viewProgress": "Voir la progression",
         "msg.collectionAdd.added": '{added} element(s) ajoute(s) a "{name}".',
         "msg.collectionAdd.skippedExisting":
             "{count} element(s) ignores : deja presents dans la collection.",
         "msg.collectionAdd.skippedDuplicate": "{count} doublon(s) ignores dans la selection.",
         "msg.collectionAdd.noneAddedExisting":
             'Aucun nouvel element ajoute a "{name}" (tous deja presents).',
-        "msg.aiFeaturesNotice":
-            "Avertissement :\n\nAssets Manager inclut maintenant des fonctions IA (auto captions, recherche IA, smart collections, etc.).\nCes fonctions sont encore en cours de developpement.\n\nSi Assets Manager etait deja installe, supprimez d'abord la DB.\nQuand l'enrichissement est termine, lancez Vector Backfill pour vos assets existants.\nApres avoir clique sur Backfill, cela peut prendre tres longtemps si vous avez beaucoup d'assets.",
         "msg.dbResetNoticeDetail":
             'Note de mise a jour Majoor :\n\nPour eviter les erreurs de base de donnees avec cette version, supprimez votre index existant. Cliquez sur le bouton "Delete DB" dans le panneau Index Status pour le reinitialiser.',
         "msg.nightlyUpdateTitle": "Majoor Assets Manager",

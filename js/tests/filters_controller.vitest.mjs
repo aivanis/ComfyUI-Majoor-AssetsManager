@@ -1,4 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
+import { usePanelStore } from "../stores/usePanelStore.js";
 
 class ElementStub {
     constructor() {
@@ -50,6 +52,8 @@ describe("filtersController", () => {
     });
 
     it("clears stale max resolution bounds when a preset is selected", async () => {
+        setActivePinia(createPinia());
+        const panelStore = usePanelStore();
         const { bindFilters } = await import("../features/panel/controllers/filtersController.js");
 
         const state = {
@@ -103,10 +107,10 @@ describe("filtersController", () => {
         resolutionPresetSelect.value = "fhd";
         resolutionPresetSelect.dispatchEvent({ type: "change" });
 
-        expect(state.minWidth).toBe(1920);
-        expect(state.minHeight).toBe(1080);
-        expect(state.maxWidth).toBe(0);
-        expect(state.maxHeight).toBe(0);
+        expect(panelStore.minWidth).toBe(1920);
+        expect(panelStore.minHeight).toBe(1080);
+        expect(panelStore.maxWidth).toBe(0);
+        expect(panelStore.maxHeight).toBe(0);
         expect(minWidthInput.value).toBe("1920");
         expect(minHeightInput.value).toBe("1080");
         expect(maxWidthInput.value).toBe("");

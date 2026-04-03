@@ -172,11 +172,6 @@ function _buildLocalNoticeKey(localVersion, branch) {
     return `${v}::${b}`;
 }
 
-function showAiFeaturesNoticeOnce(_localVersion, _branch) {
-    // Disabled: No longer show AI features work-in-progress popup
-    return;
-}
-
 export async function checkMajoorVersion({ force = false } = {}) {
     if (typeof window === "undefined") {
         return null;
@@ -198,8 +193,6 @@ export async function checkMajoorVersion({ force = false } = {}) {
         emitVersionUpdateState({ available: false });
         return null;
     }
-
-    showAiFeaturesNoticeOnce(localVersion, branch);
     let skipRemoteCheck = false;
     try {
         if (!force) {

@@ -3,6 +3,7 @@ import { comfyToast } from "../../../app/toast.js";
 import { t } from "../../../app/i18n.js";
 import { loadMajoorSettings } from "../../../app/settings.js";
 import { APP_CONFIG } from "../../../app/config.js";
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
 
 export function createGridController({
     gridContainer,
@@ -14,6 +15,35 @@ export function createGridController({
     searchInputEl,
     state,
 }) {
+    const { read, write } = createPanelStateBridge(state, [
+        "scope",
+        "customRootId",
+        "currentFolderRelativePath",
+        "kindFilter",
+        "workflowOnly",
+        "minRating",
+        "minSizeMB",
+        "maxSizeMB",
+        "resolutionCompare",
+        "minWidth",
+        "minHeight",
+        "maxWidth",
+        "maxHeight",
+        "workflowType",
+        "dateRangeFilter",
+        "dateExactFilter",
+        "sort",
+        "activeAssetId",
+        "selectedAssetIds",
+        "collectionId",
+        "collectionName",
+        "viewScope",
+        "similarResults",
+        "similarTitle",
+        "similarSourceAssetId",
+        "lastGridCount",
+        "lastGridTotal",
+    ]);
     let _isReloading = false;
     let _pendingReload = false;
     let _lastReloadErrorAt = 0;
@@ -75,28 +105,29 @@ export function createGridController({
     };
 
     const _buildSemanticFilterOptions = () => {
-        const rawSubfolder = String(state.currentFolderRelativePath || "").trim();
-        const isCustomBrowserMode = state.scope === "custom" && !state.customRootId;
+        const rawSubfolder = String(read("currentFolderRelativePath", "") || "").trim();
+        const isCustomBrowserMode =
+            read("scope", "output") === "custom" && !read("customRootId", "");
         return {
             subfolder: !isCustomBrowserMode && rawSubfolder ? rawSubfolder : null,
-            kind: state.kindFilter || null,
-            hasWorkflow: state.workflowOnly ? true : null,
-            minRating: Number(state.minRating || 0) > 0 ? Number(state.minRating || 0) : null,
-            minSizeMB: Number(state.minSizeMB || 0) > 0 ? Number(state.minSizeMB || 0) : null,
-            maxSizeMB: Number(state.maxSizeMB || 0) > 0 ? Number(state.maxSizeMB || 0) : null,
-            minWidth: Number(state.minWidth || 0) > 0 ? Number(state.minWidth || 0) : null,
-            minHeight: Number(state.minHeight || 0) > 0 ? Number(state.minHeight || 0) : null,
-            maxWidth: Number(state.maxWidth || 0) > 0 ? Number(state.maxWidth || 0) : null,
-            maxHeight: Number(state.maxHeight || 0) > 0 ? Number(state.maxHeight || 0) : null,
+            kind: read("kindFilter", "") || null,
+            hasWorkflow: read("workflowOnly", false) ? true : null,
+            minRating: Number(read("minRating", 0) || 0) > 0 ? Number(read("minRating", 0) || 0) : null,
+            minSizeMB: Number(read("minSizeMB", 0) || 0) > 0 ? Number(read("minSizeMB", 0) || 0) : null,
+            maxSizeMB: Number(read("maxSizeMB", 0) || 0) > 0 ? Number(read("maxSizeMB", 0) || 0) : null,
+            minWidth: Number(read("minWidth", 0) || 0) > 0 ? Number(read("minWidth", 0) || 0) : null,
+            minHeight: Number(read("minHeight", 0) || 0) > 0 ? Number(read("minHeight", 0) || 0) : null,
+            maxWidth: Number(read("maxWidth", 0) || 0) > 0 ? Number(read("maxWidth", 0) || 0) : null,
+            maxHeight: Number(read("maxHeight", 0) || 0) > 0 ? Number(read("maxHeight", 0) || 0) : null,
             workflowType:
-                String(state.workflowType || "")
+                String(read("workflowType", "") || "")
                     .trim()
                     .toUpperCase() || null,
             dateRange:
-                String(state.dateRangeFilter || "")
+                String(read("dateRangeFilter", "") || "")
                     .trim()
                     .toLowerCase() || null,
-            dateExact: String(state.dateExactFilter || "").trim() || null,
+            dateExact: String(read("dateExactFilter", "") || "").trim() || null,
         };
     };
 
@@ -155,8 +186,7 @@ export function createGridController({
         const aiEnabled = _isAiEnabled();
         const semanticMode = aiEnabled && _isSemanticMode();
         if (!aiEnabled) {
-            const ftsQuery = hasAiPrefix ? q || "*" : query;
-            return await loadAssets(gridContainer, ftsQuery);
+            return await loadAssets(gridContainer, q || "*");
         }
 
         const wordCount = q.split(/\s+/).filter(Boolean).length;
@@ -199,8 +229,8 @@ export function createGridController({
                 const filters = _buildSemanticFilterOptions();
                 const vecRes = await vectorSearch(q, {
                     topK: 100,
-                    scope: state.scope || "output",
-                    customRootId: state.customRootId || "",
+                    scope: read("scope", "output") || "output",
+                    customRootId: read("customRootId", "") || "",
                     ...filters,
                 });
                 if (vecRes?.ok && Array.isArray(vecRes.data) && vecRes.data.length > 0) {
@@ -225,8 +255,8 @@ export function createGridController({
             try {
                 const hybRes = await hybridSearch(q, {
                     topK: 100,
-                    scope: state.scope || "output",
-                    customRootId: state.customRootId || "",
+                    scope: read("scope", "output") || "output",
+                    customRootId: read("customRootId", "") || "",
                     ...filters,
                 });
                 if (hybRes?.ok && Array.isArray(hybRes.data) && hybRes.data.length > 0) {
@@ -246,8 +276,8 @@ export function createGridController({
             try {
                 const vecRes = await vectorSearch(q, {
                     topK: 100,
-                    scope: state.scope || "output",
-                    customRootId: state.customRootId || "",
+                    scope: read("scope", "output") || "output",
+                    customRootId: read("customRootId", "") || "",
                     ...filters,
                 });
                 if (vecRes?.ok && Array.isArray(vecRes.data) && vecRes.data.length > 0) {
@@ -265,8 +295,7 @@ export function createGridController({
                 console.debug?.("[Majoor] Semantic search failed, falling back to FTS", err);
             }
         }
-        const ftsQuery = hasAiPrefix ? q || "*" : query;
-        const ftsResult = await loadAssets(gridContainer, ftsQuery);
+        const ftsResult = await loadAssets(gridContainer, q || "*");
 
         if (looksNaturalLanguage && !aiAttempted) {
             const count = Number(ftsResult?.count || 0) || 0;
@@ -276,8 +305,8 @@ export function createGridController({
                     const filters = _buildSemanticFilterOptions();
                     const hybRes = await hybridSearch(q, {
                         topK: 100,
-                        scope: state.scope || "output",
-                        customRootId: state.customRootId || "",
+                        scope: read("scope", "output") || "output",
+                        customRootId: read("customRootId", "") || "",
                         ...filters,
                     });
                     if (hybRes?.ok && Array.isArray(hybRes.data) && hybRes.data.length > 0) {
@@ -314,40 +343,40 @@ export function createGridController({
         } catch (e) {
             console.debug?.(e);
         }
-        gridContainer.dataset.mjrScope = state.scope;
-        gridContainer.dataset.mjrCustomRootId = state.customRootId || "";
-        const subfolder = state.currentFolderRelativePath || "";
+        gridContainer.dataset.mjrScope = read("scope", "output");
+        gridContainer.dataset.mjrCustomRootId = read("customRootId", "") || "";
+        const subfolder = read("currentFolderRelativePath", "") || "";
         gridContainer.dataset.mjrSubfolder = subfolder;
-        gridContainer.dataset.mjrFilterKind = state.kindFilter || "";
-        gridContainer.dataset.mjrFilterWorkflowOnly = state.workflowOnly ? "1" : "0";
-        gridContainer.dataset.mjrFilterMinRating = String(state.minRating || 0);
-        gridContainer.dataset.mjrFilterMinSizeMB = String(state.minSizeMB || 0);
-        gridContainer.dataset.mjrFilterMaxSizeMB = String(state.maxSizeMB || 0);
-        gridContainer.dataset.mjrFilterResolutionCompare = String(state.resolutionCompare || "gte");
-        gridContainer.dataset.mjrFilterMinWidth = String(state.minWidth || 0);
-        gridContainer.dataset.mjrFilterMinHeight = String(state.minHeight || 0);
-        gridContainer.dataset.mjrFilterMaxWidth = String(state.maxWidth || 0);
-        gridContainer.dataset.mjrFilterMaxHeight = String(state.maxHeight || 0);
-        gridContainer.dataset.mjrFilterWorkflowType = String(state.workflowType || "");
-        gridContainer.dataset.mjrFilterDateRange = state.dateRangeFilter || "";
-        gridContainer.dataset.mjrFilterDateExact = state.dateExactFilter || "";
-        gridContainer.dataset.mjrSort = state.sort || "mtime_desc";
+        gridContainer.dataset.mjrFilterKind = read("kindFilter", "") || "";
+        gridContainer.dataset.mjrFilterWorkflowOnly = read("workflowOnly", false) ? "1" : "0";
+        gridContainer.dataset.mjrFilterMinRating = String(read("minRating", 0) || 0);
+        gridContainer.dataset.mjrFilterMinSizeMB = String(read("minSizeMB", 0) || 0);
+        gridContainer.dataset.mjrFilterMaxSizeMB = String(read("maxSizeMB", 0) || 0);
+        gridContainer.dataset.mjrFilterResolutionCompare = String(read("resolutionCompare", "gte") || "gte");
+        gridContainer.dataset.mjrFilterMinWidth = String(read("minWidth", 0) || 0);
+        gridContainer.dataset.mjrFilterMinHeight = String(read("minHeight", 0) || 0);
+        gridContainer.dataset.mjrFilterMaxWidth = String(read("maxWidth", 0) || 0);
+        gridContainer.dataset.mjrFilterMaxHeight = String(read("maxHeight", 0) || 0);
+        gridContainer.dataset.mjrFilterWorkflowType = String(read("workflowType", "") || "");
+        gridContainer.dataset.mjrFilterDateRange = read("dateRangeFilter", "") || "";
+        gridContainer.dataset.mjrFilterDateExact = read("dateExactFilter", "") || "";
+        gridContainer.dataset.mjrSort = read("sort", "mtime_desc") || "mtime_desc";
         gridContainer.dataset.mjrGroupStacks =
             APP_CONFIG.EXECUTION_GROUPING_ENABLED &&
-            (state.scope === "output" || state.scope === "all")
+            (read("scope", "output") === "output" || read("scope", "output") === "all")
                 ? "1"
                 : "0";
 
         // Keep selection durable across re-renders by persisting it in the dataset
         // (GridView re-applies selection as cards are created).
         try {
-            const selected = Array.isArray(state.selectedAssetIds)
-                ? state.selectedAssetIds.filter(Boolean).map(String)
+            const selected = Array.isArray(read("selectedAssetIds", []))
+                ? read("selectedAssetIds", []).filter(Boolean).map(String)
                 : [];
             if (selected.length) {
                 gridContainer.dataset.mjrSelectedAssetIds = JSON.stringify(selected);
                 gridContainer.dataset.mjrSelectedAssetId = String(
-                    state.activeAssetId || selected[0] || "",
+                    read("activeAssetId", "") || selected[0] || "",
                 );
             } else {
                 delete gridContainer.dataset.mjrSelectedAssetIds;
@@ -357,29 +386,33 @@ export function createGridController({
             console.debug?.(e);
         }
 
-        if (state.scope === "custom" && !state.customRootId && !state.currentFolderRelativePath) {
+        if (
+            read("scope", "output") === "custom" &&
+            !read("customRootId", "") &&
+            !read("currentFolderRelativePath", "")
+        ) {
             try {
                 disposeGrid(gridContainer);
             } catch (e) {
                 console.debug?.(e);
             }
             // Browser mode: no selected custom root required. Start at filesystem roots.
-            state.currentFolderRelativePath = "";
+            write("currentFolderRelativePath", "");
         }
 
-        if (state.collectionId) {
-            const res = await getCollectionAssets?.(state.collectionId);
+        if (read("collectionId", "")) {
+            const res = await getCollectionAssets?.(read("collectionId", ""));
             if (res?.ok && res.data && Array.isArray(res.data.assets)) {
-                const title = state.collectionName
-                    ? `Collection: ${state.collectionName}`
+                const title = read("collectionName", "")
+                    ? `Collection: ${read("collectionName", "")}`
                     : "Collection";
                 const result = await loadAssetsFromList(gridContainer, res.data.assets, {
                     title,
                     reset: true,
                 });
                 try {
-                    state.lastGridCount = Number(result?.count || 0) || 0;
-                    state.lastGridTotal = Number(result?.total || 0) || 0;
+                    write("lastGridCount", Number(result?.count || 0) || 0);
+                    write("lastGridTotal", Number(result?.total || 0) || 0);
                     gridContainer.dispatchEvent?.(
                         new CustomEvent("mjr:grid-stats", { detail: result || {} }),
                     );
@@ -389,15 +422,20 @@ export function createGridController({
                 return;
             }
             // If collection fetch fails, fall back to normal loading and clear the broken state.
-            state.collectionId = "";
-            state.collectionName = "";
+            write("collectionId", "");
+            write("collectionName", "");
         }
 
-        if (String(state.viewScope || "").toLowerCase() === "similar") {
-            const list = Array.isArray(state.similarResults) ? state.similarResults : [];
-            const sourceId = String(state.similarSourceAssetId || "").trim();
+        const viewScope = String(read("viewScope", state?.viewScope || "") || "").toLowerCase();
+        if (viewScope === "similar") {
+            const bridgeList = Array.isArray(read("similarResults", [])) ? read("similarResults", []) : [];
+            const stateList = Array.isArray(state?.similarResults) ? state.similarResults : [];
+            const list = bridgeList.length > 0 ? bridgeList : stateList;
+            const sourceId = String(
+                read("similarSourceAssetId", state?.similarSourceAssetId || "") || "",
+            ).trim();
             const title = String(
-                state.similarTitle ||
+                read("similarTitle", state?.similarTitle || "") ||
                     t("search.similarResults", "Similar to asset #{id} ({n} results)", {
                         id: sourceId || "?",
                         n: list.length,
@@ -408,8 +446,8 @@ export function createGridController({
                 reset: true,
             });
             try {
-                state.lastGridCount = Number(result?.count || 0) || 0;
-                state.lastGridTotal = Number(result?.total || 0) || 0;
+                write("lastGridCount", Number(result?.count || 0) || 0);
+                write("lastGridTotal", Number(result?.total || 0) || 0);
                 gridContainer.dispatchEvent?.(
                     new CustomEvent("mjr:grid-stats", { detail: result || {} }),
                 );
@@ -435,8 +473,8 @@ export function createGridController({
         }
 
         try {
-            state.lastGridCount = Number(result?.count || 0) || 0;
-            state.lastGridTotal = Number(result?.total || 0) || 0;
+            write("lastGridCount", Number(result?.count || 0) || 0);
+            write("lastGridTotal", Number(result?.total || 0) || 0);
             gridContainer.dispatchEvent?.(
                 new CustomEvent("mjr:grid-stats", { detail: result || {} }),
             );

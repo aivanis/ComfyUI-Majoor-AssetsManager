@@ -4,7 +4,7 @@ import {
     flushUpsertBatch,
     getUpsertBatchState,
     upsertAsset,
-} from "../features/grid/InfiniteScroll.js";
+} from "../vue/composables/useVirtualGrid.js";
 
 function assetKey(asset) {
     const stackId = String(asset?.stack_id || "").trim();

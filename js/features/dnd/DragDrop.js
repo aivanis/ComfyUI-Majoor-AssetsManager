@@ -8,10 +8,17 @@ import { ENDPOINTS, buildCustomViewURL, buildViewURL } from "../../api/endpoints
 import { comfyToast } from "../../app/toast.js";
 import { pickRootId } from "../../utils/ids.js";
 
-import { DND_GLOBAL_KEY, DND_INSTANCE_VERSION, DND_MIME } from "./utils/constants.js";
+import { DND_MIME } from "./utils/constants.js";
 import { dndLog } from "./utils/log.js";
 import { buildPayloadViewURL, getDraggedAsset } from "./utils/payload.js";
 import { isManagedPayload } from "./utils/video.js";
+import {
+    clearAssetDragStartCleanup,
+    getAssetDragStartCleanup,
+    markInternalDropOccurred,
+    resetDndRuntimeState,
+    setAssetDragStartCleanup,
+} from "./runtimeState.js";
 import { isCanvasDropTarget, markCanvasDirty } from "./targets/canvas.js";
 import { applyDragOutToOS, handleDragEnd } from "./out/DragOut.js";
 import {
@@ -238,92 +245,90 @@ const tryLoadWorkflowToCanvas = async (payload, fallbackAbsPath = null) => {
     return false;
 };
 
-export const bindAssetDragStart = (containerEl) => {
-    if (!containerEl) return;
-    if (containerEl._mjrAssetDragStartBound) return;
-    containerEl._mjrAssetDragStartBound = true;
+export function createAssetDragStartHandler(containerEl) {
+    return (event) => {
+        const dt = event?.dataTransfer;
+        if (!dt) return;
+        const card = event?.target?.closest?.(".mjr-asset-card");
+        if (!card) return;
 
-    containerEl.addEventListener(
-        "dragstart",
-        (event) => {
-            const dt = event?.dataTransfer;
-            if (!dt) return;
-            const card = event?.target?.closest?.(".mjr-asset-card");
-            if (!card) return;
+        const asset = card._mjrAsset;
+        if (!asset || typeof asset !== "object") return;
+        const kind = String(asset?.kind || "").toLowerCase();
+        const type = String(asset?.type || "output").toLowerCase();
+        const payload = {
+            filename: asset.filename,
+            subfolder: asset.subfolder || "",
+            type,
+            root_id: pickRootId(asset) || undefined,
+            kind,
+        };
 
-            const asset = card._mjrAsset;
-            if (!asset || typeof asset !== "object") return;
-            const kind = String(asset?.kind || "").toLowerCase();
-            const type = String(asset?.type || "output").toLowerCase();
-            const payload = {
-                filename: asset.filename,
-                subfolder: asset.subfolder || "",
-                type,
-                root_id: pickRootId(asset) || undefined,
-                kind,
-            };
-
-            try {
-                dt.setData(DND_MIME, JSON.stringify(payload));
-                dt.setData("text/plain", String(asset.filename || ""));
-                // Apply OS drag-out (DownloadURL + batch ZIP) for all asset kinds.
-                // applyDragOutToOS handles single-file and multi-selection ZIP internally.
-                const viewUrl = buildURL(payload);
-                applyDragOutToOS({ dt, asset, containerEl, card, viewUrl });
-            } catch (e) {
-                console.debug?.(e);
-            }
-
-            // Listen for dragend to detect external drops and offer metadata stripping.
-            try {
-                card.addEventListener(
-                    "dragend",
-                    (endEvent) => {
-                        handleDragEnd(endEvent, { asset, containerEl, card });
-                    },
-                    { once: true },
-                );
-            } catch (e) {
-                console.debug?.(e);
-            }
-
-            const preview =
-                card.querySelector("img") ||
-                card.querySelector("video") ||
-                card.querySelector("canvas");
-            if (preview && preview instanceof HTMLElement) {
-                try {
-                    dt.setDragImage(preview, 10, 10);
-                } catch (e) {
-                    console.debug?.(e);
-                }
-            }
-        },
-        true,
-    );
-};
-
-export const initDragDrop = () => {
-    const existing = (() => {
         try {
-            return window?.[DND_GLOBAL_KEY] || null;
-        } catch {
-            return null;
-        }
-    })();
-
-    // If a previous version is already installed, remove it and replace with the current one.
-    if (existing?.initialized) {
-        if (existing.version === DND_INSTANCE_VERSION) {
-            return existing.dispose || (() => {});
-        }
-        try {
-            existing.dispose?.({ force: true });
+            dt.setData(DND_MIME, JSON.stringify(payload));
+            dt.setData("text/plain", String(asset.filename || ""));
+            // Apply OS drag-out (DownloadURL + batch ZIP) for all asset kinds.
+            // applyDragOutToOS handles single-file and multi-selection ZIP internally.
+            const viewUrl = buildURL(payload);
+            applyDragOutToOS({ dt, asset, containerEl, card, viewUrl });
         } catch (e) {
             console.debug?.(e);
         }
+
+        // Listen for dragend to detect external drops and offer metadata stripping.
+        try {
+            card.addEventListener(
+                "dragend",
+                (endEvent) => {
+                    handleDragEnd(endEvent, { asset, containerEl, card });
+                },
+                { once: true },
+            );
+        } catch (e) {
+            console.debug?.(e);
+        }
+
+        const preview =
+            card.querySelector("img") ||
+            card.querySelector("video") ||
+            card.querySelector("canvas");
+        if (preview && preview instanceof HTMLElement) {
+            try {
+                dt.setDragImage(preview, 10, 10);
+            } catch (e) {
+                console.debug?.(e);
+            }
+        }
+    };
+}
+
+export const bindAssetDragStart = (containerEl) => {
+    if (!containerEl) return () => {};
+    const existingCleanup = getAssetDragStartCleanup(containerEl);
+    if (typeof existingCleanup === "function") {
+        return existingCleanup;
     }
 
+    const onDragStart = createAssetDragStartHandler(containerEl);
+
+    containerEl.addEventListener("dragstart", onDragStart, true);
+
+    const cleanup = () => {
+        try {
+            containerEl.removeEventListener("dragstart", onDragStart, true);
+        } catch (e) {
+            console.debug?.(e);
+        }
+        clearAssetDragStartCleanup(containerEl);
+    };
+
+    return setAssetDragStartCleanup(containerEl, cleanup);
+};
+
+let _dragDropRuntime = null;
+let _dragDropRuntimeRefCount = 0;
+
+export function createDragDropRuntimeHandlers() {
     const onDragOver = (event) => {
         const app = _resolveApp();
         const types = Array.from(event?.dataTransfer?.types || []);
@@ -357,9 +362,7 @@ export const initDragDrop = () => {
     const onDrop = async (event) => {
         // Mark that an internal drop occurred so dragend can distinguish
         // internal drops from external (OS/Explorer) drops.
-        try {
-            window.__mjrInternalDropOccurred = true;
-        } catch {}
+        markInternalDropOccurred();
 
         const app = _resolveApp();
         const types = Array.from(event?.dataTransfer?.types || []);
@@ -441,22 +444,25 @@ export const initDragDrop = () => {
         dndLog("dragleave");
     };
 
+    return {
+        onDragOver,
+        onDrop,
+        onDragLeave,
+    };
+}
+
+function createDragDropRuntime() {
+    if (typeof window === "undefined" || !window?.addEventListener) {
+        return { dispose() {} };
+    }
+
+    const { onDragOver, onDrop, onDragLeave } = createDragDropRuntimeHandlers();
+
     window.addEventListener("dragover", onDragOver, true);
     window.addEventListener("drop", onDrop, true);
     window.addEventListener("dragleave", onDragLeave, true);
 
-    const dispose = ({ force = false } = {}) => {
-        const state = (() => {
-            try {
-                return window?.[DND_GLOBAL_KEY] || null;
-            } catch {
-                return null;
-            }
-        })();
-
-        // Only uninstall if this instance is still the active one.
-        if (!force && state?.dispose !== dispose) return;
-
+    const dispose = () => {
         try {
             window.removeEventListener("dragover", onDragOver, true);
             window.removeEventListener("drop", onDrop, true);
@@ -470,25 +476,53 @@ export const initDragDrop = () => {
         } catch (e) {
             console.debug?.(e);
         }
-
-        try {
-            if (window?.[DND_GLOBAL_KEY]?.dispose === dispose) {
-                delete window[DND_GLOBAL_KEY];
-            }
-        } catch (e) {
-            console.debug?.(e);
-        }
     };
 
+    return { dispose };
+}
+
+export function installDragDropRuntime() {
+    if (!_dragDropRuntime) {
+        _dragDropRuntime = createDragDropRuntime();
+        _dragDropRuntimeRefCount = 0;
+    }
+    _dragDropRuntimeRefCount += 1;
+
+    let disposed = false;
+    return ({ force = false } = {}) => {
+        if (disposed) return;
+        disposed = true;
+        teardownDragDropRuntime({ force });
+    };
+}
+
+export function teardownDragDropRuntime({ force = false } = {}) {
+    if (!_dragDropRuntime) {
+        _dragDropRuntimeRefCount = 0;
+        resetDndRuntimeState();
+        return;
+    }
+
+    if (!force && _dragDropRuntimeRefCount > 1) {
+        _dragDropRuntimeRefCount -= 1;
+        return;
+    }
+
+    _dragDropRuntimeRefCount = 0;
     try {
-        window[DND_GLOBAL_KEY] = {
-            initialized: true,
-            version: DND_INSTANCE_VERSION,
-            dispose,
-        };
+        _dragDropRuntime.dispose?.();
     } catch (e) {
         console.debug?.(e);
     }
+    _dragDropRuntime = null;
+    resetDndRuntimeState();
+}
 
-    return dispose;
-};
+export function getDragDropRuntimeState() {
+    return {
+        installed: !!_dragDropRuntime,
+        refCount: _dragDropRuntimeRefCount,
+    };
+}
+
+export const initDragDrop = installDragDropRuntime;

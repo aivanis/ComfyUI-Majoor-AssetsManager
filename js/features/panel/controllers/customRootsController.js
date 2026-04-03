@@ -1,4 +1,5 @@
 import { t } from "../../../app/i18n.js";
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
 
 export function createCustomRootsController({
     state,
@@ -13,6 +14,17 @@ export function createCustomRootsController({
     reloadGrid,
     onRootChanged = null,
 }) {
+    const legacyState = state && typeof state === "object" ? state : {};
+    const { read, write } = createPanelStateBridge(state, [
+        "customRootId",
+        "customRootLabel",
+        "currentFolderRelativePath",
+    ]);
+
+    const setCustomRootLabel = (value) => {
+        write("customRootLabel", String(value || ""));
+    };
+
     const refreshCustomRoots = async (preferId = null) => {
         // Show loading state
         const originalPlaceholder =
@@ -44,22 +56,22 @@ export function createCustomRootsController({
                 customSelect.appendChild(opt);
             });
 
-            const desired = preferId || state.customRootId;
+            const desired = preferId || read("customRootId", "");
             if (desired && roots.some((r) => r.id === desired)) {
                 customSelect.value = desired;
-                state.customRootId = desired;
+                write("customRootId", desired);
                 try {
                     const sel = customSelect.options[customSelect.selectedIndex];
-                    state.customRootLabel = String(sel?.text || "").trim();
+                    setCustomRootLabel(String(sel?.text || "").trim());
                 } catch {
-                    state.customRootLabel = "";
+                    setCustomRootLabel("");
                 }
             } else {
                 customSelect.value = "";
-                state.customRootId = "";
-                state.customRootLabel = "";
+                write("customRootId", "");
+                setCustomRootLabel("");
             }
-            customRemoveBtn.disabled = !state.customRootId;
+            customRemoveBtn.disabled = !read("customRootId", "");
         } catch (err) {
             console.warn("Majoor: failed to load custom roots", err);
             // Show error state
@@ -95,17 +107,17 @@ export function createCustomRootsController({
         const onCustomRootChange = async () => {
             // Only update state if not disabled (not in loading/error state)
             if (!customSelect.disabled) {
-                state.customRootId = customSelect.value || "";
+                write("customRootId", customSelect.value || "");
                 try {
                     const sel = customSelect.options[customSelect.selectedIndex];
-                    state.customRootLabel = String(sel?.text || "").trim();
+                    setCustomRootLabel(String(sel?.text || "").trim());
                 } catch {
-                    state.customRootLabel = "";
+                    setCustomRootLabel("");
                 }
-                state.currentFolderRelativePath = "";
-                customRemoveBtn.disabled = !state.customRootId;
+                write("currentFolderRelativePath", "");
+                customRemoveBtn.disabled = !read("customRootId", "");
                 try {
-                    await onRootChanged?.(state);
+                    await onRootChanged?.(legacyState);
                 } catch (e) {
                     console.debug?.(e);
                 }
@@ -166,7 +178,7 @@ export function createCustomRootsController({
         addManagedListener(customAddBtn, "click", onCustomAddClick);
 
         const onCustomRemoveClick = async () => {
-            if (!state.customRootId) return;
+            if (!read("customRootId", "")) return;
 
             const selectedOption = customSelect.options[customSelect.selectedIndex];
             const folderName = selectedOption
@@ -186,7 +198,9 @@ export function createCustomRootsController({
             customRemoveBtn.textContent = t("btn.removing");
 
             try {
-                const json = await post(ENDPOINTS.CUSTOM_ROOTS_REMOVE, { id: state.customRootId });
+                const json = await post(ENDPOINTS.CUSTOM_ROOTS_REMOVE, {
+                    id: read("customRootId", ""),
+                });
                 if (!json?.ok) {
                     comfyToast(
                         json?.error ||
@@ -196,9 +210,9 @@ export function createCustomRootsController({
                     return;
                 }
                 comfyToast(t("toast.folderRemoved", "Folder removed"), "success");
-                state.customRootId = "";
-                state.customRootLabel = "";
-                state.currentFolderRelativePath = "";
+                write("customRootId", "");
+                setCustomRootLabel("");
+                write("currentFolderRelativePath", "");
                 await refreshCustomRoots();
                 await reloadGrid();
             } catch (err) {
@@ -212,7 +226,7 @@ export function createCustomRootsController({
                 );
             } finally {
                 // Re-enable button regardless of outcome
-                customRemoveBtn.disabled = !state.customRootId; // Keep disabled if no selection
+                customRemoveBtn.disabled = !read("customRootId", ""); // Keep disabled if no selection
                 customRemoveBtn.textContent = t("btn.remove");
             }
         };

@@ -1,4 +1,5 @@
 import { t } from "../../../app/i18n.js";
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
 
 export function createSortController({
     state,
@@ -9,6 +10,8 @@ export function createSortController({
     reloadGrid,
     onChanged = null,
 }) {
+    const { read, write } = createPanelStateBridge(state, ["sort"]);
+
     const getSortOptions = () => [
         { key: "mtime_desc", label: t("sort.newest") },
         { key: "mtime_asc", label: t("sort.oldest") },
@@ -35,7 +38,7 @@ export function createSortController({
         sortMenu.replaceChildren();
         const sortOptions = getSortOptions();
         for (const opt of sortOptions) {
-            const isActive = opt.key === state.sort;
+            const isActive = opt.key === read("sort", "mtime_desc");
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = "mjr-menu-item";
@@ -82,8 +85,8 @@ export function createSortController({
             });
 
             btn.addEventListener("click", async () => {
-                state.sort = opt.key;
-                setSortIcon(state.sort);
+                write("sort", opt.key);
+                setSortIcon(read("sort", "mtime_desc"));
                 renderSortMenu();
                 try {
                     onChanged?.();
@@ -100,7 +103,7 @@ export function createSortController({
     };
 
     const bind = ({ onBeforeToggle } = {}) => {
-        setSortIcon(state.sort);
+        setSortIcon(read("sort", "mtime_desc"));
         renderSortMenu();
         sortBtn.addEventListener("click", (e) => {
             e.stopPropagation();

@@ -223,10 +223,10 @@ export function createViewerToolbar({
     toolsRow.style.cssText = `
         display: flex;
         align-items: center;
-        justify-content: center;
-        gap: 10px;
+        justify-content: flex-start;
+        gap: 8px 10px;
         flex-wrap: wrap;
-        padding: 6px 4px 2px;
+        padding: 6px 8px 4px;
         border-top: 0.8px solid rgba(196, 202, 210, 0.16);
         background: rgba(12, 14, 19, 0.28);
     `;
@@ -236,7 +236,8 @@ export function createViewerToolbar({
         g.className = "mjr-viewer-tools-group";
         if (key) g.dataset.group = String(key);
         if (accentRgb) g.style.setProperty("--mjr-group-accent", String(accentRgb));
-        g.style.cssText = "display:flex; align-items:center; gap:8px;";
+        g.style.cssText =
+            "display:flex; align-items:center; gap:8px; padding:3px 8px; border-radius:8px; border:1px solid rgba(196,202,210,0.14); background:rgba(10,12,16,0.22);";
         if (label) {
             const l = document.createElement("span");
             l.className = "mjr-viewer-tools-group-label";
@@ -609,6 +610,8 @@ export function createViewerToolbar({
     resetGradeBtn.style.fontSize = "12px";
     resetGradeBtn.style.padding = "0 10px";
     resetGradeBtn.classList?.add?.("mjr-viewer-tool-btn", "mjr-viewer-tool-btn--reset");
+    resetGradeBtn.classList?.add?.("mjr-viewer-tools-action", "mjr-viewer-tools-action--primary");
+    resetGradeBtn.style.marginLeft = "auto";
 
     const exportBtn = document.createElement("button");
     exportBtn.type = "button";
@@ -622,6 +625,7 @@ export function createViewerToolbar({
     exportIcon.setAttribute("aria-hidden", "true");
     exportIcon.style.fontSize = "14px";
     exportBtn.appendChild(exportIcon);
+    exportBtn.classList?.add?.("mjr-viewer-tools-action");
     try {
         exportBtn.style.display = "none";
     } catch (e) {
@@ -640,6 +644,7 @@ export function createViewerToolbar({
     copyIcon.setAttribute("aria-hidden", "true");
     copyIcon.style.fontSize = "14px";
     copyBtn.appendChild(copyIcon);
+    copyBtn.classList?.add?.("mjr-viewer-tools-action");
     try {
         copyBtn.style.display = "none";
     } catch (e) {
@@ -730,18 +735,29 @@ export function createViewerToolbar({
     anaGroup.appendChild(scopesSelect);
     toolsRow.appendChild(anaGroup);
 
-    const ovGroup = toolsGroup({ key: "overlay", label: "Overlay", accentRgb: ACCENT.overlay });
-    ovGroup.appendChild(gridToggle.b);
-    ovGroup.appendChild(gridModeSelect);
-    ovGroup.appendChild(maskToggle.b);
-    ovGroup.appendChild(formatSelect);
-    ovGroup.appendChild(maskOpacityCtl.wrap);
-    ovGroup.appendChild(probeToggle.b);
-    ovGroup.appendChild(loupeToggle.b);
-    ovGroup.appendChild(hudToggle.b);
-    ovGroup.appendChild(focusToggle.b);
-    ovGroup.appendChild(genInfoToggle.b);
-    toolsRow.appendChild(ovGroup);
+    const ovGuidesGroup = toolsGroup({
+        key: "overlay-guides",
+        label: "Guides",
+        accentRgb: ACCENT.overlay,
+    });
+    ovGuidesGroup.appendChild(gridToggle.b);
+    ovGuidesGroup.appendChild(gridModeSelect);
+    ovGuidesGroup.appendChild(maskToggle.b);
+    ovGuidesGroup.appendChild(formatSelect);
+    ovGuidesGroup.appendChild(maskOpacityCtl.wrap);
+    toolsRow.appendChild(ovGuidesGroup);
+
+    const ovInspectGroup = toolsGroup({
+        key: "overlay-inspect",
+        label: "Inspect",
+        accentRgb: ACCENT.overlay,
+    });
+    const inspectButtons = [probeToggle.b, loupeToggle.b, hudToggle.b, focusToggle.b, genInfoToggle.b];
+    inspectButtons.forEach((btn, index) => {
+        if (index > 0) btn.style.marginLeft = "4px";
+        ovInspectGroup.appendChild(btn);
+    });
+    toolsRow.appendChild(ovInspectGroup);
 
     const cmpGroup = toolsGroup({ key: "compare", label: "Compare", accentRgb: ACCENT.compare });
     cmpGroup.style.borderRadius = "8px";
@@ -784,6 +800,8 @@ export function createViewerToolbar({
     // Shortcut help (discoverability)
     const helpWrap = document.createElement("div");
     helpWrap.style.cssText = "position: relative; display:inline-flex; align-items:center;";
+    helpWrap.className = "mjr-viewer-tools-action";
+    helpWrap.style.marginLeft = "4px";
 
     const helpBtn = document.createElement("button");
     helpBtn.type = "button";
@@ -1130,16 +1148,16 @@ export function createViewerToolbar({
             anaGroup.style.display = hidden;
             resetGradeBtn.style.display = hidden;
             model3dHint.style.display = isModel3D ? "inline-flex" : "none";
-            // For 3D: hide image-specific overlay tools but keep genInfo and focus toggles
-            // Also hide overlay group label and help button for a cleaner 3D toolbar
-            const ovLabel = ovGroup.querySelector?.(".mjr-viewer-tools-group-label");
+            // For 3D: hide image-specific guide tools but keep focus/gen toggles.
+            const ovInspectLabel = ovInspectGroup.querySelector?.(".mjr-viewer-tools-group-label");
             if (isModel3D) {
-                ovGroup.style.display = "";
-                if (ovLabel) ovLabel.style.display = "none";
+                ovGuidesGroup.style.display = "none";
+                ovInspectGroup.style.display = "";
+                if (ovInspectLabel) ovInspectLabel.style.display = "none";
                 helpWrap.style.display = "none";
                 header.style.padding = "8px 16px";
                 header.style.gap = "4px";
-                toolsRow.style.padding = "4px 4px 2px";
+                toolsRow.style.padding = "4px 8px 2px";
                 for (const el of [
                     gridToggle.b,
                     gridModeSelect,
@@ -1155,12 +1173,13 @@ export function createViewerToolbar({
                     } catch (_) {}
                 }
             } else {
-                ovGroup.style.display = "";
-                if (ovLabel) ovLabel.style.display = "";
+                ovGuidesGroup.style.display = "";
+                ovInspectGroup.style.display = "";
+                if (ovInspectLabel) ovInspectLabel.style.display = "";
                 helpWrap.style.display = "";
                 header.style.padding = "12px 20px";
                 header.style.gap = "8px";
-                toolsRow.style.padding = "6px 4px 2px";
+                toolsRow.style.padding = "6px 8px 4px";
                 for (const el of [
                     gridToggle.b,
                     gridModeSelect,

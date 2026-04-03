@@ -57,7 +57,11 @@ __branch__ = _detect_branch_from_env()
 
 root = Path(__file__).resolve().parent
 if WEB_DIRECTORY is None:
-    WEB_DIRECTORY = str(root / "js")
+    # js_dist/ contains the Vite-built bundle (npm run build).
+    # Fall back to js/ (raw source) when the dist directory has not been built yet
+    # so development without a build step still works.
+    _js_dist = root / "js_dist"
+    WEB_DIRECTORY = str(_js_dist if _js_dist.is_dir() else root / "js")
 
 # Ensure extension-local packages (e.g. `mjr_am_backend`) are importable even when
 # ComfyUI loads this module by file path without adding custom node root to sys.path.

@@ -5,6 +5,7 @@ import { pickRootId } from "../../../utils/ids.js";
 import { safeClosest } from "../../../utils/dom.js";
 import { comfyToast } from "../../../app/toast.js";
 import { t } from "../../../app/i18n.js";
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
 
 const RESCAN_FLAG = "_mjrRescanning";
 const RESCAN_TTL_MS = 1500;
@@ -294,6 +295,14 @@ function ensureSelectionVisible(gridContainer) {
 }
 
 function scheduleEnsureSelectionVisible(gridContainer) {
+    if (gridContainer) {
+        try {
+            gridContainer._mjrAutoRevealSelectionUntil = Date.now() + 900;
+        } catch (e) {
+            console.debug?.(e);
+        }
+    }
+
     const runOnce = () => {
         try {
             ensureSelectionVisible(gridContainer);
@@ -412,8 +421,8 @@ function applySelection(gridContainer, ids, activeId = "") {
     return list;
 }
 
-function syncSelectionState({ gridContainer, state, activeId } = {}) {
-    if (!state || !gridContainer) return;
+function syncSelectionState({ gridContainer, state, activeId, readState = null, writeState = null } = {}) {
+    if ((!state && !writeState) || !gridContainer) return;
     try {
         let selected = [];
         if (gridContainer.dataset?.mjrSelectedAssetIds) {
@@ -433,12 +442,25 @@ function syncSelectionState({ gridContainer, state, activeId } = {}) {
                 .map(String);
         }
 
-        state.selectedAssetIds = selected;
-        if (activeId != null) state.activeAssetId = String(activeId);
-        else if (state.activeAssetId && selected.includes(String(state.activeAssetId))) {
+        if (typeof writeState === "function") {
+            writeState("selectedAssetIds", selected);
+        } else {
+            state.selectedAssetIds = selected;
+        }
+
+        const prevActiveId =
+            typeof readState === "function"
+                ? String(readState("activeAssetId", "") || "")
+                : String(state?.activeAssetId || "");
+
+        if (activeId != null) {
+            if (typeof writeState === "function") writeState("activeAssetId", String(activeId));
+            else state.activeAssetId = String(activeId);
+        } else if (prevActiveId && selected.includes(prevActiveId)) {
             // keep existing active
         } else {
-            state.activeAssetId = selected[0] || "";
+            if (typeof writeState === "function") writeState("activeAssetId", selected[0] || "");
+            else state.activeAssetId = selected[0] || "";
         }
     } catch (e) {
         console.debug?.(e);
@@ -454,6 +476,11 @@ export function bindSidebarOpen({
     closeSidebar,
     state,
 }) {
+    const { read, write } = createPanelStateBridge(state, [
+        "activeAssetId",
+        "selectedAssetIds",
+        "sidebarOpen",
+    ]);
     if (!gridContainer) return { dispose: () => {} };
     if (gridContainer._mjrSidebarOpenBound) {
         return { dispose: gridContainer._mjrSidebarOpenDispose || (() => {}) };
@@ -493,18 +520,29 @@ export function bindSidebarOpen({
             const scrollRoot = gridContainer.parentElement;
             let raf = null;
             let timer = null;
+            const shouldAutoRevealSelection = () => {
+                try {
+                    return Date.now() <= Number(gridContainer?._mjrAutoRevealSelectionUntil || 0);
+                } catch {
+                    return false;
+                }
+            };
             const schedule = () => {
                 if (raf) cancelAnimationFrame(raf);
                 if (timer) clearTimeout(timer);
                 // First pass: immediate after layout
                 raf = requestAnimationFrame(() => {
                     raf = null;
-                    ensureSelectionVisible(gridContainer);
+                    if (shouldAutoRevealSelection()) {
+                        ensureSelectionVisible(gridContainer);
+                    }
                 });
                 // Second pass: after VirtualGrid debounce (100ms) + render
                 timer = setTimeout(() => {
                     timer = null;
-                    ensureSelectionVisible(gridContainer);
+                    if (shouldAutoRevealSelection()) {
+                        ensureSelectionVisible(gridContainer);
+                    }
                 }, 160);
             };
 
@@ -582,7 +620,7 @@ export function bindSidebarOpen({
             // Ensure this card is selected, but do not open the sidebar from dot clicks.
             const id = card?.dataset?.mjrAssetId || "";
             applySelection(gridContainer, id ? [id] : [], id);
-            syncSelectionState({ gridContainer, state, activeId: id });
+            syncSelectionState({ gridContainer, state, activeId: id, readState: read, writeState: write });
 
             const updated = await rescanSingleAsset({
                 card,
@@ -617,6 +655,32 @@ export function bindSidebarOpen({
         const asset = card._mjrAsset;
         if (!asset) return;
 
+        if (gridContainer?._mjrSelectionManagedByVue) {
+            const clickedId = String(card?.dataset?.mjrAssetId || "").trim();
+            syncSelectionState({
+                gridContainer,
+                state,
+                activeId: clickedId,
+                readState: read,
+                writeState: write,
+            });
+            try {
+                if (sidebar?.classList?.contains?.("is-open")) {
+                    await showAssetInSidebar(sidebar, asset, (updatedAsset) =>
+                        applyAssetUpdateToCard(card, asset, updatedAsset),
+                    );
+                    try {
+                        write("sidebarOpen", true);
+                    } catch (e) {
+                        console.debug?.(e);
+                    }
+                }
+            } catch (e) {
+                console.debug?.(e);
+            }
+            return;
+        }
+
         e.preventDefault();
         e.stopPropagation();
 
@@ -625,13 +689,25 @@ export function bindSidebarOpen({
             const alreadySelected = card.classList.contains("is-selected");
             if (alreadySelected) {
                 applySelection(gridContainer, [], "");
-                syncSelectionState({ gridContainer, state, activeId: "" });
+                syncSelectionState({
+                    gridContainer,
+                    state,
+                    activeId: "",
+                    readState: read,
+                    writeState: write,
+                });
                 return;
             }
 
             const id = card?.dataset?.mjrAssetId;
             applySelection(gridContainer, id ? [id] : [], id || "");
-            syncSelectionState({ gridContainer, state, activeId: id || "" });
+            syncSelectionState({
+                gridContainer,
+                state,
+                activeId: id || "",
+                readState: read,
+                writeState: write,
+            });
 
             // When the sidebar is already open, clicking a different card navigates details.
             try {
@@ -672,7 +748,13 @@ export function bindSidebarOpen({
                             .filter(Boolean);
                         applySelection(gridContainer, rangeIds, id || rangeIds[0] || "");
                         gridContainer._mjrLastSelectedIndex = targetIndex;
-                        syncSelectionState({ gridContainer, state, activeId: id || "" });
+                        syncSelectionState({
+                            gridContainer,
+                            state,
+                            activeId: id || "",
+                            readState: read,
+                            writeState: write,
+                        });
                         return;
                     }
                 }
@@ -719,7 +801,13 @@ export function bindSidebarOpen({
             const nextActiveId = selectedSet.has(clickedId) ? clickedId : nextList[0] || "";
             // Use canonical selection setter so both grid + window selection events are fired.
             applySelection(gridContainer, nextList, nextActiveId);
-            syncSelectionState({ gridContainer, state, activeId: nextActiveId });
+            syncSelectionState({
+                gridContainer,
+                state,
+                activeId: nextActiveId,
+                readState: read,
+                writeState: write,
+            });
             return;
         }
         // Click only selects the asset (sidebar opens via hotkey/context menu).
@@ -734,7 +822,7 @@ export function bindSidebarOpen({
     gridContainer.addEventListener("click", onClick);
 
     const openDetailsForSelection = async () => {
-        const activeId = state?.activeAssetId ? String(state.activeAssetId) : "";
+        const activeId = String(read("activeAssetId", "") || "");
         let card = null;
         if (activeId) {
             try {
@@ -761,7 +849,13 @@ export function bindSidebarOpen({
         // (needed when triggered from the global hotkey which bypasses the grid keydown handler)
         setSelectedCard(gridContainer, card);
         updateSelectedIdsDataset(gridContainer);
-        syncSelectionState({ gridContainer, state, activeId: card?.dataset?.mjrAssetId });
+        syncSelectionState({
+            gridContainer,
+            state,
+            activeId: card?.dataset?.mjrAssetId,
+            readState: read,
+            writeState: write,
+        });
 
         try {
             const isOpen = !!sidebar?.classList?.contains?.("is-open");
@@ -775,7 +869,7 @@ export function bindSidebarOpen({
                 closeSidebar(sidebar);
                 // Persist sidebar closed state
                 try {
-                    state.sidebarOpen = false;
+                    write("sidebarOpen", false);
                 } catch (e) {
                     console.debug?.(e);
                 }
@@ -793,7 +887,7 @@ export function bindSidebarOpen({
             );
             // Persist sidebar open state
             try {
-                state.sidebarOpen = true;
+                write("sidebarOpen", true);
             } catch (e) {
                 console.debug?.(e);
             }
@@ -812,7 +906,7 @@ export function bindSidebarOpen({
             return false;
         }
 
-        const activeId = String(state?.activeAssetId || "").trim();
+        const activeId = String(read("activeAssetId", "") || "").trim();
         if (!activeId) return false;
 
         let card = null;
@@ -829,7 +923,7 @@ export function bindSidebarOpen({
                 applyAssetUpdateToCard(card, asset, updatedAsset),
             );
             try {
-                state.sidebarOpen = true;
+                write("sidebarOpen", true);
             } catch (e) {
                 console.debug?.(e);
             }
@@ -839,6 +933,26 @@ export function bindSidebarOpen({
         }
         return false;
     };
+
+    let selectionRefreshQueued = false;
+    const onSelectionChanged = () => {
+        try {
+            if (!sidebar?.classList?.contains?.("is-open")) return;
+        } catch {
+            return;
+        }
+        if (selectionRefreshQueued) return;
+        selectionRefreshQueued = true;
+        queueMicrotask(async () => {
+            selectionRefreshQueued = false;
+            try {
+                await refreshActiveAsset();
+            } catch (e) {
+                console.debug?.(e);
+            }
+        });
+    };
+    gridContainer.addEventListener("mjr:selection-changed", onSelectionChanged);
 
     // Keyboard accessibility: toggle details from focused card.
     const onKeyDown = (e) => {
@@ -858,7 +972,13 @@ export function bindSidebarOpen({
         e.stopPropagation();
         setSelectedCard(gridContainer, card);
         updateSelectedIdsDataset(gridContainer);
-        syncSelectionState({ gridContainer, state, activeId: card?.dataset?.mjrAssetId });
+        syncSelectionState({
+            gridContainer,
+            state,
+            activeId: card?.dataset?.mjrAssetId,
+            readState: read,
+            writeState: write,
+        });
         openDetailsForSelection();
     };
     gridContainer.addEventListener("keydown", onKeyDown);
@@ -866,7 +986,7 @@ export function bindSidebarOpen({
     // Listen for sidebar close events (e.g. from the close button in sidebar header)
     const onSidebarClosed = () => {
         try {
-            state.sidebarOpen = false;
+            write("sidebarOpen", false);
         } catch (e) {
             console.debug?.(e);
         }
@@ -897,6 +1017,11 @@ export function bindSidebarOpen({
         }
         try {
             gridContainer.removeEventListener("keydown", onKeyDown);
+        } catch (e) {
+            console.debug?.(e);
+        }
+        try {
+            gridContainer.removeEventListener("mjr:selection-changed", onSelectionChanged);
         } catch (e) {
             console.debug?.(e);
         }

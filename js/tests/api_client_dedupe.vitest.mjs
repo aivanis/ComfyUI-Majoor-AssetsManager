@@ -52,7 +52,7 @@ describe("api client request deduplication", () => {
 
         const client = await import("../api/client.js");
         const first = client.getAssetMetadata(7);
-        const second = client.getAssetMetadata(7);
+        const _second = client.getAssetMetadata(7);
 
         expect(globalThis.fetch).toHaveBeenCalledTimes(0);
         await Promise.resolve();

@@ -1,7 +1,5 @@
-import { createGenerationSection } from "../../components/sidebar/sections/GenerationSection.js";
-import { createWorkflowMinimapSection } from "../../components/sidebar/sections/WorkflowMinimapSection.js";
-import { createFileInfoSection } from "../../components/sidebar/sections/FileInfoSection.js";
-import { createInfoBox } from "../../components/sidebar/utils/dom.js";
+import { createMjrApp } from "../../vue/createVueApp.js";
+import ViewerMetadataBlock from "../../vue/components/viewer/ViewerMetadataBlock.vue";
 import { safeCall as baseSafeCall } from "../../utils/safeCall.js";
 import { APP_CONFIG } from "../../app/config.js";
 
@@ -476,6 +474,58 @@ export async function ensureViewerMetadataAsset(
 }
 
 export function buildViewerMetadataBlocks({ title, asset, ui } = {}) {
+    const host = document.createElement("div");
+    try {
+        const { app } = createMjrApp(ViewerMetadataBlock, {
+            title,
+            asset,
+            loading: Boolean(ui?.loading),
+            onRetry: typeof ui?.onRetry === "function" ? ui.onRetry : null,
+        });
+        app.mount(host);
+        host._mjrDispose = () => {
+            try {
+                app.unmount();
+            } catch (e) {
+                console.debug?.(e);
+            }
+        };
+        return host;
+    } catch (e) {
+        console.debug?.(e);
+    }
+
+    const fallback = document.createElement("div");
+    fallback.style.cssText = "display:flex; flex-direction:column; gap:10px; margin-bottom: 14px;";
+    if (title) {
+        const h = document.createElement("div");
+        h.textContent = title;
+        h.style.cssText =
+            "font-size: 12px; font-weight: 600; letter-spacing: 0.02em; color: rgba(255,255,255,0.86);";
+        fallback.appendChild(h);
+    }
+    const raw = asset?.metadata_raw;
+    if (raw != null) {
+        const details = document.createElement("details");
+        details.style.cssText =
+            "border: 1px solid rgba(255,255,255,0.10); border-radius: 10px; background: rgba(255,255,255,0.04); overflow: hidden;";
+        const summary = document.createElement("summary");
+        summary.textContent = "Raw metadata";
+        summary.style.cssText =
+            "cursor: pointer; padding: 10px 12px; color: rgba(255,255,255,0.78); user-select: none;";
+        const pre = document.createElement("pre");
+        pre.style.cssText =
+            "margin:0; padding: 10px 12px; max-height: 280px; overflow:auto; font-size: 11px; line-height: 1.35; color: rgba(255,255,255,0.86);";
+        let txt = typeof raw === "string" ? raw : JSON.stringify(raw, null, 2);
+        if (txt.length > 40_000) txt = `${txt.slice(0, 40_000)}\n...(truncated)`;
+        pre.textContent = txt;
+        details.appendChild(summary);
+        details.appendChild(pre);
+        fallback.appendChild(details);
+    }
+    return fallback;
+    /*
+
     const block = document.createElement("div");
     block.style.cssText = "display:flex; flex-direction:column; gap:10px; margin-bottom: 14px;";
 
@@ -528,12 +578,12 @@ export function buildViewerMetadataBlocks({ title, asset, ui } = {}) {
         });
     }
 
-    const gen = safeCall(() => createGenerationSection(asset), null);
-    const fileInfo = safeCall(() => createFileInfoSection(asset), null);
+    const gen = null;
+    const fileInfo = null;
 
     let wf = null;
     if (APP_CONFIG.WORKFLOW_MINIMAP_ENABLED !== false) {
-        wf = safeCall(() => createWorkflowMinimapSection(asset), null);
+        wf = null;
     }
 
     if (fileInfo) block.appendChild(fileInfo);
@@ -580,4 +630,5 @@ export function buildViewerMetadataBlocks({ title, asset, ui } = {}) {
     });
 
     return block;
+    */
 }

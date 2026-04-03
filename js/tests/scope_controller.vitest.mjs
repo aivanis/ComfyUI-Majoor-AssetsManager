@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
 
 import { createScopeController } from "../features/panel/controllers/scopeController.js";
+import { usePanelStore } from "../stores/usePanelStore.js";
 
 function makeButton(scope) {
     const classes = new Set();
@@ -21,6 +23,17 @@ function makeButton(scope) {
 
 describe("scopeController similar scope", () => {
     it("activates a temporary similar scope and clears it cleanly", async () => {
+        setActivePinia(createPinia());
+        const panelStore = usePanelStore();
+        panelStore.scope = "output";
+        panelStore.viewScope = "";
+        panelStore.similarResults = [{ asset_id: 7 }];
+        panelStore.similarTitle = "Similar to asset #42 (1 results)";
+        panelStore.similarSourceAssetId = "42";
+        panelStore.collectionId = "";
+        panelStore.collectionName = "";
+        panelStore.currentFolderRelativePath = "";
+        panelStore.customRootId = "";
         const tabButtons = {
             tabAll: makeButton("all"),
             tabInputs: makeButton("input"),
@@ -66,20 +79,21 @@ describe("scopeController similar scope", () => {
         expect(tabButtons.tabOutputs.classList.has("is-active")).toBe(true);
 
         await controller.setScope("similar");
-        expect(state.viewScope).toBe("similar");
+        expect(panelStore.viewScope).toBe("similar");
         expect(tabButtons.tabSimilar.classList.has("is-active")).toBe(true);
         expect(onScopeChanged).not.toHaveBeenCalled();
         expect(onBeforeReload).toHaveBeenCalledTimes(1);
         expect(reloadGrid).toHaveBeenCalledTimes(1);
 
         await controller.clearSimilarScope({ reload: false });
-        expect(state.viewScope).toBe("");
-        expect(state.similarResults).toEqual([]);
-        expect(state.similarTitle).toBe("");
-        expect(state.similarSourceAssetId).toBe("");
+        expect(panelStore.viewScope).toBe("");
         expect(tabButtons.tabSimilar.style.display).toBe("none");
 
         await controller.setScope("output");
+        expect(panelStore.scope).toBe("output");
+        expect(panelStore.collectionId).toBe("");
+        expect(panelStore.collectionName).toBe("");
+        expect(panelStore.currentFolderRelativePath).toBe("");
         expect(reconcileSelection).toHaveBeenCalledTimes(1);
     });
 });

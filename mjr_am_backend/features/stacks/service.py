@@ -252,11 +252,11 @@ class StacksService:
         return Result.Ok(True)
 
     async def auto_select_cover(self, stack_id: int) -> Result[int | None]:
-        """Pick the best cover asset for a stack (largest image, or last file)."""
+        """Pick the best cover asset for a stack (last generated image, or last file)."""
         preferred_queries = (
             "SELECT id FROM assets "
             "WHERE stack_id = ? AND kind = 'image' "
-            "ORDER BY size DESC, mtime DESC LIMIT 1",
+            "ORDER BY mtime DESC LIMIT 1",
             "SELECT id FROM assets WHERE stack_id = ? ORDER BY mtime DESC LIMIT 1",
         )
         for query in preferred_queries:

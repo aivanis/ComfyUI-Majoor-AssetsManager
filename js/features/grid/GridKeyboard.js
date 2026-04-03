@@ -22,7 +22,7 @@ import {
 import { buildDownloadURL } from "../../api/endpoints.js";
 import { ASSET_RATING_CHANGED_EVENT } from "../../app/events.js";
 import { safeDispatchCustomEvent } from "../../utils/events.js";
-import { getViewerInstance } from "../../components/Viewer.js";
+import { requestViewerOpen } from "../viewer/viewerOpenRequest.js";
 import { showAddToCollectionMenu } from "../collections/contextmenu/addToCollectionMenu.js";
 import { normalizeRenameFilename, validateFilename } from "../../utils/filenames.js";
 import { getHotkeysState, isHotkeysSuspended } from "../panel/controllers/hotkeysState.js";
@@ -184,13 +184,14 @@ export function installGridKeyboard({
     onOpenTagsEditor = () => {},
     onSelectionChanged = () => {},
     onAssetChanged = () => {},
-    getViewer = null,
 } = {}) {
     if (!gridContainer) return { bind: () => {}, unbind: () => {}, dispose: () => {} };
 
     let keydownHandler = null;
     let bound = false;
-    const resolveViewer = typeof getViewer === "function" ? getViewer : getViewerInstance;
+    const openInViewer = ({ assets = [], index = 0, mode = "" } = {}) => {
+        requestViewerOpen({ assets, index, mode });
+    };
 
     const getSelection = () => {
         try {
@@ -489,9 +490,8 @@ export function installGridKeyboard({
             if (selected.length > 0) {
                 consume();
                 try {
-                    const viewer = resolveViewer();
                     if (selected.length >= 2 && selected.length <= 4) {
-                        viewer.open(selected, 0);
+                        openInViewer({ assets: selected, index: 0 });
                     } else {
                         // Open all assets from grid, starting at active
                         let allAssets = [];
@@ -505,7 +505,7 @@ export function installGridKeyboard({
                             allAssets = cards.map((card) => card._mjrAsset).filter(Boolean);
                         }
                         const idx = allAssets.findIndex((a) => String(a?.id) === String(asset?.id));
-                        viewer.open(allAssets, Math.max(0, idx));
+                        openInViewer({ assets: allAssets, index: Math.max(0, idx) });
                     }
                 } catch (err) {
                     console.error("[GridKeyboard] Open viewer failed:", err);
@@ -528,9 +528,7 @@ export function installGridKeyboard({
             if (selected.length === 2) {
                 consume();
                 try {
-                    const viewer = resolveViewer();
-                    viewer.open(selected, 0);
-                    viewer.setMode?.("ab");
+                    openInViewer({ assets: selected, index: 0, mode: "ab" });
                 } catch (e) {
                     console.debug?.(e);
                 }
@@ -543,9 +541,7 @@ export function installGridKeyboard({
             if (selected.length >= 2 && selected.length <= 4) {
                 consume();
                 try {
-                    const viewer = resolveViewer();
-                    viewer.open(selected, 0);
-                    viewer.setMode?.("sidebyside");
+                    openInViewer({ assets: selected, index: 0, mode: "sidebyside" });
                 } catch (e) {
                     console.debug?.(e);
                 }

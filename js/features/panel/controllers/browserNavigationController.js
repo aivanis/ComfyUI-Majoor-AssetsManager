@@ -1,4 +1,5 @@
 import { t } from "../../../app/i18n.js";
+import { createPanelStateBridge } from "../../../stores/panelStateBridge.js";
 
 export function createBrowserNavigationController({
     state,
@@ -9,6 +10,11 @@ export function createBrowserNavigationController({
     onContextChanged = null,
     lifecycleSignal = null,
 } = {}) {
+    const { read, write } = createPanelStateBridge(state, [
+        "scope",
+        "customRootId",
+        "currentFolderRelativePath",
+    ]);
     const folderBackStack = [];
 
     const normPath = (value) =>
@@ -16,7 +22,7 @@ export function createBrowserNavigationController({
             .trim()
             .replaceAll("\\", "/");
     const isWindowsDrive = (part) => /^[a-zA-Z]:$/.test(String(part || "").trim());
-    const currentFolderPath = () => normPath(state.currentFolderRelativePath || "");
+    const currentFolderPath = () => normPath(read("currentFolderRelativePath", "") || "");
 
     const pushUniqueHistory = (stack, value) => {
         const v = normPath(value);
@@ -39,7 +45,7 @@ export function createBrowserNavigationController({
 
     const setFolderPath = (next) => {
         const v = normPath(next);
-        state.currentFolderRelativePath = v;
+        write("currentFolderRelativePath", v);
         try {
             if (gridContainer?.dataset) gridContainer.dataset.mjrSubfolder = v;
         } catch (e) {
@@ -121,7 +127,7 @@ export function createBrowserNavigationController({
     };
 
     const resetToBrowserRoot = async () => {
-        state.customRootId = "";
+        write("customRootId", "");
         setFolderPath("");
         resetGridScrollToTop();
         notifyContext();
@@ -129,12 +135,12 @@ export function createBrowserNavigationController({
     };
 
     const renderBreadcrumb = () => {
-        const isCustom = String(state.scope || "") === "custom";
-        const rel = String(state.currentFolderRelativePath || "")
+        const isCustom = String(read("scope", "") || "") === "custom";
+        const rel = String(read("currentFolderRelativePath", "") || "")
             .trim()
             .replaceAll("\\", "/");
         const folderBrowsingActive = isCustom || !!rel;
-        const selectedRootId = String(state.customRootId || "").trim();
+        const selectedRootId = String(read("customRootId", "") || "").trim();
         const selectedRootLabel = (() => {
             if (!selectedRootId) return "";
             try {
@@ -158,7 +164,7 @@ export function createBrowserNavigationController({
         backBtn.type = "button";
         backBtn.textContent = t("btn.back", "Back");
         backBtn.className = "mjr-btn-link";
-        const hasSelectedRoot = !!String(state.customRootId || "").trim();
+        const hasSelectedRoot = !!String(read("customRootId", "") || "").trim();
         const canBackToBrowserRoot = hasSelectedRoot && !rel;
         const canBackByPath = !!rel;
         backBtn.disabled = folderBackStack.length === 0 && !canBackToBrowserRoot && !canBackByPath;
@@ -224,7 +230,7 @@ export function createBrowserNavigationController({
                 el.addEventListener(
                     "click",
                     async () => {
-                        if (label === "Computer" && String(state.customRootId || "").trim()) {
+                        if (label === "Computer" && String(read("customRootId", "") || "").trim()) {
                             await resetToBrowserRoot();
                             return;
                         }

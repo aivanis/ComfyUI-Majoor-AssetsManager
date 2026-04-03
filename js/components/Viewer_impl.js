@@ -12,7 +12,10 @@ import {
     getFileMetadataScoped,
 } from "../api/client.js";
 import { ASSET_RATING_CHANGED_EVENT, ASSET_TAGS_CHANGED_EVENT } from "../app/events.js";
-import { bindViewerContextMenu } from "../features/viewer/ViewerContextMenu.js";
+import {
+    bindViewerContextMenu,
+    unbindViewerContextMenu,
+} from "../features/viewer/ViewerContextMenu.js";
 import { createFileBadge, createRatingBadge, createTagsBadge } from "./Badges.js";
 import { APP_CONFIG } from "../app/config.js";
 import { safeDispatchCustomEvent } from "../utils/events.js";
@@ -82,6 +85,7 @@ function createViewer() {
         bottom: 0;
         background: rgba(0, 0, 0, 0.95);
         z-index: 10000;
+        pointer-events: auto;
         display: none;
         flex-direction: column;
         box-sizing: border-box;
@@ -1121,6 +1125,26 @@ function createViewer() {
     // Generation Info side panel (prompt/model/etc)
     // ----------------------------------------------------------------------------
 
+    const clearGenInfoBody = (target) => {
+        if (!target) return;
+        try {
+            for (const child of Array.from(target.childNodes || [])) {
+                try {
+                    child?._mjrDispose?.();
+                } catch (e) {
+                    console.debug?.(e);
+                }
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        try {
+            target.replaceChildren();
+        } catch (e) {
+            console.debug?.(e);
+        }
+    };
+
     const stopGenInfoFetch = () => {
         try {
             state._genInfoAbort?.abort?.();
@@ -1194,12 +1218,12 @@ function createViewer() {
             if (!open) {
                 stopGenInfoFetch();
                 try {
-                    genInfoBody.replaceChildren();
+                    clearGenInfoBody(genInfoBody);
                 } catch (e) {
                     console.debug?.(e);
                 }
                 try {
-                    genInfoBodyLeft.replaceChildren();
+                    clearGenInfoBody(genInfoBodyLeft);
                 } catch (e) {
                     console.debug?.(e);
                 }
@@ -1221,12 +1245,12 @@ function createViewer() {
 
         const renderNow = ({ left, leftExtra, right, rightExtra, single }) => {
             try {
-                genInfoBody.replaceChildren();
+                clearGenInfoBody(genInfoBody);
             } catch (e) {
                 console.debug?.(e);
             }
             try {
-                genInfoBodyLeft.replaceChildren();
+                clearGenInfoBody(genInfoBodyLeft);
             } catch (e) {
                 console.debug?.(e);
             }
@@ -2537,18 +2561,19 @@ function createViewer() {
         }
         try {
             genInfoOverlay.style.display = "none";
-            genInfoBody.replaceChildren();
+            clearGenInfoBody(genInfoBody);
         } catch (e) {
             console.debug?.(e);
         }
         try {
             genInfoOverlayLeft.style.display = "none";
-            genInfoBodyLeft.replaceChildren();
+            clearGenInfoBody(genInfoBodyLeft);
         } catch (e) {
             console.debug?.(e);
         }
 
         overlay.style.display = "none";
+        overlay.style.pointerEvents = "none";
         disposeOpenListeners();
         try {
             document.body.style.overflow = state._prevBodyOverflow ?? "";
@@ -2619,6 +2644,7 @@ function createViewer() {
             }
 
             overlay.style.display = "flex";
+            overlay.style.pointerEvents = "auto";
 
             // FIX: Store previously focused element and set focus to overlay for accessibility
             try {
@@ -2738,6 +2764,11 @@ function createViewer() {
             } catch (e) {
                 console.debug?.(e);
             }
+            try {
+                unbindViewerContextMenu(overlay);
+            } catch (e) {
+                console.debug?.(e);
+            }
 
             try {
                 for (const u of overlay._mjrViewerUnsubs || []) safeCall(u);
@@ -2768,9 +2799,9 @@ function createViewer() {
         },
     };
 
-    // Upgrade the toolbar close button to a full dispose once API is available.
+    // Keep toolbar close non-destructive so the singleton viewer can reopen reliably.
     try {
-        _requestCloseFromButton = () => api.dispose();
+        _requestCloseFromButton = () => api.close();
     } catch (e) {
         console.debug?.(e);
     }
