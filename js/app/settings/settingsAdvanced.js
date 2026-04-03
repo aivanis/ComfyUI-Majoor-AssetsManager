@@ -501,6 +501,8 @@ export function registerAdvancedSettings(safeAddSetting, settings, notifyApplied
             },
             onChange: (value) => {
                 const next = String(value || "").trim();
+                // Ignore no-op updates to avoid repeated API calls/toasts when settings UI rebinds.
+                if (next === _hfTokenCommittedValue) return;
                 try {
                     if (_hfTokenSaveTimer) {
                         clearTimeout(_hfTokenSaveTimer);
@@ -521,10 +523,14 @@ export function registerAdvancedSettings(safeAddSetting, settings, notifyApplied
                         }
                         _hfTokenCommittedValue = next;
                         notifyApplied("ai.huggingFaceToken");
-                        comfyToast(
-                            next ? "HuggingFace token saved" : "HuggingFace token cleared",
-                            "success",
-                        );
+                        if (next) {
+                            comfyToast("HuggingFace token saved", "success");
+                        } else {
+                            // Keep UX feedback but don't pollute Message Center history.
+                            comfyToast("HuggingFace token cleared", "success", undefined, {
+                                noHistory: true,
+                            });
+                        }
                     } catch (error) {
                         if (seq !== _hfTokenSaveSeq) return;
                         comfyToast(error?.message || "Failed to update HuggingFace token", "error");

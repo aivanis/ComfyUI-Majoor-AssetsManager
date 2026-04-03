@@ -386,7 +386,11 @@ function createViewerMenuItems({
 
                         comfyToast(t("toast.fileRenamedSuccess"), "success");
                         try {
-                            window.dispatchEvent(new CustomEvent("mjr:reload-grid"));
+                            window.dispatchEvent(
+                                new CustomEvent("mjr:reload-grid", {
+                                    detail: { reason: "viewer-rename" },
+                                }),
+                            );
                         } catch (e) {
                             console.debug?.(e);
                         }

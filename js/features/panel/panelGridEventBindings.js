@@ -111,7 +111,7 @@ export function bindGridEvents({
     try {
         window.addEventListener(
             "mjr:reload-grid",
-            () => {
+            (event) => {
                 try {
                     if (panelLifecycleAC?.signal?.aborted) return;
                 } catch (e) {
@@ -122,6 +122,10 @@ export function bindGridEvents({
                 } catch (e) {
                     console.debug?.(e);
                 }
+                // Only process explicit, reasoned global reload requests.
+                // This avoids accidental reloads from anonymous CustomEvents emitted elsewhere.
+                const reason = String(event?.detail?.reason || "").trim();
+                if (!reason) return;
                 requestQueuedReload();
             },
             { signal: panelLifecycleAC?.signal },

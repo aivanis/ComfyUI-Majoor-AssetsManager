@@ -162,7 +162,6 @@ export function createSettingsSync({
         const isInitialSync = changedKey === "__init__";
         const shouldRefreshGrid =
             isInitialSync ||
-            changedKey === "" ||
             changedKey.startsWith("grid.") ||
             changedKey.startsWith("infiniteScroll.") ||
             changedKey.startsWith("siblings.") ||
@@ -171,10 +170,9 @@ export function createSettingsSync({
             changedKey.startsWith("workflowMinimap.");
         const shouldRefreshSidebar =
             isInitialSync ||
-            changedKey === "" ||
             changedKey.startsWith("sidebar.") ||
             changedKey.startsWith("ai.");
-        const shouldApplyWatcher = changedKey === "" || changedKey.startsWith("watcher.");
+        const shouldApplyWatcher = isInitialSync || changedKey.startsWith("watcher.");
 
         try {
             const s = loadMajoorSettings();
