@@ -279,39 +279,80 @@ export function useGridLoader({
 
         const limit = Math.max(1, Math.min(APP_CONFIG.MAX_PAGE_SIZE, APP_CONFIG.DEFAULT_PAGE_SIZE));
         const loadingStartedAt = Date.now();
+        // Dynamically calculate max empty batches based on total assets
+        // For 7000+ assets: allows ~200+ empty batches before giving up
+        // For smaller sets: proportional (min 8, max 200)
+        const totalAssets = Number(state.total || 0) || 1000;
+        const MAX_EMPTY_APPEND_BATCHES = Math.min(
+            200,
+            Math.max(8, Math.ceil((totalAssets / 1000) * 30))
+        );
         state.loading = true;
         clearStatusMessage();
         try {
-            const page = await fetchPage(state.query, limit, state.offset, {
-                requestId: Number(state.requestId ?? 0) || 0,
-                signal: state.abortController?.signal || null,
-            });
-            if (!page.ok) {
-                if (page.aborted || page.stale) {
+            let emptyAppendBatches = 0;
+            while (!state.done) {
+                const page = await fetchPage(state.query, limit, state.offset, {
+                    requestId: Number(state.requestId ?? 0) || 0,
+                    signal: state.abortController?.signal || null,
+                });
+                if (!page.ok) {
+                    if (page.aborted || page.stale) {
+                        return page;
+                    }
+                    state.done = true;
+                    setStatusMessage(
+                        formatLoadErrorMessage("Failed to load assets", page?.error || "Unknown error"),
+                        { error: true },
+                    );
                     return page;
                 }
-                state.done = true;
-                setStatusMessage(
-                    formatLoadErrorMessage("Failed to load assets", page?.error || "Unknown error"),
-                    { error: true },
-                );
-                return page;
+
+                if (page.total != null) {
+                    state.total = Number(page.total) || 0;
+                }
+
+                const fetchedCount = Number(page.count || 0) || 0;
+                const addedCount = Number(appendAssets(gridContainer, page.assets || []) || 0) || 0;
+                state.offset += fetchedCount;
+                const wasDone = state.done;
+                state.done =
+                    fetchedCount <= 0 ||
+                    (Number.isFinite(Number(state.total)) &&
+                        Number(state.total || 0) > 0 &&
+                        state.assets.length >= Number(state.total || 0));
+
+                // Debug logging
+                if (emptyAppendBatches > 0 || state.done) {
+                    console.debug(`[Grid LoadPage] offset=${state.offset}, fetched=${fetchedCount}, added=${addedCount}, done=${state.done}, visibleCount=${state.assets.length}, total=${state.total}, emptyBatches=${emptyAppendBatches}/${MAX_EMPTY_APPEND_BATCHES}`);
+                }
+
+                if (state.done || addedCount > 0) {
+                    return {
+                        ok: true,
+                        count: fetchedCount,
+                        total: state.total,
+                    };
+                }
+
+                // If a fetched page adds zero visible cards (dedupe/hide), keep fetching
+                // so infinite scroll doesn't stall at the current bottom.
+                // Limit is now dynamic based on total assets to handle large libraries.
+                emptyAppendBatches += 1;
+                if (emptyAppendBatches >= MAX_EMPTY_APPEND_BATCHES) {
+                    console.debug(`[Grid] Empty append batches limit reached: ${emptyAppendBatches}/${MAX_EMPTY_APPEND_BATCHES}`);
+                    return {
+                        ok: true,
+                        count: 0,
+                        total: state.total,
+                        skippedEmpty: true,
+                    };
+                }
             }
 
-            if (page.total != null) {
-                state.total = Number(page.total) || 0;
-            }
-
-            appendAssets(gridContainer, page.assets || []);
-            state.offset += Number(page.count || 0) || 0;
-            state.done =
-                (Number(page.count || 0) || 0) <= 0 ||
-                (Number.isFinite(Number(state.total)) &&
-                    Number(state.total || 0) > 0 &&
-                    state.assets.length >= Number(state.total || 0));
             return {
                 ok: true,
-                count: Number(page.count || 0) || 0,
+                count: 0,
                 total: state.total,
             };
         } catch (err) {
