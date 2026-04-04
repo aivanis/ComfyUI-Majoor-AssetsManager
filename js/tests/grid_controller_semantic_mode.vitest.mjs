@@ -130,4 +130,42 @@ describe("gridController semantic mode", () => {
         );
         expect(loadAssets).not.toHaveBeenCalled();
     });
+
+    it("keeps long natural language queries on lexical search when semantic toggle is off", async () => {
+        setActivePinia(createPinia());
+        const panelStore = usePanelStore();
+        panelStore.scope = "output";
+
+        const { createGridController } =
+            await import("../features/panel/controllers/gridController.js");
+
+        apiState.hybridSearch.mockResolvedValue({ ok: true, data: [{ id: 9 }] });
+        apiState.vectorSearch.mockResolvedValue({ ok: true, data: [{ id: 10 }] });
+
+        const loadAssets = vi.fn(async () => ({ ok: true, count: 1, total: 1 }));
+        const loadAssetsFromList = vi.fn(async (_grid, assets) => ({
+            ok: true,
+            count: assets.length,
+            total: assets.length,
+        }));
+
+        const controller = createGridController({
+            gridContainer: createGridContainer(),
+            loadAssets,
+            loadAssetsFromList,
+            getCollectionAssets: vi.fn(),
+            disposeGrid: vi.fn(),
+            getQuery: () =>
+                "a single organic flower is blooming at the center with delicate asymmetrical petals",
+            searchInputEl: { dataset: { mjrSemanticMode: "0" } },
+            state: panelStore,
+        });
+
+        await controller.reloadGrid();
+
+        expect(loadAssets).toHaveBeenCalledTimes(1);
+        expect(apiState.hybridSearch).not.toHaveBeenCalled();
+        expect(apiState.vectorSearch).not.toHaveBeenCalled();
+        expect(loadAssetsFromList).not.toHaveBeenCalled();
+    });
 });

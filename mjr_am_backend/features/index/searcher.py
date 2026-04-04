@@ -3,6 +3,7 @@ Index searcher - handles asset search and retrieval operations.
 """
 import os
 import re
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,17 @@ MAX_FILEPATH_LOOKUP = SEARCH_MAX_FILEPATH_LOOKUP
 VALID_SORT_KEYS = {"mtime_desc", "mtime_asc", "name_asc", "name_desc", "rating_desc", "size_desc", "size_asc"}
 _SAFE_SQL_FRAGMENT_RE = re.compile(r"^[\s\w\.\(\)=<>\?!,'\\%:$-]+$")
 _FTS_RESERVED = {"AND", "OR", "NOT", "NEAR"}
+_LONG_QUERY_OR_THRESHOLD = 7
+_MAX_PREFIX_TOKENS = 16
+_STOPWORDS_FR_EN = {
+    # English
+    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from", "in", "is", "it", "of",
+    "on", "or", "that", "the", "to", "was", "were", "with", "without",
+    # French
+    "a", "au", "aux", "avec", "ce", "ces", "dans", "de", "des", "du", "en", "et", "la", "le",
+    "les", "leur", "leurs", "mais", "ou", "par", "pas", "pour", "sans", "se", "ses", "sur", "un",
+    "une", "vos", "votre",
+}
 _AI_SELECT_SQL = """
                 COALESCE(a.enhanced_caption, '') as enhanced_caption,
                 COALESCE(ae.auto_tags, '[]') as auto_tags,
@@ -75,6 +87,55 @@ def _normalize_sort_key(sort: str | None) -> str:
     if s in VALID_SORT_KEYS:
         return s
     return "mtime_desc"
+
+
+def _strip_diacritics(text: str) -> str:
+    normalized = unicodedata.normalize("NFKD", text)
+    return "".join(ch for ch in normalized if not unicodedata.combining(ch))
+
+
+def _extract_quoted_phrases(text: str) -> list[str]:
+    phrases: list[str] = []
+    for match in re.finditer(r'"([^"]+)"|\'([^\']+)\'', text):
+        phrase = match.group(1) or match.group(2) or ""
+        phrase = _strip_diacritics(phrase)
+        phrase = re.sub(r"[\"'\-:&/\\|;@#*~()\[\]{}\.]+", " ", phrase)
+        phrase = re.sub(r"[^\x20-\x7E]+", " ", phrase)
+        phrase = re.sub(r"\s+", " ", phrase).strip().lower()
+        if phrase:
+            phrases.append(phrase)
+    # Keep phrase clauses bounded for MATCH stability.
+    return phrases[:4]
+
+
+def _dedupe_tokens(tokens: list[str]) -> list[str]:
+    out: list[str] = []
+    seen: set[str] = set()
+    for token in tokens:
+        if token in seen:
+            continue
+        seen.add(token)
+        out.append(token)
+    return out
+
+
+def _build_token_match_expression(tokens: list[str]) -> str:
+    if not tokens:
+        return ""
+    terms = [f"{token}*" for token in tokens[:_MAX_PREFIX_TOKENS]]
+    if len(terms) > _LONG_QUERY_OR_THRESHOLD:
+        return " OR ".join(terms)
+    return " ".join(terms)
+
+
+def _is_meaningful_token(token: str) -> bool:
+    if not token or len(token) <= 1:
+        return False
+    if token.upper() in _FTS_RESERVED:
+        return False
+    if token in _STOPWORDS_FR_EN:
+        return False
+    return True
 
 
 def _build_sort_sql(sort: str | None, *, table_alias: str = "a", rank_alias: str | None = None) -> str:
@@ -910,13 +971,13 @@ class IndexSearcher:
     def _global_fts_select_sql(total_field: str, metadata_tags_text_clause: str) -> str:
         return f"""
             WITH matches AS (
-                SELECT rowid AS asset_id, bm25(assets_fts) AS rank
+                SELECT rowid AS asset_id, bm25(assets_fts, 8.0, 1.25) AS rank
                 FROM assets_fts
                 WHERE assets_fts MATCH ?
 
                 UNION ALL
 
-                SELECT rowid AS asset_id, (bm25(asset_metadata_fts) + 8.0) AS rank
+                SELECT rowid AS asset_id, (bm25(asset_metadata_fts, 7.0, 4.0, 1.5) + 2.0) AS rank
                 FROM asset_metadata_fts
                 WHERE asset_metadata_fts MATCH ?
             ),
@@ -1061,13 +1122,13 @@ class IndexSearcher:
         sql_parts = [
             f"""
             WITH matches AS (
-                SELECT rowid AS asset_id, bm25(assets_fts) AS rank
+                SELECT rowid AS asset_id, bm25(assets_fts, 8.0, 1.25) AS rank
                 FROM assets_fts
                 WHERE assets_fts MATCH ?
 
                 UNION ALL
 
-                SELECT rowid AS asset_id, (bm25(asset_metadata_fts) + 8.0) AS rank
+                SELECT rowid AS asset_id, (bm25(asset_metadata_fts, 7.0, 4.0, 1.5) + 2.0) AS rank
                 FROM asset_metadata_fts
                 WHERE asset_metadata_fts MATCH ?
             ),
@@ -1717,32 +1778,45 @@ class IndexSearcher:
 
     def _sanitize_fts_query(self, query: str) -> str:
         """
-        Escape special characters for FTS5, collapse whitespace, and add wildcards
-        for partial prefix matching (Google-like behavior).
+        Build a robust FTS5 MATCH query:
+        - strips dangerous punctuation/control chars,
+        - normalizes accents,
+        - supports quoted phrase clauses,
+        - and uses OR for very long queries to avoid over-constraining results.
         """
         text = query.strip()
         if not text:
             return "*"
 
-        # Replace FTS5 special characters with spaces
-        sanitized = re.sub(r"[\"'\-:&/\\|;@#*~()\[\]{}\.]+", " ", text)
+        phrases = _extract_quoted_phrases(text)
+        text_wo_quotes = re.sub(r'"[^"]*"|\'[^\']*\'', " ", text)
+
+        sanitized = _strip_diacritics(text_wo_quotes)
+        # Replace FTS5 special characters with spaces.
+        sanitized = re.sub(r"[\"'\-:&/\\|;@#*~()\[\]{}\.]+", " ", sanitized)
         # Replace non-printable / control chars
         sanitized = re.sub(r"[^\x20-\x7E]+", " ", sanitized)
         # Collapse whitespace
         sanitized = re.sub(r"\s+", " ", sanitized).strip()
 
-        if not sanitized:
-            return "*"
-
         # Normalize case for stable behavior (FTS is case-insensitive anyway).
         sanitized = sanitized.lower()
 
-        # Apply prefix matching to every token to allow partial matches (e.g. "dark" -> "dark*").
+        # Apply prefix matching to every token to allow partial matches.
         # Avoid FTS reserved operators to prevent malformed MATCH expressions.
-        tokens = [tok for tok in sanitized.split() if tok and tok.upper() not in _FTS_RESERVED]
-        if not tokens:
-            return ""
-        return " ".join(f"{token}*" for token in tokens)
+        tokens = [tok for tok in sanitized.split() if _is_meaningful_token(tok)]
+        tokens = _dedupe_tokens(tokens)
+
+        token_expr = _build_token_match_expression(tokens)
+        phrase_terms = [f'"{phrase}"' for phrase in phrases]
+
+        if phrase_terms and token_expr:
+            return " OR ".join(phrase_terms + [token_expr])
+        if phrase_terms:
+            return " OR ".join(phrase_terms)
+        if token_expr:
+            return token_expr
+        return ""
 
     def _is_malformed_match_error(self, err: Any) -> bool:
         try:

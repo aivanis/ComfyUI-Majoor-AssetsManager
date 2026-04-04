@@ -2643,6 +2643,60 @@ export class FloatingViewer {
     }
 
     /** Render the gen-info overlay onto the canvas region (ox, oy, w, h). */
+    _estimateGenInfoOverlayHeight(ctx, fileData, regionWidth) {
+        if (!ctx || !fileData || !this._genInfoSelections.size) return 0;
+        const fields = this._getGenFields(fileData);
+        const order = [
+            "prompt",
+            "seed",
+            "model",
+            "lora",
+            "sampler",
+            "scheduler",
+            "cfg",
+            "step",
+            "genTime",
+        ];
+        const fontSize = 11;
+        const lh = 16;
+        const pad = 8;
+        const boxW = Math.max(100, Number(regionWidth || 0) - pad * 2);
+        let lineCount = 0;
+
+        for (const k of order) {
+            if (!this._genInfoSelections.has(k)) continue;
+            const v = fields[k] != null ? String(fields[k]) : "";
+            if (!v) continue;
+
+            let labelText = k.charAt(0).toUpperCase() + k.slice(1);
+            if (k === "lora") labelText = "LoRA";
+            else if (k === "cfg") labelText = "CFG";
+            else if (k === "genTime") labelText = "Gen Time";
+
+            const label = `${labelText}: `;
+            ctx.font = `bold ${fontSize}px system-ui, sans-serif`;
+            const labelW = ctx.measureText(label).width;
+            ctx.font = `${fontSize}px system-ui, sans-serif`;
+            const availW = Math.max(32, boxW - pad * 2 - labelW);
+
+            let lines = 0;
+            let line = "";
+            for (const word of v.split(" ")) {
+                const test = line ? line + " " + word : word;
+                if (ctx.measureText(test).width > availW && line) {
+                    lines += 1;
+                    line = word;
+                } else {
+                    line = test;
+                }
+            }
+            if (line) lines += 1;
+            lineCount += lines;
+        }
+
+        return lineCount > 0 ? lineCount * lh + pad * 2 : 0;
+    }
+
     _drawGenInfoOverlay(ctx, fileData, ox, oy, w, h) {
         if (!fileData || !this._genInfoSelections.size) return;
         const fields = this._getGenFields(fileData);
@@ -2680,8 +2734,8 @@ export class FloatingViewer {
             else if (k === "cfg") labelText = "CFG";
             else if (k === "genTime") labelText = "Gen Time";
 
-            // Generous cap — word wrap handles display, not hard truncation
-            const raw = k === "prompt" && v.length > 500 ? v.slice(0, 500) + "…" : v;
+            // Keep full values in exported overlays; rely on wrapping and overlay height.
+            const raw = v;
             entries.push({
                 label: `${labelText}: `,
                 value: raw,
@@ -2720,20 +2774,8 @@ export class FloatingViewer {
             rows.push({ label, labelW, lines, color });
         }
 
-        // Cap height at 40% of region (mirrors CSS max-height: 40%)
-        const maxVisibleLines = Math.max(1, Math.floor((h * 0.4 - pad * 2) / lh));
-        const visibleRows = [];
-        let lineCount = 0;
-        for (const row of rows) {
-            if (lineCount >= maxVisibleLines) break;
-            const kept = [];
-            for (const ln of row.lines) {
-                if (lineCount >= maxVisibleLines) break;
-                kept.push(ln);
-                lineCount++;
-            }
-            if (kept.length > 0) visibleRows.push({ ...row, lines: kept });
-        }
+        const visibleRows = rows;
+        const lineCount = rows.reduce((sum, row) => sum + row.lines.length, 0);
 
         const boxH = lineCount * lh + pad * 2;
         const boxX = ox + pad;
@@ -2781,7 +2823,20 @@ export class FloatingViewer {
         }
 
         const w = this._contentEl.clientWidth || 480;
-        const h = this._contentEl.clientHeight || 360;
+        const baseH = this._contentEl.clientHeight || 360;
+        let h = baseH;
+
+        if (this._mode === MFV_MODES.SIMPLE && this._mediaA && this._genInfoSelections.size) {
+            const measureCanvas = document.createElement("canvas");
+            measureCanvas.width = w;
+            measureCanvas.height = baseH;
+            const measureCtx = measureCanvas.getContext("2d");
+            const neededBoxH = this._estimateGenInfoOverlayHeight(measureCtx, this._mediaA, w);
+            if (neededBoxH > 0) {
+                const desiredH = Math.max(baseH, neededBoxH + 24);
+                h = Math.min(desiredH, baseH * 4);
+            }
+        }
 
         const canvas = document.createElement("canvas");
         canvas.width = w;
@@ -2794,7 +2849,7 @@ export class FloatingViewer {
         try {
             if (this._mode === MFV_MODES.SIMPLE) {
                 if (this._mediaA) {
-                    await this._drawMediaFit(ctx, this._mediaA, 0, 0, w, h);
+                    await this._drawMediaFit(ctx, this._mediaA, 0, 0, w, baseH);
                     this._drawGenInfoOverlay(ctx, this._mediaA, 0, 0, w, h);
                 }
             } else if (this._mode === MFV_MODES.AB) {

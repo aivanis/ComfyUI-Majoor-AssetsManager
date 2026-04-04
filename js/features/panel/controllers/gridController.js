@@ -171,8 +171,7 @@ export function createGridController({
      * Load assets using hybrid search when in semantic mode, with fallback chain:
      * hybridSearch → vectorSearch (pure semantic) → FTS.
      *
-     * Auto-detection: queries starting with "ai:" or containing 3+ words
-     * automatically trigger AI semantic search without toggling the button.
+        * Explicit activation only: semantic toggle or "ai:" prefix.
      */
     const _loadWithSemanticFallback = async (query) => {
         let q = String(query || "").trim();
@@ -188,67 +187,11 @@ export function createGridController({
         if (!aiEnabled) {
             return await loadAssets(gridContainer, q || "*");
         }
-
-        const wordCount = q.split(/\s+/).filter(Boolean).length;
-        const visualSingleWordKeywords = new Set([
-            "green",
-            "red",
-            "blue",
-            "yellow",
-            "orange",
-            "purple",
-            "pink",
-            "black",
-            "white",
-            "gray",
-            "grey",
-            "vert",
-            "rouge",
-            "bleu",
-            "jaune",
-            "violet",
-            "rose",
-            "noir",
-            "blanc",
-            "gris",
-        ]);
-        const looksVisualSingleWord =
-            wordCount === 1 && visualSingleWordKeywords.has(String(q || "").toLowerCase());
-        const looksNaturalLanguage =
-            (q.length >= 12 && q.includes(" ") && q !== "*" && !/[a-z]+\s*:/i.test(q)) ||
-            hasAiPrefix ||
-            wordCount >= 3 ||
-            looksVisualSingleWord;
-        const shouldAutoAiSearch = looksNaturalLanguage && !semanticMode;
+        const semanticRequested = semanticMode || hasAiPrefix;
         let aiAttempted = false;
         let aiError = "";
 
-        if (shouldAutoAiSearch && q) {
-            aiAttempted = true;
-            try {
-                const filters = _buildSemanticFilterOptions();
-                const vecRes = await vectorSearch(q, {
-                    topK: 100,
-                    scope: read("scope", "output") || "output",
-                    customRootId: read("customRootId", "") || "",
-                    ...filters,
-                });
-                if (vecRes?.ok && Array.isArray(vecRes.data) && vecRes.data.length > 0) {
-                    return await loadAssetsFromList(gridContainer, vecRes.data, {
-                        title: `AI Search: "${q}" (${vecRes.data.length} results)`,
-                        reset: true,
-                    });
-                }
-                if (vecRes?.ok === false) {
-                    aiError = _safeErrorText(vecRes?.error || vecRes?.message, aiError);
-                }
-            } catch (err) {
-                aiError = _safeErrorText(err, aiError);
-                console.debug?.("[Majoor] Automatic AI search failed, falling back to FTS", err);
-            }
-        }
-
-        if (semanticMode && q && q !== "*") {
+        if (semanticRequested && q && q !== "*") {
             aiAttempted = true;
             const filters = _buildSemanticFilterOptions();
             // Try hybrid search first (FTS + semantic via RRF)
@@ -296,34 +239,6 @@ export function createGridController({
             }
         }
         const ftsResult = await loadAssets(gridContainer, q || "*");
-
-        if (looksNaturalLanguage && !aiAttempted) {
-            const count = Number(ftsResult?.count || 0) || 0;
-            if (count === 0) {
-                try {
-                    aiAttempted = true;
-                    const filters = _buildSemanticFilterOptions();
-                    const hybRes = await hybridSearch(q, {
-                        topK: 100,
-                        scope: read("scope", "output") || "output",
-                        customRootId: read("customRootId", "") || "",
-                        ...filters,
-                    });
-                    if (hybRes?.ok && Array.isArray(hybRes.data) && hybRes.data.length > 0) {
-                        return await loadAssetsFromList(gridContainer, hybRes.data, {
-                            title: `AI Fallback: "${q}" (${hybRes.data.length} results)`,
-                            reset: true,
-                        });
-                    }
-                    if (hybRes?.ok === false) {
-                        aiError = _safeErrorText(hybRes?.error || hybRes?.message, aiError);
-                    }
-                } catch (err) {
-                    aiError = _safeErrorText(err, aiError);
-                    console.debug?.("[Majoor] Automatic AI fallback failed", err);
-                }
-            }
-        }
 
         if (aiAttempted) {
             const count = Number(ftsResult?.count || 0) || 0;
