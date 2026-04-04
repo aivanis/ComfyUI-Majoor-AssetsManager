@@ -73,7 +73,7 @@ function _bindFeedSelection(host) {
         const card = event.target?.closest?.(".mjr-asset-card");
         if (!card || !grid.contains(card)) return;
         const interactive = event.target?.closest?.("a, button, input, textarea, select, label");
-        if (interactive && card.contains(interactive)) return;
+        if (interactive && interactive !== card && card.contains(interactive)) return;
         const clickedId = String(card.dataset?.mjrAssetId || "").trim();
         if (!clickedId) return;
 
@@ -216,12 +216,22 @@ function _scheduleHostRender(host) {
     }, FEED_PUSH_RENDER_DEBOUNCE_MS);
 }
 
-function _openGroupViewer(groupedAsset, startIndex = 0) {
+function _openGroupViewer(host, groupedAsset, startIndex = 0) {
     const assets = Array.isArray(groupedAsset?._mjrFeedGroupAssets)
         ? groupedAsset._mjrFeedGroupAssets.filter(Boolean)
         : [groupedAsset].filter(Boolean);
     if (!assets.length) return;
     const safeIndex = Math.max(0, Math.min(startIndex, assets.length - 1));
+    const activeAsset = assets[safeIndex] || null;
+    const activeId = String(activeAsset?.id || "").trim();
+    if (host?.grid && activeId) {
+        try {
+            window.__MJR_LAST_SELECTION_GRID__ = host.grid;
+        } catch (e) {
+            console.debug?.(e);
+        }
+        _applyFeedSelection(host.grid, [activeId], activeId);
+    }
     requestViewerOpen({ assets, index: safeIndex });
 }
 
@@ -253,7 +263,7 @@ function _buildGroupPopover(host, groupedAsset) {
             event.preventDefault();
             event.stopPropagation();
             host.popoverManager?.close?.(popover);
-            _openGroupViewer(groupedAsset, index);
+            _openGroupViewer(host, groupedAsset, index);
         });
         grid.appendChild(card);
     }
@@ -715,6 +725,7 @@ function _makeHost(container, external = {}) {
     };
     _buildEmpty(host);
     _buildGrid(host, external.gridWrapper ?? null);
+    _bindFeedSelection(host);
     host.popoverManager = createPopoverManager(root);
 
     // Bind the same context menu as the main grid.
