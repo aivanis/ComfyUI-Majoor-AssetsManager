@@ -29,6 +29,21 @@ def test_dedupe_result_payload_total_not_below_returned_assets() -> None:
     assert out["total"] == 2
 
 
+def test_dedupe_result_payload_preserves_missing_total() -> None:
+    payload = {
+        "assets": [
+            {"filepath": "/a/x.png"},
+            {"filepath": "/a/x.png"},
+            {"filepath": "/a/y.png"},
+        ],
+        "limit": 100,
+        "offset": 100,
+    }
+    out = rh.dedupe_result_payload(payload)
+    assert len(out["assets"]) == 2
+    assert "total" not in out
+
+
 def test_coerce_browser_tags_accepts_json_list_and_list() -> None:
     assert rh.coerce_browser_tags('["a","b",1]') == ["a", "b"]
     assert rh.coerce_browser_tags(["x", 1, "y"]) == ["x", "y"]

@@ -153,7 +153,7 @@ const dateStr = computed(() => (timestamp.value ? formatDate(timestamp.value) : 
 const timeStr = computed(() => (timestamp.value ? formatTime(timestamp.value) : ""));
 
 // File badge collision state
-const hasCollision = computed(() => !!props.asset._mjrNameCollision);
+const hasCollision = computed(() => !!props.asset._mjrNameCollision && !props.asset._mjrDupStack);
 const fileBadgeBg = computed(() => {
     if (hasCollision.value) return "var(--mjr-badge-duplicate-alert, #ff1744)";
     const map = {

@@ -3,7 +3,7 @@ import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { measureElement, useVirtualizer } from "@tanstack/vue-virtual";
 import { APP_CONFIG } from "../../../app/config.js";
 import { requestViewerOpen } from "../../../features/viewer/viewerOpenRequest.js";
-import { ensureStackGroupCard } from "../../../features/grid/StackGroupCards.js";
+import { ensureStackGroupCard, ensureDupStackCard } from "../../../features/grid/StackGroupCards.js";
 import { setSelectedIdsDataset } from "../../../features/grid/GridSelectionManager.js";
 import { applyGridSettingsClasses, configureGridContainer } from "../../../features/grid/gridApi.js";
 import { bindAssetDragStart } from "../../../features/dnd/DragDrop.js";
@@ -192,11 +192,77 @@ function emitSelectionChanged() {
 
 emitSelectionChanged._lastSelectionKey = "";
 
+function buildDisplayAssets(assets) {
+    const list = Array.isArray(assets) ? assets : [];
+    const buckets = new Map();
+    const singles = [];
+
+    for (const asset of list) {
+        const filenameKey = String(asset?.filename || "").trim().toLowerCase();
+        if (!filenameKey) {
+            singles.push(asset);
+            continue;
+        }
+        let bucket = buckets.get(filenameKey);
+        if (!bucket) {
+            bucket = [];
+            buckets.set(filenameKey, bucket);
+        }
+        bucket.push(asset);
+    }
+
+    const output = [];
+    for (const asset of list) {
+        const filenameKey = String(asset?.filename || "").trim().toLowerCase();
+        if (!filenameKey) {
+            asset._mjrNameCollision = false;
+            delete asset._mjrNameCollisionCount;
+            delete asset._mjrNameCollisionPaths;
+            asset._mjrDupStack = false;
+            asset._mjrDupMembers = null;
+            asset._mjrDupCount = 0;
+            output.push(asset);
+            continue;
+        }
+
+        const bucket = buckets.get(filenameKey) || [];
+        if (!bucket.length) continue;
+        if (bucket[0] !== asset) continue;
+
+        for (const member of bucket) {
+            member._mjrNameCollision = false;
+            delete member._mjrNameCollisionCount;
+            delete member._mjrNameCollisionPaths;
+            member._mjrDupStack = false;
+            member._mjrDupMembers = null;
+            member._mjrDupCount = 0;
+        }
+
+        if (bucket.length >= 2) {
+            const prevMembers = Array.isArray(asset._mjrDupMembers) ? asset._mjrDupMembers : [];
+            const memberIds = new Set(prevMembers.map((entry) => String(entry?.id || "")));
+            const mergedMembers = [
+                ...prevMembers,
+                ...bucket.filter((entry) => !memberIds.has(String(entry?.id || ""))),
+            ];
+            asset._mjrDupStack = true;
+            asset._mjrDupMembers = mergedMembers;
+            asset._mjrDupCount = mergedMembers.length;
+        }
+
+        output.push(asset);
+    }
+
+    return output;
+}
+
+const displayAssets = computed(() => buildDisplayAssets(state.assets));
+
 function emitGridStats() {
     const container = gridContainerRef.value;
     if (!container) return;
     const detail = {
-        count: Array.isArray(state.assets) ? state.assets.length : 0,
+        count: Array.isArray(displayAssets.value) ? displayAssets.value.length : 0,
         total: Number(state.total || 0) || 0,
     };
     try {
@@ -260,7 +326,7 @@ function installGridApi(container) {
         disposeAssetDragStart = null;
     }
     container._mjrPrimaryPointerSelectionUnbind = () => {};
-    container._mjrGetAssets = () => (Array.isArray(state.assets) ? state.assets : []);
+    container._mjrGetAssets = () => (Array.isArray(displayAssets.value) ? displayAssets.value : []);
     container._mjrSetSelection = (ids, activeId = "") => {
         const detail = setSelection(ids, activeId);
         updateSelectionDatasets();
@@ -330,7 +396,7 @@ watch(
 
 watch(
     () =>
-        `${Array.isArray(state.assets) ? state.assets.length : 0}::${Number(state.total || 0)}::${Number(state.hiddenPngSiblings || 0)}`,
+        `${Array.isArray(displayAssets.value) ? displayAssets.value.length : 0}::${Number(state.total || 0)}::${Number(state.hiddenPngSiblings || 0)}`,
     () => {
         if (!gridContainerRef.value) return;
         emitGridStats();
@@ -369,7 +435,7 @@ const estimateRowHeight = computed(() => {
 });
 
 const rows = computed(() => {
-    const assets = Array.isArray(state.assets) ? state.assets : [];
+    const assets = Array.isArray(displayAssets.value) ? displayAssets.value : [];
     const cols = Math.max(1, columnCount.value);
     const nextRows = [];
     for (let index = 0; index < assets.length; index += cols) {
@@ -526,11 +592,20 @@ watch(
     () => rows.value.length,
     async () => {
         await nextTick();
+        syncAllRenderedDuplicateCards();
         try {
             rowVirtualizer.value.measure();
         } catch (e) {
             console.debug?.(e);
         }
+    },
+);
+
+watch(
+    () => `${Array.isArray(state.assets) ? state.assets.length : 0}::${(Array.isArray(state.assets) ? state.assets : []).map((asset) => String(asset?.filename || "")).join("|")}`,
+    async () => {
+        await nextTick();
+        syncAllRenderedDuplicateCards();
     },
 );
 
@@ -569,13 +644,84 @@ function unregisterFilenameCard(card) {
     cardFilenameKeys.delete(card);
 }
 
+function syncRenderedDuplicateCards(filenameKey) {
+    const key = String(filenameKey || "").trim().toLowerCase();
+    if (!key) return;
+
+    const renderedSet = state.renderedFilenameMap.get(key);
+    const renderedCards = Array.from(renderedSet || []);
+    if (!renderedCards.length) return;
+
+    const count = Math.max(
+        Number(state.filenameCounts?.get?.(key) || 0) || 0,
+        renderedCards.length,
+    );
+    const allMembers = (Array.isArray(state.assets) ? state.assets : []).filter(
+        (asset) => String(asset?.filename || "").trim().toLowerCase() === key,
+    );
+
+    const primaryCard = renderedCards[0] || null;
+    const primaryAsset = primaryCard?._mjrAsset || allMembers[0] || null;
+
+    for (const card of renderedCards) {
+        delete card.dataset.mjrDupHidden;
+        const asset = card._mjrAsset;
+        if (asset) {
+            asset._mjrNameCollision = false;
+            delete asset._mjrNameCollisionCount;
+            delete asset._mjrNameCollisionPaths;
+            asset._mjrDupStack = false;
+            asset._mjrDupMembers = null;
+            asset._mjrDupCount = 0;
+            asset._mjrDupHidden = false;
+        }
+    }
+
+    if (!primaryCard || !primaryAsset || count < 2) {
+        for (const card of renderedCards) {
+            try {
+                ensureDupStackCard(gridContainerRef.value, card, card._mjrAsset);
+            } catch (e) {
+                console.debug?.(e);
+            }
+        }
+        return;
+    }
+
+    primaryAsset._mjrDupStack = true;
+    primaryAsset._mjrDupMembers = allMembers.length ? allMembers : [primaryAsset];
+    primaryAsset._mjrDupCount = primaryAsset._mjrDupMembers.length;
+    primaryAsset._mjrNameCollision = false;
+
+    for (let index = 1; index < renderedCards.length; index += 1) {
+        renderedCards[index].dataset.mjrDupHidden = "true";
+        if (renderedCards[index]._mjrAsset) {
+            renderedCards[index]._mjrAsset._mjrDupHidden = true;
+        }
+    }
+
+    try {
+        ensureDupStackCard(gridContainerRef.value, primaryCard, primaryAsset);
+    } catch (e) {
+        console.debug?.(e);
+    }
+}
+
+function syncAllRenderedDuplicateCards() {
+    for (const key of state.renderedFilenameMap.keys()) {
+        syncRenderedDuplicateCards(key);
+    }
+}
+
 function bindCardRef(asset, node) {
     const id = String(asset?.id || "").trim();
     if (!id) return;
     if (!node) {
         const prev = state.cardElements.get(id);
+        const prevKey = prev ? cardFilenameKeys.get(prev) : "";
         unregisterFilenameCard(prev);
         state.cardElements.delete(id);
+        syncRenderedDuplicateCards(prevKey);
         return;
     }
 
@@ -587,9 +733,15 @@ function bindCardRef(asset, node) {
     card._mjrReactiveAsset = asset;
     card.dataset.mjrKind = String(asset?.kind || "");
     registerFilenameCard(card, asset);
+    syncRenderedDuplicateCards(String(asset?.filename || "").trim().toLowerCase());
 
     try {
         ensureStackGroupCard(gridContainerRef.value, card, asset);
+    } catch (e) {
+        console.debug?.(e);
+    }
+    try {
+        ensureDupStackCard(gridContainerRef.value, card, asset);
     } catch (e) {
         console.debug?.(e);
     }
@@ -1045,7 +1197,7 @@ defineExpose({
                         role="button"
                         tabindex="0"
                         draggable="true"
-                        :style="cardStyle()"
+                        :style="[cardStyle(), asset._mjrDupHidden ? { display: 'none' } : null]"
                         :class="{ 'is-selected': isSelected(asset) }"
                         :data-mjr-asset-id="String(asset.id ?? '')"
                         :data-mjr-filename-key="String(asset.filename || '').toLowerCase()"
@@ -1093,7 +1245,7 @@ defineExpose({
                         role="button"
                         tabindex="0"
                         draggable="true"
-                        :style="cardStyle()"
+                        :style="[cardStyle(), asset._mjrDupHidden ? { display: 'none' } : null]"
                         :class="{ 'is-selected': isSelected(asset) }"
                         :data-mjr-asset-id="String(asset.id ?? '')"
                         :data-mjr-filename-key="String(asset.filename || '').toLowerCase()"

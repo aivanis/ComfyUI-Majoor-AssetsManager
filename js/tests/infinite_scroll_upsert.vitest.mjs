@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
     flushUpsertBatch,
     getUpsertBatchState,
+    resolvePageAdvanceCount,
     upsertAsset,
 } from "../vue/composables/useVirtualGrid.js";
 
@@ -13,6 +14,39 @@ function assetKey(asset) {
 }
 
 describe("InfiniteScroll upsert", () => {
+    it("advances by the consumed backend page window when dedupe shrinks a page", () => {
+        expect(
+            resolvePageAdvanceCount({
+                count: 16,
+                limit: 100,
+                offset: 100,
+                total: 7000,
+            }),
+        ).toBe(100);
+    });
+
+    it("clamps the page advance to the remaining total on the last page", () => {
+        expect(
+            resolvePageAdvanceCount({
+                count: 16,
+                limit: 100,
+                offset: 7000,
+                total: 7050,
+            }),
+        ).toBe(50);
+    });
+
+    it("falls back to the returned count when total is unknown", () => {
+        expect(
+            resolvePageAdvanceCount({
+                count: 16,
+                limit: 100,
+                offset: 100,
+                total: null,
+            }),
+        ).toBe(16);
+    });
+
     it("refreshes seen keys when an existing asset gains a stack id", () => {
         const gridContainer = { dataset: { mjrSort: "mtime_desc" } };
         const state = {

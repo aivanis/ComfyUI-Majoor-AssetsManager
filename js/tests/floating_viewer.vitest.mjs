@@ -326,6 +326,63 @@ describe("FloatingViewer", () => {
         );
     });
 
+    it("uses about:blank popup in browser contexts even when Document PiP exists", async () => {
+        const { FloatingViewer } = await import("../features/viewer/FloatingViewer.js");
+
+        const requestWindow = vi.fn(() => Promise.resolve());
+        globalThis.window = {
+            documentPictureInPicture: { requestWindow },
+            open: vi.fn(),
+            screenX: 0,
+            screenLeft: 0,
+            screenY: 0,
+            screenTop: 0,
+            outerWidth: 1280,
+            outerHeight: 900,
+        };
+
+        const viewer = {
+            _isPopped: false,
+            element: { offsetWidth: 640, offsetHeight: 480 },
+            _stopEdgeResize: vi.fn(),
+            _fallbackPopout: vi.fn(),
+        };
+
+        FloatingViewer.prototype.popOut.call(viewer);
+
+        expect(viewer._fallbackPopout).toHaveBeenCalledWith(viewer.element, 640, 480);
+        expect(requestWindow).not.toHaveBeenCalled();
+    });
+
+    it("uses Document PiP as fallback in Electron app contexts", async () => {
+        const { FloatingViewer } = await import("../features/viewer/FloatingViewer.js");
+
+        const requestWindow = vi.fn(() => new Promise(() => {}));
+        globalThis.window = {
+            documentPictureInPicture: { requestWindow },
+            process: { versions: { electron: "39.8.3" } },
+            open: vi.fn(),
+            screenX: 0,
+            screenLeft: 0,
+            screenY: 0,
+            screenTop: 0,
+            outerWidth: 1280,
+            outerHeight: 900,
+        };
+
+        const viewer = {
+            _isPopped: false,
+            element: { offsetWidth: 640, offsetHeight: 480 },
+            _stopEdgeResize: vi.fn(),
+            _fallbackPopout: vi.fn(),
+        };
+
+        FloatingViewer.prototype.popOut.call(viewer);
+
+        expect(requestWindow).toHaveBeenCalledWith({ width: 640, height: 480 });
+        expect(viewer._fallbackPopout).not.toHaveBeenCalled();
+    });
+
     it("installs follower sync for compare-mode playable media", async () => {
         const { FloatingViewer, MFV_MODES } = await import("../features/viewer/FloatingViewer.js");
 

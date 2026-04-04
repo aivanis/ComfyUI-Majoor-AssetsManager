@@ -4576,6 +4576,48 @@
     line-height: 1;
 }
 
+/* ── Duplicate stack button ──────────────────────────────────────────────── */
+/* Shows on the primary card when same-filename duplicates exist.             */
+/* Positioned at bottom-right to not overlap the stack-group button (top-right). */
+.mjr-assets-manager .mjr-dup-stack-button {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 22px;
+    padding: 3px 7px;
+    border: 1px solid rgba(255, 180, 0, 0.38);
+    border-radius: 999px;
+    background: rgba(30, 18, 0, 0.82);
+    color: rgba(255, 200, 60, 0.96);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    cursor: pointer;
+    font-size: 11px;
+    transition: background 0.15s;
+}
+
+.mjr-assets-manager .mjr-dup-stack-button:hover {
+    background: rgba(50, 30, 0, 0.94);
+    border-color: rgba(255, 180, 0, 0.6);
+}
+
+.mjr-assets-manager .mjr-dup-stack-count {
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.mjr-assets-manager .mjr-asset-card[data-mjr-dup-stacked="true"] .mjr-dup-stack-button {
+    box-shadow:
+        0 2px 8px rgba(0, 0, 0, 0.32),
+        0 0 0 1px rgba(255, 180, 0, 0.2);
+}
+
 .mjr-assets-manager .mjr-asset-card[data-mjr-stacked="true"] .mjr-stack-group-button,
 .mjr-bottom-feed .mjr-asset-card[data-mjr-stacked="true"] .mjr-feed-group-button {
     box-shadow:

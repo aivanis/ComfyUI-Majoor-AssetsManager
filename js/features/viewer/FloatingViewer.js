@@ -44,6 +44,22 @@ const MFV_PREVIEW_HINT = "K";
 const MFV_NODESTREAM_HINT = "N";
 const CLOSE_HINT = "Esc";
 
+function _isElectronAppHost() {
+    try {
+        const root = typeof window !== "undefined" ? window : globalThis;
+        const electronVersion = root?.process?.versions?.electron;
+        if (typeof electronVersion === "string" && electronVersion.trim()) {
+            return true;
+        }
+        if (root?.electron || root?.ipcRenderer || root?.electronAPI) {
+            return true;
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return false;
+}
+
 function _extOf(filename) {
     try {
         const name = String(filename || "").trim();
@@ -1778,11 +1794,11 @@ export class FloatingViewer {
         const w = Math.max(el.offsetWidth || 520, 400);
         const h = Math.max(el.offsetHeight || 420, 300);
 
-        // 1. Document Picture-in-Picture (Chrome 116+) ─────────────────────────
-        //    Creates a same-origin always-on-top window that shares the full JS
-        //    context of the main page.  Bypasses the about:blank isolation that
-        //    breaks window.open() in Chrome App mode and Electron-based hosts.
-        if ("documentPictureInPicture" in window) {
+        // 1. Electron app fallback: Document Picture-in-Picture ────────────────
+        //    In standard browser usage we keep the classic about:blank popup.
+        //    In Electron-style hosts with a real bridge exposed, PiP is more
+        //    reliable than popup navigation and keeps the viewer usable.
+        if (_isElectronAppHost() && "documentPictureInPicture" in window) {
             window.documentPictureInPicture
                 .requestWindow({ width: w, height: h })
                 .then((pipWindow) => {
@@ -1862,7 +1878,7 @@ export class FloatingViewer {
             return;
         }
 
-        // 2. Fallback: classic window.open() to the backend-served shell page.
+        // 2. Browser default: classic about:blank popup window.
         this._fallbackPopout(el, w, h);
     }
 

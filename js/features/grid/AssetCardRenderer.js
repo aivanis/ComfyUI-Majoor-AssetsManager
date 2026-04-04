@@ -220,41 +220,88 @@ export function appendAssets(gridContainer, assets, state, deps) {
     const assetsToRemoveFromState = new Set();
     const applyFilenameCollisions = () => {
         try {
+            const visibleIds = new Set(
+                (Array.isArray(state.assets) ? state.assets : [])
+                    .map((a) => String(a?.id || ""))
+                    .filter(Boolean),
+            );
             for (const [key, bucket] of filenameToAssets.entries()) {
-                const count = bucket.length;
+                const visibleBucket = (Array.isArray(bucket) ? bucket : []).filter((asset) => {
+                    const id = String(asset?.id || "");
+                    return id ? visibleIds.has(id) : false;
+                });
+                const count = visibleBucket.length;
                 filenameCounts.set(key, count);
+
                 if (count < 2) {
-                    for (const asset of bucket) {
+                    // Clear any stale dup-stack markers (count dropped back to 1)
+                    for (const asset of visibleBucket) {
                         asset._mjrNameCollision = false;
                         delete asset._mjrNameCollisionCount;
                         delete asset._mjrNameCollisionPaths;
+                        if (asset._mjrDupStack) {
+                            asset._mjrDupStack = false;
+                            asset._mjrDupMembers = null;
+                            asset._mjrDupCount = 0;
+                        }
                     }
-                    const renderedList = state.renderedFilenameMap.get(key);
+                    const renderedList = state.renderedFilenameMap?.get(key);
                     if (renderedList) {
                         for (const card of renderedList) {
                             const badge = card.querySelector?.(".mjr-file-badge");
                             deps.setFileBadgeCollision(badge, false);
+                            try { deps.ensureDupStackCard?.(gridContainer, card, card._mjrAsset); } catch (e) { console.debug?.(e); }
                         }
                     }
                     continue;
                 }
-                const paths = buildCollisionPaths(bucket);
-                for (const asset of bucket) {
-                    asset._mjrNameCollision = true;
-                    asset._mjrNameCollisionCount = count;
-                    asset._mjrNameCollisionPaths = paths;
+
+                // ── count >= 2: group into a duplicate stack ──────────────────────────────
+                // Keep an existing primary if we already marked one, else pick first asset.
+                const existingPrimary = visibleBucket.find((a) => a._mjrDupStack);
+                const primary = existingPrimary || visibleBucket[0];
+                const secondaries = visibleBucket.filter((a) => a !== primary);
+
+                // Ensure stale collision markers are cleared on all visible members.
+                for (const asset of visibleBucket) {
+                    asset._mjrNameCollision = false;
+                    delete asset._mjrNameCollisionCount;
+                    delete asset._mjrNameCollisionPaths;
+                    if (asset !== primary) {
+                        asset._mjrDupStack = false;
+                        asset._mjrDupMembers = null;
+                        asset._mjrDupCount = 0;
+                    }
                 }
-                const renderedList = state.renderedFilenameMap.get(key);
+
+                // Merge new duplicates with existing _mjrDupMembers to survive across pages.
+                const prevMembers = Array.isArray(primary._mjrDupMembers) ? primary._mjrDupMembers : [];
+                const prevIds = new Set(prevMembers.map((a) => String(a?.id || "")));
+                const merged = [
+                    ...prevMembers,
+                    ...visibleBucket.filter((a) => !prevIds.has(String(a?.id || ""))),
+                ];
+                primary._mjrDupStack = true;
+                primary._mjrDupMembers = merged;
+                primary._mjrDupCount = merged.length;
+                primary._mjrNameCollision = false; // primary card shows stack button, not red badge
+
+                // Remove secondary copies from state.assets so only the primary card shows.
+                const secondaryIds = new Set(secondaries.map((a) => String(a?.id || "")));
+                if (secondaryIds.size > 0) {
+                    state.assets = state.assets.filter((a) => !secondaryIds.has(String(a?.id || "")));
+                }
+
+                // Update rendered primary card: attach dup-stack button, clear red collision badge.
+                const renderedList = state.renderedFilenameMap?.get(key);
                 if (renderedList) {
                     for (const card of renderedList) {
+                        const cardAsset = card._mjrAsset;
                         const badge = card.querySelector?.(".mjr-file-badge");
-                        const asset = card._mjrAsset;
-                        deps.setFileBadgeCollision(badge, true, {
-                            filename: asset?.filename || "",
-                            count,
-                            paths: asset?._mjrNameCollisionPaths || paths,
-                        });
-                        setCollisionTooltip(card, asset?.filename, count);
+                        if (cardAsset === primary || String(cardAsset?.id || "") === String(primary?.id || "")) {
+                            deps.setFileBadgeCollision(badge, false);
+                            try { deps.ensureDupStackCard?.(gridContainer, card, primary); } catch (e) { console.debug?.(e); }
+                        }
                     }
                 }
             }

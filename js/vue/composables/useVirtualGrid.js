@@ -179,6 +179,31 @@ export function maybeKeepPinnedToBottom(_state, _before) {
     return;
 }
 
+export function resolvePageAdvanceCount({ count = 0, limit = 0, offset = 0, total = null } = {}) {
+    const responseCount = Math.max(0, Number(count) || 0);
+    if (responseCount <= 0) return 0;
+
+    const requestedLimit = Math.max(0, Number(limit) || 0);
+    const currentOffset = Math.max(0, Number(offset) || 0);
+    const knownTotal = total == null ? null : Math.max(0, Number(total) || 0);
+    const remaining = knownTotal == null ? null : Math.max(0, knownTotal - currentOffset);
+
+    if (requestedLimit <= 0 || knownTotal == null) {
+        return responseCount;
+    }
+
+    if (responseCount >= requestedLimit) {
+        return requestedLimit;
+    }
+
+    const pageWindow = Math.min(requestedLimit, remaining);
+    if (pageWindow <= 0) {
+        return responseCount;
+    }
+
+    return Math.max(responseCount, pageWindow);
+}
+
 export function startInfiniteScroll(gridContainer, state, deps) {
     if (!deps.config.INFINITE_SCROLL_ENABLED) return;
     stopObserver(state);
@@ -393,7 +418,18 @@ export async function fetchPage(
             const serverCount = Array.isArray(assets) ? assets.length : 0;
             const rawTotal = result.data?.total;
             const total = rawTotal == null ? null : Number(rawTotal ?? 0) || 0;
-            return { ok: true, assets, total, count: serverCount, sortKey, safeQuery };
+            const responseLimit = Math.max(0, Number(result.data?.limit) || 0);
+            const responseOffset = Math.max(0, Number(result.data?.offset) || 0);
+            return {
+                ok: true,
+                assets,
+                total,
+                count: serverCount,
+                limit: responseLimit,
+                offset: responseOffset,
+                sortKey,
+                safeQuery,
+            };
         }
         try {
             if (String(result?.code || "") === "ABORTED")
@@ -454,10 +490,20 @@ export async function loadNextPage(gridContainer, state, deps) {
         }
         if (page.total != null) state.total = page.total;
         const added = deps.appendAssets(gridContainer, page.assets || [], state);
-        state.offset += page.count || 0;
+        const consumedCount = resolvePageAdvanceCount({
+            count: page.count,
+            limit: page.limit || limit,
+            offset: state.offset,
+            total: page.total != null ? page.total : state.total,
+        });
+        state.offset += consumedCount;
         deps.gridDebug("loadNextPage:append", { added, offset: state.offset });
         deps.maybeKeepPinnedToBottom(state, before);
-        if ((page.count || 0) === 0) {
+        const knownTotal = Number(state.total);
+        if (
+            consumedCount <= 0 ||
+            (Number.isFinite(knownTotal) && knownTotal > 0 && state.offset >= knownTotal)
+        ) {
             state.done = true;
             deps.stopObserver(state);
         }
@@ -542,14 +588,48 @@ export function getUpsertBatchState(gridContainer, upsertState) {
 function dedupeAssetsByKey(state, deps) {
     const seenIds = new Set();
     const seenKeys = new Set();
+    const filenamePrimary = new Map();
     const deduped = [];
     for (const asset of Array.isArray(state?.assets) ? state.assets : []) {
         const assetId = asset?.id != null ? String(asset.id) : "";
         const key = deps.assetKey(asset);
+        const filenameKey = String(asset?.filename || "").trim().toLowerCase();
         if (assetId && seenIds.has(assetId)) continue;
         if (key && seenKeys.has(key)) continue;
+
+        if (filenameKey) {
+            const primary = filenamePrimary.get(filenameKey);
+            if (primary) {
+                const prevMembers = Array.isArray(primary._mjrDupMembers) ? primary._mjrDupMembers : [primary];
+                const prevIds = new Set(prevMembers.map((a) => String(a?.id || "")));
+                const merged = [
+                    ...prevMembers,
+                    ...[asset].filter((a) => !prevIds.has(String(a?.id || ""))),
+                ];
+                primary._mjrDupStack = true;
+                primary._mjrDupMembers = merged;
+                primary._mjrDupCount = merged.length;
+                primary._mjrNameCollision = false;
+                delete primary._mjrNameCollisionCount;
+                delete primary._mjrNameCollisionPaths;
+
+                asset._mjrNameCollision = false;
+                delete asset._mjrNameCollisionCount;
+                delete asset._mjrNameCollisionPaths;
+                asset._mjrDupStack = false;
+                asset._mjrDupMembers = null;
+                asset._mjrDupCount = 0;
+                continue;
+            }
+        }
+
         if (assetId) seenIds.add(assetId);
         if (key) seenKeys.add(key);
+        if (filenameKey) filenamePrimary.set(filenameKey, asset);
+
+        asset._mjrNameCollision = false;
+        delete asset._mjrNameCollisionCount;
+        delete asset._mjrNameCollisionPaths;
         deduped.push(asset);
     }
     state.assets = deduped;

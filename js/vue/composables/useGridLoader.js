@@ -8,11 +8,12 @@ import { pickRootId } from "../../utils/ids.js";
 import {
     appendAssets as cardAppendAssets,
 } from "../../features/grid/AssetCardRenderer.js";
-import { getStackAwareAssetKey } from "../../features/grid/StackGroupCards.js";
+import { getStackAwareAssetKey, ensureDupStackCard } from "../../features/grid/StackGroupCards.js";
 import {
     compareAssets,
     fetchPage as fetchGridPage,
     getUpsertBatchState,
+    resolvePageAdvanceCount,
     upsertAsset as queueUpsertAsset,
 } from "./useVirtualGrid.js";
 
@@ -234,6 +235,7 @@ export function useGridLoader({
             ensureVirtualGrid: () => state.virtualGrid,
             setFileBadgeCollision,
             assetKey: (asset) => assetKey(asset, gridContainer),
+            ensureDupStackCard: (gc, card, asset) => ensureDupStackCard(gc, card, asset),
         });
     }
 
@@ -313,18 +315,24 @@ export function useGridLoader({
                 }
 
                 const fetchedCount = Number(page.count || 0) || 0;
+                const consumedCount = resolvePageAdvanceCount({
+                    count: fetchedCount,
+                    limit: Number(page.limit || limit) || limit,
+                    offset: state.offset,
+                    total: page.total != null ? page.total : state.total,
+                });
                 const addedCount = Number(appendAssets(gridContainer, page.assets || []) || 0) || 0;
-                state.offset += fetchedCount;
+                state.offset += consumedCount;
                 const wasDone = state.done;
                 state.done =
-                    fetchedCount <= 0 ||
+                    consumedCount <= 0 ||
                     (Number.isFinite(Number(state.total)) &&
                         Number(state.total || 0) > 0 &&
-                        state.assets.length >= Number(state.total || 0));
+                        state.offset >= Number(state.total || 0));
 
                 // Debug logging
                 if (emptyAppendBatches > 0 || state.done) {
-                    console.debug(`[Grid LoadPage] offset=${state.offset}, fetched=${fetchedCount}, added=${addedCount}, done=${state.done}, visibleCount=${state.assets.length}, total=${state.total}, emptyBatches=${emptyAppendBatches}/${MAX_EMPTY_APPEND_BATCHES}`);
+                    console.debug(`[Grid LoadPage] offset=${state.offset}, fetched=${fetchedCount}, consumed=${consumedCount}, added=${addedCount}, done=${state.done}, visibleCount=${state.assets.length}, total=${state.total}, emptyBatches=${emptyAppendBatches}/${MAX_EMPTY_APPEND_BATCHES}`);
                 }
 
                 if (state.done || addedCount > 0) {

@@ -105,3 +105,63 @@ export function disposeStackGroupCards(gridContainer) {
         console.debug?.(e);
     }
 }
+
+/**
+ * Attach or update a "duplicate stack" button on a card.
+ * Called when a filename collision is detected (same filename, different paths).
+ * The button opens all copies in the similar/stack-group panel.
+ */
+export function ensureDupStackCard(gridContainer, card, asset) {
+    if (!card || !asset) return;
+    const isDupStack = !!asset._mjrDupStack;
+    const count = Number(asset._mjrDupCount || 0) || 0;
+
+    // Remove the button if no longer a dup stack
+    if (!isDupStack || count < 2) {
+        const existing = card.querySelector(".mjr-dup-stack-button");
+        if (existing) existing.remove();
+        delete card.dataset.mjrDupStacked;
+        delete card.dataset.mjrDupCount;
+        return;
+    }
+
+    // Mark the card
+    card.dataset.mjrDupStacked = "true";
+    card.dataset.mjrDupCount = String(count);
+
+    // Update existing button or create it
+    let button = card.querySelector(".mjr-dup-stack-button");
+    if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.className = "mjr-dup-stack-button";
+        button.setAttribute("aria-label", "Show all duplicates");
+
+        button.addEventListener("click", (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            try {
+                const members = Array.isArray(asset._mjrDupMembers) ? asset._mjrDupMembers : [asset];
+                const n = members.length;
+                gridContainer.dispatchEvent(
+                    new CustomEvent(EVENTS.OPEN_STACK_GROUP, {
+                        bubbles: true,
+                        detail: {
+                            asset,
+                            members,
+                            title: `Duplicates — ${n} copies`,
+                            isDupGroup: true,
+                        },
+                    }),
+                );
+            } catch (err) {
+                console.debug?.(err);
+            }
+        });
+        card.appendChild(button);
+    }
+
+    const label = `${count} duplicate${count > 1 ? "s" : ""}`;
+    button.title = `${label} — click to compare all copies`;
+    button.innerHTML = `<span class="pi pi-copy"></span><span class="mjr-dup-stack-count">${count}</span>`;
+}

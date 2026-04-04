@@ -37,6 +37,8 @@ def dedupe_result_payload(payload: dict | None) -> dict:
     if isinstance(assets, list):
         deduped = dedupe_by_filepath(assets)
         data["assets"] = deduped
+        if "total" not in data or data.get("total") is None:
+            return data
         try:
             db_total = int(data.get("total") or 0)
             deduped_count = len(deduped)
