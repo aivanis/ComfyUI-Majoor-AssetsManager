@@ -2,7 +2,7 @@
 
 ## Presentation Video
 
-[![Watch the presentation video](https://img.youtube.com/vi/mRxMnrggliY/maxresdefault.jpg)](https://youtu.be/mRxMnrggliY)
+<video src="https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/releases/download/v2.4.4/COMFYUI.ASSETS.MANAGER.mp4" controls autoplay muted loop width="100%"></video>
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-Repo-181717?logo=github)](https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager)
 [![GitHub Stars](https://img.shields.io/github/stars/MajoorWaldi/ComfyUI-Majoor-AssetsManager?style=flat)](https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/stargazers)
