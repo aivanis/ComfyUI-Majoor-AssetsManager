@@ -1,4 +1,5 @@
 import json
+import sqlite3
 
 import pytest
 from aiohttp import web
@@ -92,3 +93,31 @@ def test_extract_paths_helpers():
     app_paths = r._extract_app_paths(app)
     table_paths = r._extract_table_paths(rt)
     assert "/x" in app_paths and "/x" in table_paths
+
+
+def test_route_verbose_logs_enabled_from_env_and_db(monkeypatch):
+    monkeypatch.setenv("MAJOOR_ROUTE_VERBOSE_LOGS", "1")
+    assert r._route_verbose_logs_enabled() is True
+
+    monkeypatch.delenv("MAJOOR_ROUTE_VERBOSE_LOGS", raising=False)
+    monkeypatch.delenv("MJR_AM_ROUTE_VERBOSE_LOGS", raising=False)
+    monkeypatch.delenv("MAJOOR_VERBOSE_ROUTE_LOGS", raising=False)
+    monkeypatch.delenv("MJR_AM_VERBOSE_ROUTE_LOGS", raising=False)
+
+    class _Conn:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def execute(self, _sql, _params):
+            class _Cursor:
+                @staticmethod
+                def fetchone():
+                    return ("1",)
+
+            return _Cursor()
+
+    monkeypatch.setattr(sqlite3, "connect", lambda *_args, **_kwargs: _Conn())
+    assert r._route_verbose_logs_enabled() is True

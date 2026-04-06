@@ -196,7 +196,7 @@ choco install -y ffmpeg exiftool
 
 # OR using WinGet
 winget install -e --id Gyan.FFmpeg
-winget install -e --id PhilHarvey.ExifTool
+winget install -e --id OliverBetz.ExifTool
 ```
 
 #### macOS

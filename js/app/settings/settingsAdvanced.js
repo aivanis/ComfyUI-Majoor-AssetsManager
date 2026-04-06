@@ -15,6 +15,10 @@ import {
     setHuggingFaceSettings,
     getAiLoggingSettings,
     setAiLoggingSettings,
+    getRouteLoggingSettings,
+    setRouteLoggingSettings,
+    getStartupLoggingSettings,
+    setStartupLoggingSettings,
 } from "../../api/client.js";
 import { comfyToast, recordToastHistory } from "../toast.js";
 import {
@@ -417,6 +421,110 @@ export function registerAdvancedSettings(safeAddSetting, settings, notifyApplied
             notifyApplied("observability.verboseErrors");
         },
     });
+
+    safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Observability.VerboseRouteRegistrationLogs`,
+        category: cat(t("cat.advanced"), "Logs"),
+        name: "Majoor: Verbose route registration logs",
+        tooltip:
+            "When disabled, Majoor prints a compact startup summary instead of listing every registered API route. Takes effect on the next backend restart.",
+        type: "boolean",
+        defaultValue: !!(
+            settings.observability?.verboseRouteRegistrationLogs ??
+            DEFAULT_SETTINGS.observability?.verboseRouteRegistrationLogs ??
+            false
+        ),
+        onChange: async (value) => {
+            const next = !!value;
+            const previous = !!(
+                settings.observability?.verboseRouteRegistrationLogs ??
+                DEFAULT_SETTINGS.observability?.verboseRouteRegistrationLogs ??
+                false
+            );
+            settings.observability = settings.observability || {};
+            settings.observability.verboseRouteRegistrationLogs = next;
+            saveMajoorSettings(settings);
+            notifyApplied("observability.verboseRouteRegistrationLogs");
+            try {
+                const res = await setRouteLoggingSettings(next);
+                if (!res?.ok) {
+                    throw new Error(res?.error || "Failed to update route logging settings");
+                }
+            } catch (error) {
+                settings.observability.verboseRouteRegistrationLogs = previous;
+                saveMajoorSettings(settings);
+                notifyApplied("observability.verboseRouteRegistrationLogs");
+                comfyToast(error?.message || "Failed to update route logging settings", "error");
+            }
+        },
+    });
+
+    (async () => {
+        try {
+            const res = await getRouteLoggingSettings();
+            const enabled = !!res?.data?.prefs?.enabled;
+            settings.observability = settings.observability || {};
+            if (settings.observability.verboseRouteRegistrationLogs !== enabled) {
+                settings.observability.verboseRouteRegistrationLogs = enabled;
+                saveMajoorSettings(settings);
+                notifyApplied("observability.verboseRouteRegistrationLogs");
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+    })();
+
+    safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Observability.VerboseStartupLogs`,
+        category: cat(t("cat.advanced"), "Logs"),
+        name: "Majoor: Verbose startup logs",
+        tooltip:
+            "When disabled, Majoor suppresses most informational bootstrap logs during backend startup while keeping warnings and errors. Takes effect on the next backend restart.",
+        type: "boolean",
+        defaultValue: !!(
+            settings.observability?.verboseStartupLogs ??
+            DEFAULT_SETTINGS.observability?.verboseStartupLogs ??
+            false
+        ),
+        onChange: async (value) => {
+            const next = !!value;
+            const previous = !!(
+                settings.observability?.verboseStartupLogs ??
+                DEFAULT_SETTINGS.observability?.verboseStartupLogs ??
+                false
+            );
+            settings.observability = settings.observability || {};
+            settings.observability.verboseStartupLogs = next;
+            saveMajoorSettings(settings);
+            notifyApplied("observability.verboseStartupLogs");
+            try {
+                const res = await setStartupLoggingSettings(next);
+                if (!res?.ok) {
+                    throw new Error(res?.error || "Failed to update startup logging settings");
+                }
+            } catch (error) {
+                settings.observability.verboseStartupLogs = previous;
+                saveMajoorSettings(settings);
+                notifyApplied("observability.verboseStartupLogs");
+                comfyToast(error?.message || "Failed to update startup logging settings", "error");
+            }
+        },
+    });
+
+    (async () => {
+        try {
+            const res = await getStartupLoggingSettings();
+            const enabled = !!res?.data?.prefs?.enabled;
+            settings.observability = settings.observability || {};
+            if (settings.observability.verboseStartupLogs !== enabled) {
+                settings.observability.verboseStartupLogs = enabled;
+                saveMajoorSettings(settings);
+                notifyApplied("observability.verboseStartupLogs");
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+    })();
 
     // ── AI / Vector Search ────────────────────────────────────────────────
 

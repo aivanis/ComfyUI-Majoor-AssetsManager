@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from ...shared import get_logger
+from ...startup_logging import startup_log_info
 
 logger = get_logger(__name__)
 _MAX_DB_CONFIG_BYTES = 1024 * 1024
@@ -17,7 +18,12 @@ _MAX_DB_CONFIG_BYTES = 1024 * 1024
 def init_db(sqlite_obj: Any) -> None:
     try:
         sqlite_obj._loop_thread.run(sqlite_obj._ensure_initialized_async())
-        logger.info("Database initialized: %s", sqlite_obj.db_path)
+        startup_log_info(
+            logger,
+            "Database initialized: %s",
+            sqlite_obj.db_path,
+            db_path=str(sqlite_obj.db_path),
+        )
     except Exception as exc:
         logger.error("Failed to initialize database: %s", exc)
         raise

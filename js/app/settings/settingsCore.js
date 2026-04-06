@@ -100,6 +100,8 @@ export const DEFAULT_SETTINGS = {
     observability: {
         enabled: false,
         verboseErrors: false,
+        verboseRouteRegistrationLogs: false,
+        verboseStartupLogs: false,
     },
     feed: {
         minSize: APP_DEFAULTS.FEED_GRID_MIN_SIZE,

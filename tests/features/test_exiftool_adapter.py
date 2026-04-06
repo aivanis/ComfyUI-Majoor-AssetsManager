@@ -69,6 +69,16 @@ def test_resolve_executable_path_uses_windows_alias_sibling(monkeypatch, tmp_pat
     assert m.ExifTool._resolve_executable_path(str(configured)) == str(exep)
 
 
+def test_resolve_executable_path_uses_common_windows_install_dir(monkeypatch, tmp_path: Path):
+    exep = tmp_path / "Programs" / "ExifTool" / "exiftool.exe"
+    exep.parent.mkdir(parents=True)
+    exep.write_text("x")
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(m.shutil, "which", lambda _raw: None)
+    assert m.ExifTool._resolve_executable_path("exiftool") == str(exep.resolve())
+
+
 def test_trusted_roots_and_under_trusted_dirs(monkeypatch, tmp_path: Path):
     d = tmp_path / "bin"
     d.mkdir()
@@ -273,6 +283,19 @@ def test_write_errors_and_tool_missing(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(ex2, "_run_write_command", lambda *_a, **_k: (_ for _ in ()).throw(subprocess.TimeoutExpired(cmd="x", timeout=1)))
     out2 = ex2.write(str(p), {"XMP:Rating": 5})
     assert out2.code == ErrorCode.TIMEOUT
+
+
+def test_is_available_rechecks_when_tool_appears(monkeypatch):
+    calls = {"n": 0}
+
+    def _check(self):
+        calls["n"] += 1
+        return calls["n"] >= 2
+
+    monkeypatch.setattr(m.ExifTool, "_check_available", _check)
+    ex = m.ExifTool()
+    assert ex.is_available() is True
+    assert calls["n"] == 2
 
 
 @pytest.mark.asyncio

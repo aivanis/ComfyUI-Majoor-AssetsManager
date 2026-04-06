@@ -108,7 +108,7 @@ For full functionality including metadata extraction and file tagging, install t
 #### Option C: Using WinGet
 ```powershell
 winget install -e --id Gyan.FFmpeg
-winget install -e --id PhilHarvey.ExifTool
+winget install -e --id OliverBetz.ExifTool
 ```
 
 #### Option D: Manual Installation

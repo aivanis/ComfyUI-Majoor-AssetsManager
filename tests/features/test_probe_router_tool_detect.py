@@ -1,4 +1,5 @@
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 
 from mjr_am_backend import probe_router as pr
@@ -65,3 +66,26 @@ def test_tool_detect_exiftool_alias_candidates(monkeypatch):
     monkeypatch.setattr(td, "_run_command", _run)
     assert td.has_exiftool() is True
     assert "exiftool(-k).exe" in calls
+
+
+def test_tool_detect_exiftool_common_windows_dir(monkeypatch, tmp_path):
+    td.reset_tool_cache()
+    install_dir = tmp_path / "Programs" / "ExifTool"
+    install_dir.mkdir(parents=True)
+    exep = install_dir / "exiftool.exe"
+    exep.write_text("x")
+
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    monkeypatch.setattr(td.shutil, "which", lambda _b: None)
+
+    calls: list[str] = []
+
+    def _run(cmd):
+        calls.append(cmd[0])
+        if Path(cmd[0]).resolve() == exep.resolve():
+            return SimpleNamespace(returncode=0, stdout="13.54", stderr="")
+        raise FileNotFoundError("missing")
+
+    monkeypatch.setattr(td, "_run_command", _run)
+    assert td.has_exiftool() is True
+    assert any("Programs" in call and "ExifTool" in call for call in calls)

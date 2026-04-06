@@ -5,8 +5,16 @@ import hashlib
 import re
 
 from ...shared import Result, get_logger, log_success
+from ...startup_logging import startup_log_info, startup_log_success
 
 logger = get_logger(__name__)
+
+
+def _db_path(db) -> str | None:
+    try:
+        return str(getattr(db, "db_path", "") or "").strip() or None
+    except Exception:
+        return None
 
 CURRENT_SCHEMA_VERSION = 15
 # Schema version history (high-level):
@@ -337,7 +345,7 @@ async def ensure_columns_exist(db) -> Result[bool]:
 
 async def ensure_tables_exist(db) -> Result[bool]:
     """Ensure base schema tables exist (idempotent)."""
-    logger.info("Ensuring tables exist...")
+    startup_log_info(logger, "Ensuring tables exist...", db_path=_db_path(db))
     result = await db.aexecutescript(SCHEMA_V1)
     if not result.ok:
         logger.error("Failed to ensure base tables: %s", result.error)
@@ -362,7 +370,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS vec.idx_asset_embeddings_asset_id ON asset_emb
 
 async def ensure_vec_schema(db) -> Result[bool]:
     """Create the asset_embeddings table inside the attached 'vec' database."""
-    logger.info("Ensuring vec schema (vectors.sqlite)...")
+    startup_log_info(logger, "Ensuring vec schema (vectors.sqlite)...", db_path=_db_path(db))
     result = await db.aexecutescript(VEC_SCHEMA)
     if not result.ok:
         logger.error("Failed to ensure vec schema: %s", result.error)
@@ -419,7 +427,7 @@ async def purge_orphan_vec_embeddings(db) -> Result[bool]:
 
 async def ensure_indexes_and_triggers(db) -> Result[bool]:
     """Ensure indexes/triggers exist and repair FTS metadata (best-effort)."""
-    logger.info("Ensuring indexes/triggers exist...")
+    startup_log_info(logger, "Ensuring indexes/triggers exist...", db_path=_db_path(db))
     result = await db.aexecutescript(INDEXES_AND_TRIGGERS)
     if not result.ok:
         logger.error("Failed to ensure indexes/triggers: %s", result.error)
@@ -761,7 +769,7 @@ async def _ensure_schema(db) -> Result[bool]:
     if not fp_result.ok:
         logger.warning("Failed to store schema fingerprint: %s", fp_result.error)
 
-    log_success(logger, f"Schema ensured (version {CURRENT_SCHEMA_VERSION})")
+    startup_log_success(logger, f"Schema ensured (version {CURRENT_SCHEMA_VERSION})", db_path=_db_path(db))
     return Result.Ok(True)
 
 
@@ -875,7 +883,13 @@ async def migrate_schema(db) -> Result[bool]:
         Result with success boolean
     """
     current_version = await db.aget_schema_version()
-    logger.info("Ensuring schema (current version %s -> target %s)", current_version, CURRENT_SCHEMA_VERSION)
+    startup_log_info(
+        logger,
+        "Ensuring schema (current version %s -> target %s)",
+        current_version,
+        CURRENT_SCHEMA_VERSION,
+        db_path=_db_path(db),
+    )
 
     repair_result = await _ensure_schema(db)
     if not repair_result.ok:
@@ -884,9 +898,13 @@ async def migrate_schema(db) -> Result[bool]:
     final_version = await db.aget_schema_version()
 
     if current_version == final_version:
-        logger.info("Schema already reported up to date (%s)", final_version)
+        startup_log_info(logger, "Schema already reported up to date (%s)", final_version, db_path=_db_path(db))
     else:
-        log_success(logger, f"Schema repaired from version {current_version} to {final_version}")
+        startup_log_success(
+            logger,
+            f"Schema repaired from version {current_version} to {final_version}",
+            db_path=_db_path(db),
+        )
 
     return Result.Ok(True)
 

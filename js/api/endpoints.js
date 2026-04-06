@@ -44,6 +44,8 @@ export const ENDPOINTS = {
     SETTINGS_EXECUTION_GROUPING: "/mjr/am/settings/execution-grouping",
     SETTINGS_HUGGINGFACE: "/mjr/am/settings/huggingface",
     SETTINGS_AI_LOGGING: "/mjr/am/settings/ai-logging",
+    SETTINGS_ROUTE_LOGGING: "/mjr/am/settings/route-logging",
+    SETTINGS_STARTUP_LOGGING: "/mjr/am/settings/startup-logging",
 
     // View (ComfyUI native)
     VIEW: "/view",

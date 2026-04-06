@@ -12,6 +12,7 @@ from typing import Any
 
 from ...config import EXIFTOOL_TIMEOUT
 from ...shared import ErrorCode, Result, get_logger
+from ...tool_candidates import EXIFTOOL_CANDIDATE_NAMES, iter_exiftool_candidates
 
 logger = get_logger(__name__)
 
@@ -19,7 +20,6 @@ _TAG_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:-]*$")
 _EXIFTOOL_EXECUTABLE_RE = re.compile(r"^exiftool(?:\(-k\))?(?:\.exe)?$", re.IGNORECASE)
 _WINDOWS_CMDLINE_TOO_LONG = 206
 _MAX_WRITE_VALUE_CHARS = 8192
-_EXIFTOOL_CANDIDATE_NAMES = ("exiftool", "exiftool.exe", "exiftool(-k)", "exiftool(-k).exe")
 
 
 def _decode_bytes_best_effort(blob: bytes | None) -> tuple[str, bool]:
@@ -234,21 +234,16 @@ class ExifTool:
     @staticmethod
     def _resolve_executable_path(raw: str) -> str | None:
         clean = ExifTool._strip_optional_quotes(raw)
-        for candidate_name in ExifTool._candidate_executable_names(clean):
+        for candidate_name in iter_exiftool_candidates(clean):
             resolved = shutil.which(candidate_name)
             if resolved:
                 return resolved
-
-        try:
-            candidate_path = Path(clean)
-            if candidate_path.is_file():
-                return str(candidate_path.resolve(strict=True))
-            for sibling_name in ExifTool._candidate_executable_names(candidate_path.name):
-                sibling = candidate_path.with_name(sibling_name)
-                if sibling.is_file():
-                    return str(sibling.resolve(strict=True))
-        except (OSError, RuntimeError, ValueError):
-            return None
+            try:
+                candidate_path = Path(candidate_name)
+                if candidate_path.is_file():
+                    return str(candidate_path.resolve(strict=True))
+            except (OSError, RuntimeError, ValueError):
+                continue
         return None
 
     @staticmethod
@@ -260,16 +255,7 @@ class ExifTool:
 
     @staticmethod
     def _candidate_executable_names(raw: str) -> list[str]:
-        text = ExifTool._strip_optional_quotes(raw)
-        if not text:
-            return list(_EXIFTOOL_CANDIDATE_NAMES)
-
-        out: list[str] = [text]
-        if Path(text).name.lower() in _EXIFTOOL_CANDIDATE_NAMES:
-            for alias in _EXIFTOOL_CANDIDATE_NAMES:
-                if alias not in out:
-                    out.append(alias)
-        return out
+        return iter_exiftool_candidates(raw)
 
     @staticmethod
     def _is_under_trusted_dirs(resolved: str) -> bool:
@@ -307,16 +293,22 @@ class ExifTool:
         return bool(_EXIFTOOL_EXECUTABLE_RE.match(name))
 
     def _check_available(self) -> bool:
-        """Check if ExifTool is available in PATH."""
+        """Check if ExifTool is available."""
         resolved = self._resolve_executable(self.bin)
         if not resolved:
             return False
         self.bin = resolved
         return True
 
+    def _ensure_available(self) -> bool:
+        if self._available:
+            return True
+        self._available = self._check_available()
+        return self._available
+
     def is_available(self) -> bool:
         """Check if ExifTool is available."""
-        return self._available
+        return self._ensure_available()
 
     @staticmethod
     def _assign_result_for_paths(
@@ -740,7 +732,7 @@ class ExifTool:
         return tags_res.data or []
 
     def _single_read_availability_error(self) -> Result[dict[str, Any]] | None:
-        if self._available:
+        if self._ensure_available():
             return None
         return Result.Err(
             ErrorCode.TOOL_MISSING,
@@ -774,6 +766,8 @@ class ExifTool:
         Returns:
             Dict mapping file path to Result with metadata
         """
+        if not self._available:
+            self._available = self._check_available()
         if not self._available:
             err: Result[dict[str, Any]] = Result.Err(
                 ErrorCode.TOOL_MISSING, "ExifTool not found in PATH", quality="none"
@@ -855,7 +849,7 @@ class ExifTool:
             )
 
     def _validate_write_preconditions(self, path: str) -> Result[bool] | None:
-        if not self._available:
+        if not self._ensure_available():
             return Result.Err(ErrorCode.TOOL_MISSING, "ExifTool not found in PATH")
         if not path or any(ch in str(path) for ch in ("\x00", "\n", "\r")):
             return Result.Err(ErrorCode.INVALID_INPUT, "Invalid file path")

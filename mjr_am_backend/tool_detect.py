@@ -16,6 +16,11 @@ from mjr_am_backend.config import (
     FFPROBE_MIN_VERSION,
 )
 from mjr_am_backend.shared import get_logger
+from mjr_am_backend.tool_candidates import (
+    EXIFTOOL_CANDIDATE_NAMES,
+    iter_exiftool_candidates,
+    strip_optional_quotes,
+)
 
 logger = get_logger(__name__)
 
@@ -31,39 +36,7 @@ _TOOL_VERSIONS: dict[str, str | None] = {
     "ffprobe": None,
 }
 _TOOL_CACHE_LOCK = threading.Lock()
-_EXIFTOOL_CANDIDATE_NAMES = ("exiftool", "exiftool.exe", "exiftool(-k)", "exiftool(-k).exe")
 _FFPROBE_CANDIDATE_NAMES = ("ffprobe", "ffprobe.exe")
-
-
-def _strip_optional_quotes(raw: str) -> str:
-    text = str(raw or "").strip()
-    if len(text) >= 2 and text[0] == text[-1] and text[0] in ('"', "'"):
-        return text[1:-1].strip()
-    return text
-
-
-def _iter_exiftool_candidates(raw: str | None) -> list[str]:
-    configured = _strip_optional_quotes(raw or "")
-    out: list[str] = []
-
-    def add(value: str) -> None:
-        if value and value not in out:
-            out.append(value)
-
-    if configured:
-        add(configured)
-        name = Path(configured).name.lower()
-        if name in _EXIFTOOL_CANDIDATE_NAMES:
-            for alias in _EXIFTOOL_CANDIDATE_NAMES:
-                add(alias)
-
-            parent = Path(configured).parent
-            for alias in _EXIFTOOL_CANDIDATE_NAMES:
-                add(str(parent / alias))
-
-    for alias in _EXIFTOOL_CANDIDATE_NAMES:
-        add(alias)
-    return out
 
 
 def parse_tool_version(value: str | None) -> tuple[int, ...]:
@@ -119,7 +92,7 @@ def _run_command(cmd: list[str]) -> subprocess.CompletedProcess[str]:
 
 
 def _is_named_exiftool_candidate(candidate: str) -> bool:
-    return Path(candidate).name.lower() in _EXIFTOOL_CANDIDATE_NAMES
+    return Path(candidate).name.lower() in EXIFTOOL_CANDIDATE_NAMES
 
 
 def _can_try_candidate(candidate: str) -> bool:
@@ -129,7 +102,7 @@ def _can_try_candidate(candidate: str) -> bool:
 
 
 def _probe_exiftool_candidates() -> tuple[bool, subprocess.CompletedProcess[str] | None, str]:
-    for candidate in _iter_exiftool_candidates(EXIFTOOL_BIN):
+    for candidate in iter_exiftool_candidates(EXIFTOOL_BIN):
         if not _can_try_candidate(candidate):
             continue
         try:
@@ -146,7 +119,7 @@ def _is_named_ffprobe_candidate(candidate: str) -> bool:
 
 
 def _iter_ffprobe_candidates(raw: str | None) -> list[str]:
-    configured = _strip_optional_quotes(raw or "")
+    configured = strip_optional_quotes(raw or "")
     out: list[str] = []
 
     def add(value: str) -> None:
@@ -185,8 +158,8 @@ def _probe_ffprobe_candidates() -> tuple[bool, subprocess.CompletedProcess[str] 
 def has_exiftool() -> bool:
     """Check if ExifTool is available."""
     with _TOOL_CACHE_LOCK:
-        if _TOOL_CACHE["exiftool"] is not None:
-            return bool(_TOOL_CACHE["exiftool"])
+        if _TOOL_CACHE["exiftool"] is True:
+            return True
 
         try:
             available, result, chosen_bin = _probe_exiftool_candidates()

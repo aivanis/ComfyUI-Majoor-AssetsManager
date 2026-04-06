@@ -1147,6 +1147,22 @@ export async function setAiLoggingSettings(enabled = false) {
     return post(ENDPOINTS.SETTINGS_AI_LOGGING, { enabled: !!enabled });
 }
 
+export async function getRouteLoggingSettings() {
+    return get(ENDPOINTS.SETTINGS_ROUTE_LOGGING);
+}
+
+export async function setRouteLoggingSettings(enabled = false) {
+    return post(ENDPOINTS.SETTINGS_ROUTE_LOGGING, { enabled: !!enabled });
+}
+
+export async function getStartupLoggingSettings() {
+    return get(ENDPOINTS.SETTINGS_STARTUP_LOGGING);
+}
+
+export async function setStartupLoggingSettings(enabled = false) {
+    return post(ENDPOINTS.SETTINGS_STARTUP_LOGGING, { enabled: !!enabled });
+}
+
 export async function getOutputDirectorySetting() {
     return get(ENDPOINTS.SETTINGS_OUTPUT_DIRECTORY);
 }

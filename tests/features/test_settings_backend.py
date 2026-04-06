@@ -413,6 +413,48 @@ async def test_ai_verbose_logs_get_set_and_startup_restore(monkeypatch):
     assert os.environ.get("MAJOOR_AI_VERBOSE_LOGS") == "1"
 
 
+@pytest.mark.asyncio
+async def test_route_verbose_logs_get_set_and_startup_restore(monkeypatch):
+    db = _DB()
+    s = AppSettings(db)
+
+    assert await s.get_route_verbose_logs_enabled() is False
+
+    out = await s.set_route_verbose_logs_enabled(True)
+    assert out.ok is True
+    assert db.store.get("route_verbose_logs") == "1"
+    assert os.environ.get("MAJOOR_ROUTE_VERBOSE_LOGS") == "1"
+
+    monkeypatch.delenv("MAJOOR_ROUTE_VERBOSE_LOGS", raising=False)
+    monkeypatch.delenv("MJR_AM_ROUTE_VERBOSE_LOGS", raising=False)
+    monkeypatch.delenv("MAJOOR_VERBOSE_ROUTE_LOGS", raising=False)
+    monkeypatch.delenv("MJR_AM_VERBOSE_ROUTE_LOGS", raising=False)
+
+    await s.apply_route_verbose_logs_on_startup()
+    assert os.environ.get("MAJOOR_ROUTE_VERBOSE_LOGS") == "1"
+
+
+@pytest.mark.asyncio
+async def test_startup_verbose_logs_get_set_and_startup_restore(monkeypatch):
+    db = _DB()
+    s = AppSettings(db)
+
+    assert await s.get_startup_verbose_logs_enabled() is False
+
+    out = await s.set_startup_verbose_logs_enabled(True)
+    assert out.ok is True
+    assert db.store.get("startup_verbose_logs") == "1"
+    assert os.environ.get("MAJOOR_STARTUP_VERBOSE_LOGS") == "1"
+
+    monkeypatch.delenv("MAJOOR_STARTUP_VERBOSE_LOGS", raising=False)
+    monkeypatch.delenv("MJR_AM_STARTUP_VERBOSE_LOGS", raising=False)
+    monkeypatch.delenv("MAJOOR_VERBOSE_STARTUP_LOGS", raising=False)
+    monkeypatch.delenv("MJR_AM_VERBOSE_STARTUP_LOGS", raising=False)
+
+    await s.apply_startup_verbose_logs_on_startup()
+    assert os.environ.get("MAJOOR_STARTUP_VERBOSE_LOGS") == "1"
+
+
 def test_output_env_helpers(monkeypatch):
     s = AppSettings(_DB())
     monkeypatch.setenv("MAJOOR_OUTPUT_DIRECTORY", "x")

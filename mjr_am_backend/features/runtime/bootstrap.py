@@ -33,6 +33,14 @@ async def apply_startup_settings(
             "AI verbose logs setting restore failed: %s",
             "apply_ai_verbose_logs_on_startup",
         ),
+        (
+            "Verbose route registration logs setting restore failed: %s",
+            "apply_route_verbose_logs_on_startup",
+        ),
+        (
+            "Verbose startup logs setting restore failed: %s",
+            "apply_startup_verbose_logs_on_startup",
+        ),
     )
     for message, attribute_name in startup_steps:
         step = getattr(settings_service, attribute_name, None)

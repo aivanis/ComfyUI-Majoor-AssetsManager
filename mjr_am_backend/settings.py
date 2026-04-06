@@ -19,6 +19,7 @@ from .config import (
     is_vector_search_enabled,
 )
 from .shared import Result, get_logger
+from .startup_logging import startup_log_info
 from .utils import env_bool, parse_bool
 
 logger = get_logger(__name__)
@@ -31,6 +32,8 @@ _VECTOR_SEARCH_ENABLED_KEY = "vector_search_enabled"
 _EXECUTION_GROUPING_ENABLED_KEY = "execution_grouping_enabled"
 _HUGGINGFACE_TOKEN_KEY = "huggingface_token"
 _AI_VERBOSE_LOGS_KEY = "ai_verbose_logs"
+_ROUTE_VERBOSE_LOGS_KEY = "route_verbose_logs"
+_STARTUP_VERBOSE_LOGS_KEY = "startup_verbose_logs"
 _SETTINGS_VERSION_KEY = "__settings_version"
 _SECURITY_API_TOKEN_KEY = "security_api_token"
 _SECURITY_API_TOKEN_HASH_KEY = "security_api_token_hash"
@@ -98,6 +101,8 @@ class AppSettings:
         self._default_vector_search_enabled = bool(is_vector_search_enabled())
         self._default_execution_grouping_enabled = bool(is_execution_grouping_enabled())
         self._default_ai_verbose_logs = self._env_ai_verbose_logs_enabled()
+        self._default_route_verbose_logs = self._env_route_verbose_logs_enabled()
+        self._default_startup_verbose_logs = self._env_startup_verbose_logs_enabled()
         self._runtime_api_token: str = ""
         self._runtime_api_token_hash: str = ""
 
@@ -254,6 +259,34 @@ class AppSettings:
                 or os.environ.get("MJR_AM_AI_VERBOSE_LOGS")
                 or os.environ.get("MAJOOR_VERBOSE_AI_LOGS")
                 or os.environ.get("MJR_AM_VERBOSE_AI_LOGS")
+                or ""
+            )
+        except Exception:
+            raw = ""
+        return parse_bool(raw, False)
+
+    @staticmethod
+    def _env_route_verbose_logs_enabled() -> bool:
+        try:
+            raw = (
+                os.environ.get("MAJOOR_ROUTE_VERBOSE_LOGS")
+                or os.environ.get("MJR_AM_ROUTE_VERBOSE_LOGS")
+                or os.environ.get("MAJOOR_VERBOSE_ROUTE_LOGS")
+                or os.environ.get("MJR_AM_VERBOSE_ROUTE_LOGS")
+                or ""
+            )
+        except Exception:
+            raw = ""
+        return parse_bool(raw, False)
+
+    @staticmethod
+    def _env_startup_verbose_logs_enabled() -> bool:
+        try:
+            raw = (
+                os.environ.get("MAJOOR_STARTUP_VERBOSE_LOGS")
+                or os.environ.get("MJR_AM_STARTUP_VERBOSE_LOGS")
+                or os.environ.get("MAJOOR_VERBOSE_STARTUP_LOGS")
+                or os.environ.get("MJR_AM_VERBOSE_STARTUP_LOGS")
                 or ""
             )
         except Exception:
@@ -1002,6 +1035,112 @@ class AppSettings:
             self._cache_version[_AI_VERBOSE_LOGS_KEY] = current_version
             return Result.Ok(normalized)
 
+    async def get_route_verbose_logs_enabled(self) -> bool:
+        """Return persisted verbose route-registration log preference."""
+        async with self._lock:
+            current_version = await self._get_settings_version()
+            cached = self._cached_route_verbose_logs_pref(current_version)
+            if cached is not None:
+                return cached
+            raw = await self._read_setting(_ROUTE_VERBOSE_LOGS_KEY)
+            enabled = (
+                parse_bool(raw, self._default_route_verbose_logs)
+                if raw is not None
+                else self._default_route_verbose_logs
+            )
+            self._cache[_ROUTE_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
+            self._cache_at[_ROUTE_VERBOSE_LOGS_KEY] = time.monotonic()
+            self._cache_version[_ROUTE_VERBOSE_LOGS_KEY] = int(current_version or 0)
+            return enabled
+
+    def _cached_route_verbose_logs_pref(self, current_version: int) -> bool | None:
+        cached = self._cache.get(_ROUTE_VERBOSE_LOGS_KEY)
+        if cached is None:
+            return None
+        try:
+            ts = float(self._cache_at.get(_ROUTE_VERBOSE_LOGS_KEY) or 0.0)
+        except Exception:
+            ts = 0.0
+        cached_ver = int(self._cache_version.get(_ROUTE_VERBOSE_LOGS_KEY) or 0)
+        if cached_ver != int(current_version or 0):
+            return None
+        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
+            return None
+        return parse_bool(cached, self._default_route_verbose_logs)
+
+    async def set_route_verbose_logs_enabled(self, enabled: Any) -> Result[bool]:
+        """Persist verbose route-registration log preference and apply env vars."""
+        normalized = parse_bool(enabled, self._default_route_verbose_logs)
+        async with self._lock:
+            res = await self._write_setting(_ROUTE_VERBOSE_LOGS_KEY, "1" if normalized else "0")
+            if not res.ok:
+                return Result.Err("DB_ERROR", res.error or "Failed to persist route_verbose_logs")
+            self._set_route_verbose_logs_env_vars(normalized)
+            bump = await self._bump_settings_version_locked()
+            if not bump.ok:
+                try:
+                    logger.warning("Failed to bump settings version: %s", bump.error)
+                except Exception:
+                    pass
+            current_version = int(bump.data or await self._get_settings_version() or 0)
+            self._cache[_ROUTE_VERBOSE_LOGS_KEY] = "1" if normalized else "0"
+            self._cache_at[_ROUTE_VERBOSE_LOGS_KEY] = time.monotonic()
+            self._cache_version[_ROUTE_VERBOSE_LOGS_KEY] = current_version
+            return Result.Ok(normalized)
+
+    async def get_startup_verbose_logs_enabled(self) -> bool:
+        """Return persisted verbose startup-log preference."""
+        async with self._lock:
+            current_version = await self._get_settings_version()
+            cached = self._cached_startup_verbose_logs_pref(current_version)
+            if cached is not None:
+                return cached
+            raw = await self._read_setting(_STARTUP_VERBOSE_LOGS_KEY)
+            enabled = (
+                parse_bool(raw, self._default_startup_verbose_logs)
+                if raw is not None
+                else self._default_startup_verbose_logs
+            )
+            self._cache[_STARTUP_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
+            self._cache_at[_STARTUP_VERBOSE_LOGS_KEY] = time.monotonic()
+            self._cache_version[_STARTUP_VERBOSE_LOGS_KEY] = int(current_version or 0)
+            return enabled
+
+    def _cached_startup_verbose_logs_pref(self, current_version: int) -> bool | None:
+        cached = self._cache.get(_STARTUP_VERBOSE_LOGS_KEY)
+        if cached is None:
+            return None
+        try:
+            ts = float(self._cache_at.get(_STARTUP_VERBOSE_LOGS_KEY) or 0.0)
+        except Exception:
+            ts = 0.0
+        cached_ver = int(self._cache_version.get(_STARTUP_VERBOSE_LOGS_KEY) or 0)
+        if cached_ver != int(current_version or 0):
+            return None
+        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
+            return None
+        return parse_bool(cached, self._default_startup_verbose_logs)
+
+    async def set_startup_verbose_logs_enabled(self, enabled: Any) -> Result[bool]:
+        """Persist verbose startup-log preference and apply env vars."""
+        normalized = parse_bool(enabled, self._default_startup_verbose_logs)
+        async with self._lock:
+            res = await self._write_setting(_STARTUP_VERBOSE_LOGS_KEY, "1" if normalized else "0")
+            if not res.ok:
+                return Result.Err("DB_ERROR", res.error or "Failed to persist startup_verbose_logs")
+            self._set_startup_verbose_logs_env_vars(normalized)
+            bump = await self._bump_settings_version_locked()
+            if not bump.ok:
+                try:
+                    logger.warning("Failed to bump settings version: %s", bump.error)
+                except Exception:
+                    pass
+            current_version = int(bump.data or await self._get_settings_version() or 0)
+            self._cache[_STARTUP_VERBOSE_LOGS_KEY] = "1" if normalized else "0"
+            self._cache_at[_STARTUP_VERBOSE_LOGS_KEY] = time.monotonic()
+            self._cache_version[_STARTUP_VERBOSE_LOGS_KEY] = current_version
+            return Result.Ok(normalized)
+
     def _set_vector_search_env_vars(self, enabled: bool) -> None:
         value = "1" if enabled else "0"
         try:
@@ -1018,6 +1157,26 @@ class AppSettings:
             os.environ["MJR_AM_AI_VERBOSE_LOGS"] = value
             os.environ["MAJOOR_VERBOSE_AI_LOGS"] = value
             os.environ["MJR_AM_VERBOSE_AI_LOGS"] = value
+        except Exception:
+            return
+
+    def _set_route_verbose_logs_env_vars(self, enabled: bool) -> None:
+        value = "1" if enabled else "0"
+        try:
+            os.environ["MAJOOR_ROUTE_VERBOSE_LOGS"] = value
+            os.environ["MJR_AM_ROUTE_VERBOSE_LOGS"] = value
+            os.environ["MAJOOR_VERBOSE_ROUTE_LOGS"] = value
+            os.environ["MJR_AM_VERBOSE_ROUTE_LOGS"] = value
+        except Exception:
+            return
+
+    def _set_startup_verbose_logs_env_vars(self, enabled: bool) -> None:
+        value = "1" if enabled else "0"
+        try:
+            os.environ["MAJOOR_STARTUP_VERBOSE_LOGS"] = value
+            os.environ["MJR_AM_STARTUP_VERBOSE_LOGS"] = value
+            os.environ["MAJOOR_VERBOSE_STARTUP_LOGS"] = value
+            os.environ["MJR_AM_VERBOSE_STARTUP_LOGS"] = value
         except Exception:
             return
 
@@ -1190,7 +1349,11 @@ class AppSettings:
                 if normalized:
                     self._set_output_directory_env_vars(normalized)
                     self._apply_comfy_output_directory(normalized)
-                    logger.info("Restored output directory override on startup: %s", normalized)
+                    startup_log_info(
+                        logger,
+                        "Restored output directory override on startup: %s",
+                        normalized,
+                    )
         except Exception as exc:
             logger.warning("Failed to restore output directory override on startup: %s", exc)
 
@@ -1204,7 +1367,11 @@ class AppSettings:
                 self._cache[_VECTOR_SEARCH_ENABLED_KEY] = "1" if enabled else "0"
                 self._cache_at[_VECTOR_SEARCH_ENABLED_KEY] = time.monotonic()
                 self._cache_version[_VECTOR_SEARCH_ENABLED_KEY] = int(await self._get_settings_version() or 0)
-                logger.info("Restored vector search setting on startup: %s", "enabled" if enabled else "disabled")
+                startup_log_info(
+                    logger,
+                    "Restored vector search setting on startup: %s",
+                    "enabled" if enabled else "disabled",
+                )
         except Exception as exc:
             logger.warning("Failed to restore vector search setting on startup: %s", exc)
 
@@ -1224,7 +1391,7 @@ class AppSettings:
                 self._cache_version[_EXECUTION_GROUPING_ENABLED_KEY] = int(
                     await self._get_settings_version() or 0
                 )
-                logger.info(
+                startup_log_info(
                     "Restored execution grouping setting on startup: %s",
                     "enabled" if enabled else "disabled",
                 )
@@ -1239,7 +1406,11 @@ class AppSettings:
                     token = str(await self._read_setting(_HUGGINGFACE_TOKEN_KEY) or "").strip()
                 if token:
                     self._set_huggingface_token_env(token)
-                    logger.info("Restored HuggingFace token on startup: %s", self._token_hint(token))
+                    startup_log_info(
+                        logger,
+                        "Restored HuggingFace token on startup: %s",
+                        self._token_hint(token),
+                    )
         except Exception as exc:
             logger.warning("Failed to restore HuggingFace token on startup: %s", exc)
 
@@ -1253,6 +1424,58 @@ class AppSettings:
                 self._cache[_AI_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
                 self._cache_at[_AI_VERBOSE_LOGS_KEY] = time.monotonic()
                 self._cache_version[_AI_VERBOSE_LOGS_KEY] = int(await self._get_settings_version() or 0)
-                logger.info("Restored AI verbose logs setting on startup: %s", "enabled" if enabled else "disabled")
+                startup_log_info(
+                    logger,
+                    "Restored AI verbose logs setting on startup: %s",
+                    "enabled" if enabled else "disabled",
+                )
         except Exception as exc:
             logger.warning("Failed to restore AI verbose logs setting on startup: %s", exc)
+
+    async def apply_route_verbose_logs_on_startup(self) -> None:
+        """Restore verbose route-registration log preference into environment on startup."""
+        try:
+            async with self._lock:
+                raw = await self._read_setting(_ROUTE_VERBOSE_LOGS_KEY)
+                enabled = (
+                    parse_bool(raw, self._default_route_verbose_logs)
+                    if raw is not None
+                    else self._default_route_verbose_logs
+                )
+                self._set_route_verbose_logs_env_vars(enabled)
+                self._cache[_ROUTE_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
+                self._cache_at[_ROUTE_VERBOSE_LOGS_KEY] = time.monotonic()
+                self._cache_version[_ROUTE_VERBOSE_LOGS_KEY] = int(
+                    await self._get_settings_version() or 0
+                )
+                startup_log_info(
+                    logger,
+                    "Restored verbose route registration logs setting on startup: %s",
+                    "enabled" if enabled else "disabled",
+                )
+        except Exception as exc:
+            logger.warning("Failed to restore verbose route registration logs setting on startup: %s", exc)
+
+    async def apply_startup_verbose_logs_on_startup(self) -> None:
+        """Restore verbose startup-log preference into environment on startup."""
+        try:
+            async with self._lock:
+                raw = await self._read_setting(_STARTUP_VERBOSE_LOGS_KEY)
+                enabled = (
+                    parse_bool(raw, self._default_startup_verbose_logs)
+                    if raw is not None
+                    else self._default_startup_verbose_logs
+                )
+                self._set_startup_verbose_logs_env_vars(enabled)
+                self._cache[_STARTUP_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
+                self._cache_at[_STARTUP_VERBOSE_LOGS_KEY] = time.monotonic()
+                self._cache_version[_STARTUP_VERBOSE_LOGS_KEY] = int(
+                    await self._get_settings_version() or 0
+                )
+                startup_log_info(
+                    logger,
+                    "Restored verbose startup logs setting on startup: %s",
+                    "enabled" if enabled else "disabled",
+                )
+        except Exception as exc:
+            logger.warning("Failed to restore verbose startup logs setting on startup: %s", exc)

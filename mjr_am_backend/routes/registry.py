@@ -5,12 +5,16 @@ Coordinates all route handlers and registers them with PromptServer or aiohttp a
 
 from __future__ import annotations
 
+import os
+import sqlite3
 from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar, Protocol, cast
 
 from aiohttp import web
+from mjr_am_backend.config import INDEX_DB
 from mjr_am_backend.observability import ensure_observability
 from mjr_am_backend.shared import Result, get_logger
+from mjr_am_backend.utils import parse_bool
 
 from .core import (
     _get_request_user_id,
@@ -101,6 +105,87 @@ PromptServer = _PromptServerProxy()
 
 logger = get_logger(__name__)
 _ROUTES_REGISTERED = False
+_ROUTE_VERBOSE_LOG_ENV_KEYS = (
+    "MAJOOR_ROUTE_VERBOSE_LOGS",
+    "MJR_AM_ROUTE_VERBOSE_LOGS",
+    "MAJOOR_VERBOSE_ROUTE_LOGS",
+    "MJR_AM_VERBOSE_ROUTE_LOGS",
+)
+_ROUTE_VERBOSE_LOGS_DB_KEY = "route_verbose_logs"
+
+
+def _route_verbose_logs_enabled() -> bool:
+    env_value = _read_route_verbose_logs_env()
+    if env_value is not None:
+        return env_value
+    return _read_route_verbose_logs_from_db()
+
+
+def _read_route_verbose_logs_env() -> bool | None:
+    for key in _ROUTE_VERBOSE_LOG_ENV_KEYS:
+        try:
+            raw = os.environ.get(key)
+        except Exception:
+            raw = None
+        if raw is None or str(raw).strip() == "":
+            continue
+        return parse_bool(raw, False)
+    return None
+
+
+def _read_route_verbose_logs_from_db() -> bool:
+    try:
+        with sqlite3.connect(str(INDEX_DB)) as conn:
+            row = conn.execute(
+                "SELECT value FROM metadata WHERE key = ?",
+                (_ROUTE_VERBOSE_LOGS_DB_KEY,),
+            ).fetchone()
+    except Exception:
+        return False
+    if not row:
+        return False
+    try:
+        return parse_bool(row[0], False)
+    except Exception:
+        return False
+
+
+def _log_route_registration_summary(verbose: bool) -> None:
+    if not verbose:
+        logger.info(
+            "Routes registered: summary mode. Enable verbose route registration logs in Majoor Settings to list each endpoint at startup."
+        )
+        return
+
+    logger.info("=" * 60)
+    logger.info("Routes registered:")
+    logger.info("  GET /mjr/am/health")
+    logger.info("  GET /mjr/am/health/counters")
+    logger.info("  GET /mjr/am/health/db")
+    logger.info("  GET /mjr/am/config")
+    logger.info("  GET /mjr/am/tools/status")
+    logger.info("  GET /mjr/am/metadata?type=<scope>&filename=<name>&subfolder=<sub>&root_id=<id>")
+    logger.info("  POST /mjr/am/scan")
+    logger.info("  POST /mjr/am/index-files")
+    logger.info("  POST /mjr/am/stage-to-input")
+    logger.info("  POST /mjr/am/open-in-folder")
+    logger.info("  GET /mjr/am/search?q=<query>")
+    logger.info("  GET /mjr/am/asset/{asset_id}")
+    logger.info("  POST /mjr/am/asset/rename")
+    logger.info("  POST /mjr/am/assets/delete")
+    logger.info("  POST /mjr/am/assets/rename")
+    logger.info("  GET /mjr/am/collections")
+    logger.info("  GET /mjr/am/date-histogram?month=YYYY-MM")
+    logger.info("  POST /mjr/am/batch-zip")
+    logger.info("  GET /mjr/am/batch-zip/{token}")
+    logger.info("  GET /mjr/am/viewer/info?asset_id=<id>")
+    logger.info("  POST /mjr/am/db/optimize")
+    logger.info("  POST /mjr/am/db/cleanup-case-duplicates")
+    logger.info("  POST /mjr/am/db/force-delete")
+    logger.info("  GET /mjr/am/download")
+    logger.info("  GET /mjr/am/releases")
+    logger.info("  GET /mjr/am/duplicates/alerts")
+    logger.info("=" * 60)
 
 
 def _extract_app_paths(app: web.Application) -> set[str]:
@@ -309,6 +394,7 @@ def register_all_routes() -> web.RouteTableDef:
     if _ROUTES_REGISTERED:
         logger.debug("register_all_routes() skipped: already registered")
         return routes
+    verbose_route_logs = _route_verbose_logs_enabled()
 
     # Register all handler modules
     register_health_routes(routes)
@@ -327,14 +413,16 @@ def register_all_routes() -> web.RouteTableDef:
     # Register releases route (exposes tags/branches + zip template)
     try:
         register_releases_routes(routes)
-        logger.info("  GET /mjr/am/releases (Added)")
+        if verbose_route_logs:
+            logger.info("  GET /mjr/am/releases (Added)")
     except Exception as e:
         logger.error(f"Failed to register releases routes: {e}")
 
     try:
         register_version_routes(routes)
-        logger.info("  GET /mjr/am/version (Added)")
-        logger.info("  GET /majoor/version (Legacy alias)")
+        if verbose_route_logs:
+            logger.info("  GET /mjr/am/version (Added)")
+            logger.info("  GET /majoor/version (Legacy alias)")
     except Exception as e:
         logger.error(f"Failed to register version route: {e}")
 
@@ -342,68 +430,45 @@ def register_all_routes() -> web.RouteTableDef:
     try:
         register_download_routes(routes)
         register_duplicates_routes(routes)
-        logger.info("  GET /mjr/am/download (Added)")
+        if verbose_route_logs:
+            logger.info("  GET /mjr/am/download (Added)")
     except Exception as e:
         logger.error(f"Failed to register download routes: {e}")
     # Vector / semantic search routes (CLIP)
     try:
         register_vector_search_routes(routes)
-        logger.info("  GET /mjr/am/vector/search (Added)")
-        logger.info("  GET /mjr/am/vector/similar/{asset_id} (Added)")
-        logger.info("  GET /mjr/am/vector/alignment/{asset_id} (Added)")
-        logger.info("  GET /mjr/am/vector/auto-tags/{asset_id} (Added)")
-        logger.info("  GET /mjr/am/vector/stats (Added)")
-        logger.info("  POST /mjr/am/vector/index/{asset_id} (Added)")
-        logger.info("  POST /mjr/am/vector/caption/{asset_id} (Added)")
-        logger.info("  POST /mjr/am/vector/suggest-collections (Added)")
+        if verbose_route_logs:
+            logger.info("  GET /mjr/am/vector/search (Added)")
+            logger.info("  GET /mjr/am/vector/similar/{asset_id} (Added)")
+            logger.info("  GET /mjr/am/vector/alignment/{asset_id} (Added)")
+            logger.info("  GET /mjr/am/vector/auto-tags/{asset_id} (Added)")
+            logger.info("  GET /mjr/am/vector/stats (Added)")
+            logger.info("  POST /mjr/am/vector/index/{asset_id} (Added)")
+            logger.info("  POST /mjr/am/vector/caption/{asset_id} (Added)")
+            logger.info("  POST /mjr/am/vector/suggest-collections (Added)")
     except Exception as e:
         logger.error(f"Failed to register vector search routes: {e}")
     try:
         register_plugin_routes(routes)
-        logger.info("  GET /mjr/am/plugins/list (Added)")
-        logger.info("  POST /mjr/am/plugins/{name}/enable (Added)")
-        logger.info("  POST /mjr/am/plugins/reload (Added)")
+        if verbose_route_logs:
+            logger.info("  GET /mjr/am/plugins/list (Added)")
+            logger.info("  POST /mjr/am/plugins/{name}/enable (Added)")
+            logger.info("  POST /mjr/am/plugins/reload (Added)")
     except Exception as e:
         logger.error(f"Failed to register plugin routes: {e}")
     try:
         register_hybrid_search_routes(routes)
-        logger.info("  GET /mjr/am/search/hybrid (Added)")
+        if verbose_route_logs:
+            logger.info("  GET /mjr/am/search/hybrid (Added)")
     except Exception as e:
         logger.error(f"Failed to register hybrid search routes: {e}")
     try:
         register_audit_routes(routes)
-        logger.info("  GET /mjr/am/audit (Added)")
+        if verbose_route_logs:
+            logger.info("  GET /mjr/am/audit (Added)")
     except Exception as e:
         logger.error(f"Failed to register audit routes: {e}")
-    logger.info("=" * 60)
-    logger.info("Routes registered:")
-    logger.info("  GET /mjr/am/health")
-    logger.info("  GET /mjr/am/health/counters")
-    logger.info("  GET /mjr/am/health/db")
-    logger.info("  GET /mjr/am/config")
-    logger.info("  GET /mjr/am/tools/status")
-    logger.info("  GET /mjr/am/metadata?type=<scope>&filename=<name>&subfolder=<sub>&root_id=<id>")
-    logger.info("  POST /mjr/am/scan")
-    logger.info("  POST /mjr/am/index-files")
-    logger.info("  POST /mjr/am/stage-to-input")
-    logger.info("  POST /mjr/am/open-in-folder")
-    logger.info("  GET /mjr/am/search?q=<query>")
-    logger.info("  GET /mjr/am/asset/{asset_id}")
-    logger.info("  POST /mjr/am/asset/rename")
-    logger.info("  POST /mjr/am/assets/delete")
-    logger.info("  POST /mjr/am/assets/rename")
-    logger.info("  GET /mjr/am/collections")
-    logger.info("  GET /mjr/am/date-histogram?month=YYYY-MM")
-    logger.info("  POST /mjr/am/batch-zip")
-    logger.info("  GET /mjr/am/batch-zip/{token}")
-    logger.info("  GET /mjr/am/viewer/info?asset_id=<id>")
-    logger.info("  POST /mjr/am/db/optimize")
-    logger.info("  POST /mjr/am/db/cleanup-case-duplicates")
-    logger.info("  POST /mjr/am/db/force-delete")
-    logger.info("  GET /mjr/am/download")
-    logger.info("  GET /mjr/am/releases")
-    logger.info("  GET /mjr/am/duplicates/alerts")
-    logger.info("=" * 60)
+    _log_route_registration_summary(verbose_route_logs)
 
     _ROUTES_REGISTERED = True
     return routes

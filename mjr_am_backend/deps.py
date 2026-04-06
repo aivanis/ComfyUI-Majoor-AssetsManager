@@ -34,6 +34,7 @@ from .features.runtime import apply_startup_settings
 from .features.tags import RatingTagsSyncWorker
 from .settings import AppSettings
 from .shared import Result, get_logger, log_success
+from .startup_logging import startup_log_info, startup_log_success
 
 logger = get_logger(__name__)
 
@@ -65,7 +66,7 @@ def _resolve_vectors_db_path(db_path: str) -> str:
 
 
 def _init_db_or_error(db_path: str) -> Result[Sqlite]:
-    logger.info(f"Initializing database: {db_path}")
+    startup_log_info(logger, "Initializing database: %s", db_path, db_path=db_path)
     try:
         vectors_db = _resolve_vectors_db_path(db_path)
         return Result.Ok(
@@ -98,11 +99,11 @@ def _init_tools_and_settings(db: Sqlite) -> tuple[ExifTool, FFProbe, AppSettings
 
 def _log_tool_availability(exiftool: ExifTool, ffprobe: FFProbe) -> None:
     if exiftool.is_available():
-        log_success(logger, "ExifTool is available")
+        startup_log_success(logger, "ExifTool is available")
     else:
         logger.warning("ExifTool not found - metadata extraction will be limited")
     if ffprobe.is_available():
-        log_success(logger, "ffprobe is available")
+        startup_log_success(logger, "ffprobe is available")
     else:
         logger.warning("ffprobe not found - video metadata will be limited")
 
@@ -129,7 +130,7 @@ def _build_services_dict(
     # ── Vector / multimodal search (opt-in) ───────────────────────────
     if is_vector_search_enabled():
         try:
-            log_success(logger, "SigLIP2/X-CLIP vector search enabled (lazy init)")
+            startup_log_success(logger, "SigLIP2/X-CLIP vector search enabled (lazy init)")
         except Exception as exc:
             logger.warning("Vector search disabled: %s", exc)
     return services
@@ -156,7 +157,7 @@ async def _attach_watcher_if_enabled(services: dict, index_service: IndexService
     try:
         watcher = await _create_watcher(index_service)
         services["watcher"] = watcher
-        log_success(logger, "File watcher enabled")
+        startup_log_success(logger, "File watcher enabled")
     except Exception as exc:
         logger.warning("File watcher disabled: %s", exc)
 
@@ -171,7 +172,7 @@ async def build_services(db_path: str | None = None) -> Result[dict]:
     Returns:
         Result[dict] of service instances
     """
-    logger.info("Building services...")
+    startup_log_info(logger, "Building services...", db_path=_resolve_db_path(db_path))
     try:
         initialize_directories()
     except Exception as exc:
@@ -243,7 +244,7 @@ async def build_services(db_path: str | None = None) -> Result[dict]:
     _attach_rating_tags_sync_worker(services, exiftool)
     await _attach_watcher_if_enabled(services, index_service)
 
-    log_success(logger, "All services initialized")
+    startup_log_success(logger, "All services initialized")
     return Result.Ok(services)
 
 
