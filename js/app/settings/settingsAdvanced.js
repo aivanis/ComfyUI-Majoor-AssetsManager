@@ -48,6 +48,220 @@ const SETTINGS_CATEGORY = "Majoor Assets Manager";
 export function registerAdvancedSettings(safeAddSetting, settings, notifyApplied, app) {
     const cat = (section, label) => [SETTINGS_CATEGORY, section, label];
 
+    // ── OutputDirectory ───────────────────────────────────────────────────
+
+    let _outputDirCommittedValue = String(settings.paths?.outputDirectory || "");
+    let _outputDirSaveTimer = null;
+    let _outputDirSaveSeq = 0;
+    let _outputDirSaveAbort = null;
+
+    safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Paths.OutputDirectory`,
+        category: cat(t("cat.advanced"), "Paths / Output"),
+        name: "Majoor: Generation Output Directory",
+        tooltip:
+            "Override the ComfyUI generation output directory used by Majoor (equivalent to --output-directory). Leave empty to keep the current backend default.",
+        type: "text",
+        defaultValue: String(settings.paths?.outputDirectory || ""),
+        attrs: {
+            placeholder: "D:\\\\____COMFY_OUTPUTS",
+        },
+        onChange: async (value) => {
+            const next = String(value || "").trim();
+            settings.paths = settings.paths || {};
+            settings.paths.outputDirectory = next;
+            saveMajoorSettings(settings);
+
+            // The Comfy settings text input can fire on each keystroke.
+            // Debounce + cancel in-flight requests to prevent backend/UI stalls.
+            try {
+                if (_outputDirSaveTimer) {
+                    clearTimeout(_outputDirSaveTimer);
+                    _outputDirSaveTimer = null;
+                }
+            } catch (e) {
+                console.debug?.(e);
+            }
+            _outputDirSaveTimer = setTimeout(async () => {
+                _outputDirSaveTimer = null;
+                const seq = ++_outputDirSaveSeq;
+                try {
+                    _outputDirSaveAbort?.abort?.();
+                } catch (e) {
+                    console.debug?.(e);
+                }
+                _outputDirSaveAbort =
+                    typeof AbortController !== "undefined" ? new AbortController() : null;
+                try {
+                    const res = await setOutputDirectorySetting(
+                        next,
+                        _outputDirSaveAbort ? { signal: _outputDirSaveAbort.signal } : {},
+                    );
+                    if (seq !== _outputDirSaveSeq) return;
+                    if (!res?.ok) {
+                        throw new Error(
+                            res?.error ||
+                                t(
+                                    "toast.failedSetOutputDirectory",
+                                    "Failed to set output directory",
+                                ),
+                        );
+                    }
+                    const serverValue = String(res?.data?.output_directory || next).trim();
+                    settings.paths.outputDirectory = serverValue;
+                    _outputDirCommittedValue = serverValue;
+                    saveMajoorSettings(settings);
+                    notifyApplied("paths.outputDirectory");
+                } catch (error) {
+                    if (seq !== _outputDirSaveSeq) return;
+                    const aborted =
+                        String(error?.name || "") === "AbortError" ||
+                        String(error?.code || "") === "ABORTED";
+                    if (aborted) return;
+                    settings.paths.outputDirectory = _outputDirCommittedValue;
+                    saveMajoorSettings(settings);
+                    notifyApplied("paths.outputDirectory");
+                    comfyToast(
+                        error?.message ||
+                            t("toast.failedSetOutputDirectory", "Failed to set output directory"),
+                        "error",
+                    );
+                }
+            }, 700);
+        },
+    });
+
+    try {
+        getOutputDirectorySetting()
+            .then((res) => {
+                if (!res?.ok) return;
+                const serverValue = String(res?.data?.output_directory || "").trim();
+                settings.paths = settings.paths || {};
+                if (settings.paths.outputDirectory !== serverValue) {
+                    settings.paths.outputDirectory = serverValue;
+                    _outputDirCommittedValue = serverValue;
+                    saveMajoorSettings(settings);
+                    notifyApplied("paths.outputDirectory");
+                }
+            })
+            .catch(() => {});
+    } catch (e) {
+        console.debug?.(e);
+    }
+
+    // ── IndexDirectory ────────────────────────────────────────────────────
+
+    let _indexDirCommittedValue = String(settings.paths?.indexDirectory || "");
+    let _indexDirSaveTimer = null;
+    let _indexDirSaveSeq = 0;
+    let _indexDirSaveAbort = null;
+
+    safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Paths.IndexDirectory`,
+        category: cat(t("cat.advanced"), "Paths / Index"),
+        name: "Majoor: Index Database Directory",
+        tooltip:
+            "Override the Majoor index database directory. Use this to keep the SQLite index on a different local disk. Requires restart.",
+        type: "text",
+        defaultValue: String(settings.paths?.indexDirectory || ""),
+        attrs: {
+            placeholder: "D:\\MajoorIndex",
+        },
+        onChange: async (value) => {
+            const next = String(value || "").trim();
+            settings.paths = settings.paths || {};
+            settings.paths.indexDirectory = next;
+            saveMajoorSettings(settings);
+
+            try {
+                if (_indexDirSaveTimer) {
+                    clearTimeout(_indexDirSaveTimer);
+                    _indexDirSaveTimer = null;
+                }
+            } catch (e) {
+                console.debug?.(e);
+            }
+
+            _indexDirSaveTimer = setTimeout(async () => {
+                _indexDirSaveTimer = null;
+                const seq = ++_indexDirSaveSeq;
+                try {
+                    _indexDirSaveAbort?.abort?.();
+                } catch (e) {
+                    console.debug?.(e);
+                }
+                _indexDirSaveAbort =
+                    typeof AbortController !== "undefined" ? new AbortController() : null;
+                try {
+                    const res = await setIndexDirectorySetting(
+                        next,
+                        _indexDirSaveAbort ? { signal: _indexDirSaveAbort.signal } : {},
+                    );
+                    if (seq !== _indexDirSaveSeq) return;
+                    if (!res?.ok) {
+                        throw new Error(
+                            res?.error ||
+                                t("toast.failedSetIndexDirectory", "Failed to set index directory"),
+                        );
+                    }
+                    const serverValue = String(res?.data?.index_directory || next).trim();
+                    const changed = serverValue !== _indexDirCommittedValue;
+                    settings.paths.indexDirectory = serverValue;
+                    _indexDirCommittedValue = serverValue;
+                    saveMajoorSettings(settings);
+                    notifyApplied("paths.indexDirectory");
+                    if (changed) {
+                        comfyToast(
+                            t(
+                                "toast.indexDirectorySavedRestart",
+                                "Index directory saved. Restart ComfyUI to apply.",
+                            ),
+                            "success",
+                            undefined,
+                            {
+                                history: {
+                                    trackId: "settings:index-directory-saved",
+                                },
+                            },
+                        );
+                    }
+                } catch (error) {
+                    if (seq !== _indexDirSaveSeq) return;
+                    const aborted =
+                        String(error?.name || "") === "AbortError" ||
+                        String(error?.code || "") === "ABORTED";
+                    if (aborted) return;
+                    settings.paths.indexDirectory = _indexDirCommittedValue;
+                    saveMajoorSettings(settings);
+                    notifyApplied("paths.indexDirectory");
+                    comfyToast(
+                        error?.message ||
+                            t("toast.failedSetIndexDirectory", "Failed to set index directory"),
+                        "error",
+                    );
+                }
+            }, 700);
+        },
+    });
+
+    try {
+        getIndexDirectorySetting()
+            .then((res) => {
+                if (!res?.ok) return;
+                const serverValue = String(res?.data?.index_directory || "").trim();
+                settings.paths = settings.paths || {};
+                if (settings.paths.indexDirectory !== serverValue) {
+                    settings.paths.indexDirectory = serverValue;
+                    _indexDirCommittedValue = serverValue;
+                    saveMajoorSettings(settings);
+                    notifyApplied("paths.indexDirectory");
+                }
+            })
+            .catch(() => {});
+    } catch (e) {
+        console.debug?.(e);
+    }
+
     // ── Language ──────────────────────────────────────────────────────────
 
     const languages = getSupportedLanguages();
@@ -220,211 +434,6 @@ export function registerAdvancedSettings(safeAddSetting, settings, notifyApplied
                 if (changed) {
                     saveMajoorSettings(settings);
                     notifyApplied("metadataFallback");
-                }
-            })
-            .catch(() => {});
-    } catch (e) {
-        console.debug?.(e);
-    }
-
-    // ── OutputDirectory ───────────────────────────────────────────────────
-
-    let _outputDirCommittedValue = String(settings.paths?.outputDirectory || "");
-    let _outputDirSaveTimer = null;
-    let _outputDirSaveSeq = 0;
-    let _outputDirSaveAbort = null;
-
-    safeAddSetting({
-        id: `${SETTINGS_PREFIX}.Paths.OutputDirectory`,
-        category: cat(t("cat.advanced"), "Paths"),
-        name: "Majoor: Output Directory Override",
-        tooltip:
-            "Override ComfyUI output directory used by Majoor (equivalent to --output-directory). Leave empty to keep current backend default.",
-        type: "text",
-        defaultValue: String(settings.paths?.outputDirectory || ""),
-        attrs: {
-            placeholder: "D:\\\\____COMFY_OUTPUTS",
-        },
-        onChange: async (value) => {
-            const next = String(value || "").trim();
-            settings.paths = settings.paths || {};
-            settings.paths.outputDirectory = next;
-            saveMajoorSettings(settings);
-
-            // The Comfy settings text input can fire on each keystroke.
-            // Debounce + cancel in-flight requests to prevent backend/UI stalls.
-            try {
-                if (_outputDirSaveTimer) {
-                    clearTimeout(_outputDirSaveTimer);
-                    _outputDirSaveTimer = null;
-                }
-            } catch (e) {
-                console.debug?.(e);
-            }
-            _outputDirSaveTimer = setTimeout(async () => {
-                _outputDirSaveTimer = null;
-                const seq = ++_outputDirSaveSeq;
-                try {
-                    _outputDirSaveAbort?.abort?.();
-                } catch (e) {
-                    console.debug?.(e);
-                }
-                _outputDirSaveAbort =
-                    typeof AbortController !== "undefined" ? new AbortController() : null;
-                try {
-                    const res = await setOutputDirectorySetting(
-                        next,
-                        _outputDirSaveAbort ? { signal: _outputDirSaveAbort.signal } : {},
-                    );
-                    if (seq !== _outputDirSaveSeq) return;
-                    if (!res?.ok) {
-                        throw new Error(
-                            res?.error ||
-                                t(
-                                    "toast.failedSetOutputDirectory",
-                                    "Failed to set output directory",
-                                ),
-                        );
-                    }
-                    const serverValue = String(res?.data?.output_directory || next).trim();
-                    settings.paths.outputDirectory = serverValue;
-                    _outputDirCommittedValue = serverValue;
-                    saveMajoorSettings(settings);
-                    notifyApplied("paths.outputDirectory");
-                } catch (error) {
-                    if (seq !== _outputDirSaveSeq) return;
-                    const aborted =
-                        String(error?.name || "") === "AbortError" ||
-                        String(error?.code || "") === "ABORTED";
-                    if (aborted) return;
-                    settings.paths.outputDirectory = _outputDirCommittedValue;
-                    saveMajoorSettings(settings);
-                    notifyApplied("paths.outputDirectory");
-                    comfyToast(
-                        error?.message ||
-                            t("toast.failedSetOutputDirectory", "Failed to set output directory"),
-                        "error",
-                    );
-                }
-            }, 700);
-        },
-    });
-
-    try {
-        getOutputDirectorySetting()
-            .then((res) => {
-                if (!res?.ok) return;
-                const serverValue = String(res?.data?.output_directory || "").trim();
-                settings.paths = settings.paths || {};
-                if (settings.paths.outputDirectory !== serverValue) {
-                    settings.paths.outputDirectory = serverValue;
-                    _outputDirCommittedValue = serverValue;
-                    saveMajoorSettings(settings);
-                    notifyApplied("paths.outputDirectory");
-                }
-            })
-            .catch(() => {});
-    } catch (e) {
-        console.debug?.(e);
-    }
-
-    // ── IndexDirectory ────────────────────────────────────────────────────
-
-    let _indexDirCommittedValue = String(settings.paths?.indexDirectory || "");
-    let _indexDirSaveTimer = null;
-    let _indexDirSaveSeq = 0;
-    let _indexDirSaveAbort = null;
-
-    safeAddSetting({
-        id: `${SETTINGS_PREFIX}.Paths.IndexDirectory`,
-        category: cat(t("cat.advanced"), "Paths"),
-        name: "Majoor: Index Directory",
-        tooltip:
-            "Override the Majoor index directory location. Use this to keep the SQLite index on a different local disk. Requires restart.",
-        type: "text",
-        defaultValue: String(settings.paths?.indexDirectory || ""),
-        attrs: {
-            placeholder: "D:\\MajoorIndex",
-        },
-        onChange: async (value) => {
-            const next = String(value || "").trim();
-            settings.paths = settings.paths || {};
-            settings.paths.indexDirectory = next;
-            saveMajoorSettings(settings);
-
-            try {
-                if (_indexDirSaveTimer) {
-                    clearTimeout(_indexDirSaveTimer);
-                    _indexDirSaveTimer = null;
-                }
-            } catch (e) {
-                console.debug?.(e);
-            }
-
-            _indexDirSaveTimer = setTimeout(async () => {
-                _indexDirSaveTimer = null;
-                const seq = ++_indexDirSaveSeq;
-                try {
-                    _indexDirSaveAbort?.abort?.();
-                } catch (e) {
-                    console.debug?.(e);
-                }
-                _indexDirSaveAbort =
-                    typeof AbortController !== "undefined" ? new AbortController() : null;
-                try {
-                    const res = await setIndexDirectorySetting(
-                        next,
-                        _indexDirSaveAbort ? { signal: _indexDirSaveAbort.signal } : {},
-                    );
-                    if (seq !== _indexDirSaveSeq) return;
-                    if (!res?.ok) {
-                        throw new Error(
-                            res?.error ||
-                                t("toast.failedSetIndexDirectory", "Failed to set index directory"),
-                        );
-                    }
-                    const serverValue = String(res?.data?.index_directory || next).trim();
-                    settings.paths.indexDirectory = serverValue;
-                    _indexDirCommittedValue = serverValue;
-                    saveMajoorSettings(settings);
-                    notifyApplied("paths.indexDirectory");
-                    comfyToast(
-                        t(
-                            "toast.indexDirectorySavedRestart",
-                            "Index directory saved. Restart ComfyUI to apply.",
-                        ),
-                        "success",
-                    );
-                } catch (error) {
-                    if (seq !== _indexDirSaveSeq) return;
-                    const aborted =
-                        String(error?.name || "") === "AbortError" ||
-                        String(error?.code || "") === "ABORTED";
-                    if (aborted) return;
-                    settings.paths.indexDirectory = _indexDirCommittedValue;
-                    saveMajoorSettings(settings);
-                    notifyApplied("paths.indexDirectory");
-                    comfyToast(
-                        error?.message ||
-                            t("toast.failedSetIndexDirectory", "Failed to set index directory"),
-                        "error",
-                    );
-                }
-            }, 700);
-        },
-    });
-
-    try {
-        getIndexDirectorySetting()
-            .then((res) => {
-                if (!res?.ok) return;
-                const serverValue = String(res?.data?.index_directory || "").trim();
-                settings.paths = settings.paths || {};
-                if (settings.paths.indexDirectory !== serverValue) {
-                    settings.paths.indexDirectory = serverValue;
-                    _indexDirCommittedValue = serverValue;
-                    saveMajoorSettings(settings);
-                    notifyApplied("paths.indexDirectory");
                 }
             })
             .catch(() => {});

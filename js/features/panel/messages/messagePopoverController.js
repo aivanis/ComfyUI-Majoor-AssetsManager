@@ -55,7 +55,12 @@ function resolveSafeActionUrl(value) {
     if (!raw) return "";
     try {
         const baseHref = String(globalThis?.window?.location?.href || "http://127.0.0.1/");
-        const url = new URL(raw, baseHref);
+        const normalized = raw.replace(/\\/g, "/");
+        const docsMatch = normalized.match(/(?:^|\/)(docs\/[^?#]+\.md)([?#].*)?$/i);
+        const resolvedRaw = docsMatch
+            ? `/mjr/am/${docsMatch[1]}${docsMatch[2] || ""}`
+            : raw;
+        const url = new URL(resolvedRaw, baseHref);
         const protocol = String(url.protocol || "").toLowerCase();
         return protocol === "http:" || protocol === "https:" ? url.href : "";
     } catch {

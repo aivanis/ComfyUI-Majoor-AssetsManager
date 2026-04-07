@@ -200,6 +200,16 @@ export MAJOOR_MEDIA_PROBE_BACKEND="auto"
 
 ```
 
+### UI Output Directory Override
+
+If you prefer not to change shell startup scripts, you can override the generation output folder directly from the ComfyUI settings UI:
+
+1. Open Settings → **Majoor Assets Manager** → **Advanced** and search for `path` if needed.
+2. Edit **Generation Output Directory**.
+3. Save the new directory path. Leave the field empty to fall back to the current backend default.
+
+![Output directory override in Majoor settings](images/output-directory-override-ui.svg)
+
 ### Windows Batch File Example
 Create a batch file to set environment variables and start ComfyUI:
 
