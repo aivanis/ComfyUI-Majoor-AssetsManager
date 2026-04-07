@@ -21,10 +21,15 @@ By default the index lives next to your assets at `<output>/_mjr_index/`. You ca
 
 **Option 1 — UI (recommended, survives reinstalls):**
 
-1. Open Majoor Settings → Paths → **Majoor: Index Directory**.
-2. Enter the full path to the desired directory (it will be created if it does not exist).
-3. Save. A toast confirms the change and reminds you to restart ComfyUI.
-4. Restart ComfyUI. A fresh scan runs on startup.
+1. Open Settings → **Majoor Assets Manager** → **Advanced** and search for `path` if needed.
+2. Locate **Index Database Directory**.
+3. Enter the full path to the desired directory (it will be created if it does not exist).
+4. Save. A toast confirms the change and reminds you to restart ComfyUI.
+5. Restart ComfyUI. A fresh scan runs on startup.
+
+![Index directory override in Majoor settings](images/index-directory-override-ui.svg)
+
+The same section also exposes **Generation Output Directory** when you need to override the ComfyUI output folder independently from the database location.
 
 The UI persists the path in a sidecar file `.mjr_index_directory_override` next to the extension root. This file takes precedence over the default on every startup.
 
