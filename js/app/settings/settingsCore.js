@@ -162,6 +162,8 @@ export const DEFAULT_SETTINGS = {
         renderBypassState: true,
         renderErrorState: true,
         showViewport: true,
+        showNodeLabels: false,
+        size: "comfortable",
     },
     ui: {
         cardHoverColor: APP_DEFAULTS.UI_CARD_HOVER_COLOR,

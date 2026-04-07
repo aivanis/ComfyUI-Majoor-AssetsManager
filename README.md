@@ -36,6 +36,7 @@ Useful links:
 - 📖 User guide: `user_guide.html`
 - 📝 Changelog: [`CHANGELOG.md`](CHANGELOG.md)
 - 📚 Documentation index: [`docs/DOCUMENTATION_INDEX.md`](docs/DOCUMENTATION_INDEX.md)
+- 🔐 Privacy / Offline guide: [`docs/PRIVACY_OFFLINE.md`](docs/PRIVACY_OFFLINE.md)
 - 🔧 API reference: [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md)
 - 🤖 **AI Features Guide**: [`docs/AI_FEATURES.md`](docs/AI_FEATURES.md)
 
@@ -52,6 +53,7 @@ Useful links:
 - [Hotkeys & Shortcuts](#hotkeys--shortcuts)
 - [Advanced Features](#advanced-features)
 - [AI Features (How to Use)](#ai-features-how-to-use)
+- [Privacy And Offline Use](#privacy-and-offline-use)
 - [Debug: Reset Index / Delete DB](#debug-reset-index--delete-db)
 - [Backfill Warning (Important)](#backfill-warning-important)
 - [Configuration](#configuration)
@@ -492,6 +494,35 @@ Models are downloaded automatically on first use and cached locally.
 - ✅ First backfill can take time (5-30 min for 1000 assets)
 - ✅ GPU acceleration recommended for large libraries
 
+---
+
+## Privacy And Offline Use
+
+### Short version
+
+- AI inference is intended to run locally on your machine.
+- Images and prompts are not uploaded to a hosted cloud inference API for semantic search, captions, similarity, or prompt alignment.
+- Internet access is mainly needed for the initial HuggingFace model download.
+- Once required models are cached locally, AI features can work offline.
+- No usage telemetry is intentionally sent to the developer.
+
+### What uses the network
+
+- **Model download**: AI models are downloaded from HuggingFace on first use and then cached locally.
+- **Optional HuggingFace token**: used only to improve HuggingFace Hub download access and rate limits.
+- **Remote access security**: the Majoor API token protects remote write access when ComfyUI is exposed on a network.
+
+### What the tokens mean
+
+- **HuggingFace Token**: optional token for model downloads from HuggingFace Hub. It is not a cloud inference key.
+- **Majoor: API Token**: token for securing remote write operations to the local Majoor backend. It is not used to send prompts or images to an external AI service.
+
+### Important nuance
+
+The privacy claim here is specifically about where inference runs and whether your assets or prompts are uploaded for AI processing. Model loading still relies on local HuggingFace/Transformers packages and downloaded model files.
+
+See [docs/PRIVACY_OFFLINE.md](docs/PRIVACY_OFFLINE.md), [docs/AI_FEATURES.md](docs/AI_FEATURES.md), and [docs/SECURITY_ENV_VARS.md](docs/SECURITY_ENV_VARS.md) for the detailed version.
+
 ### Configuration
 
 ```bash
@@ -830,6 +861,7 @@ See [`docs/TESTING.md`](docs/TESTING.md) and [`tests/README.md`](tests/README.md
 
 ### Documentation
 - 📚 [Documentation Index](docs/DOCUMENTATION_INDEX.md)
+- 🔐 [Privacy / Offline Guide](docs/PRIVACY_OFFLINE.md)
 - 📖 [User Guide (HTML)](user_guide.html)
 - 🔧 [API Reference](docs/API_REFERENCE.md)
 - 🛠️ [Installation Guide](docs/INSTALLATION.md)
@@ -845,8 +877,12 @@ See [`docs/TESTING.md`](docs/TESTING.md) and [`tests/README.md`](tests/README.md
 
 ### Community
 - 🐛 [Report Issues](https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/issues)
-- 💬 [Discussions](https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/discussions)
+- 💡 Use GitHub Issues for bug reports, support requests, and security/privacy questions
 - ☕ [Support the Developer](https://ko-fi.com/majoorwaldi)
+
+### Notes
+- GitHub Discussions may not be enabled or available at all times for this repository.
+- If the Discussions link is unavailable, please open an Issue instead.
 
 ### Troubleshooting Resources
 1. Check ComfyUI console for error messages

@@ -35,6 +35,15 @@ Majoor now exposes the main remote write controls directly in Settings, includin
 
 For the common trusted-LAN case, `Recommended Remote LAN Setup` is the intended one-click path. It generates a server-side token if needed, applies the recommended flags, and authorizes the current browser session immediately.
 
+### Token Types And What They Mean
+
+There are two unrelated token concepts in the UI:
+
+- **Majoor: API Token**: protects remote write access to the local Majoor backend.
+- **HuggingFace Token**: optional token used for downloading AI models from HuggingFace Hub with better rate limits.
+
+The HuggingFace token is **not** a cloud inference API key. Its presence does not mean prompts or images are sent to an external hosted AI service.
+
 ### Browser Session Vs Server Token State
 Not all security values live in the same place:
 
@@ -158,6 +167,13 @@ Use that line as the quickest confirmation that the current browser session can 
 - **Recommendation**: Schedule during low-usage periods
 
 ## Advanced Configuration
+
+### AI Privacy And Offline Summary
+
+- AI inference is intended to run locally after models are available on disk.
+- First model bootstrap may require internet access to download model files from HuggingFace.
+- After download and cache, AI features can run offline.
+- Non-AI Majoor features do not require HuggingFace model downloads.
 
 ### Environment Variables (Backend)
 

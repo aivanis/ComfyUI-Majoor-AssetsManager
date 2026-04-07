@@ -10,6 +10,7 @@ export function drawWorkflowMinimap(canvas, workflow, options = null) {
         renderBypassState: true,
         renderErrorState: true,
         showViewport: true,
+        showNodeLabels: false,
         ...(options && typeof options === "object" ? options : {}),
     };
 
@@ -130,6 +131,9 @@ export function drawWorkflowMinimap(canvas, workflow, options = null) {
             stroke: settings.nodeColors ? n?.color || n?.bgcolor || null : null,
             bypassed,
             errored,
+            label: String(n?.title || n?.type || n?.comfyClass || n?.class_type || nodeId || "")
+                .replace(/\s+/g, " ")
+                .trim(),
         });
         if (nodeId) nodesById.set(nodeId, rects[rects.length - 1]);
     }
@@ -311,6 +315,27 @@ export function drawWorkflowMinimap(canvas, workflow, options = null) {
             ctx.strokeStyle = "rgba(244,67,54,0.95)";
             ctx.lineWidth = 1.5;
             ctx.strokeRect(x - 0.5, y - 0.5, w + 1, h + 1);
+        }
+
+        if (isNode && settings.showNodeLabels && r.label && w >= 42 && h >= 12) {
+            const fontSize = Math.max(8, Math.min(11, Math.floor(h * 0.28)));
+            const textY = y + fontSize + 2;
+            const maxTextWidth = Math.max(20, w - 6);
+            let label = r.label;
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(x + 1, y + 1, w - 2, h - 2);
+            ctx.clip();
+            ctx.font = `600 ${fontSize}px sans-serif`;
+            while (label.length > 3 && ctx.measureText(`${label}...`).width > maxTextWidth) {
+                label = label.slice(0, -1);
+            }
+            const finalText = label === r.label ? label : `${label}...`;
+            ctx.fillStyle = "rgba(255,255,255,0.92)";
+            ctx.shadowColor = "rgba(0,0,0,0.5)";
+            ctx.shadowBlur = 2;
+            ctx.fillText(finalText, x + 3, textY, maxTextWidth);
+            ctx.restore();
         }
     };
 

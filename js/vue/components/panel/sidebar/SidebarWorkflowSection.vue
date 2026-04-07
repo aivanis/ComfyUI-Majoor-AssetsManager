@@ -16,7 +16,15 @@ const DEFAULT_SETTINGS = Object.freeze({
     renderBypassState: true,
     renderErrorState: true,
     showViewport: true,
+    showNodeLabels: false,
+    size: "comfortable",
 });
+
+const SIZE_OPTIONS = Object.freeze([
+    { key: "compact", label: "Compact", height: 120 },
+    { key: "comfortable", label: "Comfort", height: 160 },
+    { key: "expanded", label: "Expanded", height: 220 },
+]);
 
 const canvasRef = ref(null);
 const showTools = ref(false);
@@ -154,7 +162,44 @@ const rawWorkflowJson = computed(() =>
     workflow.value ? JSON.stringify(workflow.value, null, 2) : "",
 );
 
+const workflowStats = computed(() => {
+    const current = workflow.value;
+    if (!current) {
+        return {
+            nodes: 0,
+            links: 0,
+            groups: 0,
+            source: "",
+        };
+    }
+    const nodes = Array.isArray(current?.nodes) ? current.nodes.length : 0;
+    const links =
+        (Array.isArray(current?.links) && current.links.length) ||
+        (Array.isArray(current?.extra?.links) && current.extra.links.length) ||
+        0;
+    const groups =
+        (Array.isArray(current?.groups) && current.groups.length) ||
+        (Array.isArray(current?.extra?.groups) && current.extra.groups.length) ||
+        (Array.isArray(current?.extra?.groupNodes) && current.extra.groupNodes.length) ||
+        (Array.isArray(current?.extra?.group_nodes) && current.extra.group_nodes.length) ||
+        0;
+    return {
+        nodes,
+        links,
+        groups,
+        source: current?.extra?.synthetic ? "Synthetic" : "Embedded",
+    };
+});
+
+const currentSizeOption = computed(() => {
+    const currentKey = String(minimapSettings.value?.size || "comfortable");
+    return SIZE_OPTIONS.find((item) => item.key === currentKey) || SIZE_OPTIONS[1];
+});
+
+const canvasHeight = computed(() => `${currentSizeOption.value.height}px`);
+
 const toggleOptions = computed(() => [
+    { key: "showNodeLabels", label: "Node Labels", iconClass: "pi pi-tag" },
     { key: "nodeColors", label: "Node Colors", iconClass: "pi pi-palette" },
     { key: "showLinks", label: "Show Links", iconClass: "pi pi-share-alt" },
     { key: "showGroups", label: "Show Frames/Groups", iconClass: "pi pi-th-large" },
@@ -186,6 +231,15 @@ function toggleSetting(key) {
     minimapSettings.value = {
         ...minimapSettings.value,
         [key]: !minimapSettings.value?.[key],
+    };
+    persistWorkflowMinimapSettings(minimapSettings.value);
+}
+
+function setMinimapSize(sizeKey) {
+    if (!SIZE_OPTIONS.some((item) => item.key === sizeKey)) return;
+    minimapSettings.value = {
+        ...minimapSettings.value,
+        size: sizeKey,
     };
     persistWorkflowMinimapSettings(minimapSettings.value);
 }
@@ -232,23 +286,62 @@ onBeforeUnmount(() => {
             ComfyUI Workflow
         </div>
 
-        <div
-            style="display:flex;gap:8px;margin-bottom:8px;font-size:12px"
-        >
+        <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px">
             <div
-                style="color:var(--mjr-muted, rgba(255,255,255,0.65));min-width:100px;font-weight:500"
+                style="padding:4px 9px;border-radius:999px;background:rgba(33,150,243,0.14);border:1px solid rgba(33,150,243,0.30);font-size:11px;font-weight:700;color:#90CAF9;text-transform:uppercase;letter-spacing:0.4px"
             >
-                Status
-            </div>
-            <div style="color:var(--fg-color, #eaeaea);flex:1">
                 {{ statusLabel }}
+            </div>
+            <div
+                v-if="workflowStats.source"
+                style="padding:4px 9px;border-radius:999px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.12);font-size:11px;font-weight:600;color:rgba(255,255,255,0.82)"
+            >
+                {{ workflowStats.source }}
+            </div>
+        </div>
+
+        <div
+            style="display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:8px;margin-bottom:12px"
+        >
+            <div style="padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10)">
+                <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.4px">Nodes</div>
+                <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.94);margin-top:2px">{{ workflowStats.nodes }}</div>
+            </div>
+            <div style="padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10)">
+                <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.4px">Links</div>
+                <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.94);margin-top:2px">{{ workflowStats.links }}</div>
+            </div>
+            <div style="padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10)">
+                <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.4px">Groups</div>
+                <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.94);margin-top:2px">{{ workflowStats.groups }}</div>
             </div>
         </div>
 
         <div
             style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px"
         >
-            <div style="flex:1" />
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                <button
+                    v-for="option in SIZE_OPTIONS"
+                    :key="option.key"
+                    type="button"
+                    :title="`${option.label} minimap`"
+                    :style="{
+                        appearance: 'none',
+                        border: minimapSettings.size === option.key ? '1px solid rgba(33,150,243,0.55)' : '1px solid rgba(255,255,255,0.12)',
+                        borderRadius: '999px',
+                        padding: '4px 10px',
+                        background: minimapSettings.size === option.key ? 'rgba(33,150,243,0.18)' : 'rgba(255,255,255,0.04)',
+                        color: minimapSettings.size === option.key ? '#90CAF9' : 'rgba(255,255,255,0.78)',
+                        fontSize: '11px',
+                        fontWeight: minimapSettings.size === option.key ? '700' : '600',
+                        cursor: 'pointer',
+                    }"
+                    @click="setMinimapSize(option.key)"
+                >
+                    {{ option.label }}
+                </button>
+            </div>
             <button
                 type="button"
                 class="mjr-btn mjr-icon-btn"
@@ -261,51 +354,78 @@ onBeforeUnmount(() => {
         </div>
 
         <div
-            style="display:flex;gap:10px;align-items:stretch;margin-top:10px"
+            v-if="showTools"
+            style="display:grid;grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));gap:8px;align-items:stretch;margin-top:10px;margin-bottom:10px"
         >
-            <div
-                v-if="showTools"
-                style="width:190px;flex:0 0 auto;border-radius:10px;padding:10px;background:rgba(0,0,0,0.20);border:1px solid var(--mjr-border, rgba(255,255,255,0.12))"
+            <button
+                v-for="option in toggleOptions"
+                :key="option.key"
+                type="button"
+                :style="{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    padding: '9px 10px',
+                    borderRadius: '10px',
+                    border: minimapSettings?.[option.key] ? '1px solid rgba(76,175,80,0.40)' : '1px solid rgba(255,255,255,0.12)',
+                    background: minimapSettings?.[option.key] ? 'rgba(76,175,80,0.10)' : 'rgba(255,255,255,0.04)',
+                    cursor: 'pointer',
+                    color: 'rgba(255,255,255,0.92)',
+                    textAlign: 'left',
+                }"
+                @click="toggleSetting(option.key)"
             >
-                <button
-                    v-for="option in toggleOptions"
-                    :key="option.key"
-                    type="button"
-                    style="width:100%;display:flex;align-items:center;gap:10px;padding:8px 8px;border-radius:10px;border:1px solid transparent;background:transparent;cursor:pointer;color:rgba(255,255,255,0.92);text-align:left"
-                    @click="toggleSetting(option.key)"
+                <span
+                    :style="{
+                        width: '22px',
+                        height: '22px',
+                        borderRadius: '6px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        background: minimapSettings?.[option.key] ? 'rgba(76,175,80,0.95)' : 'rgba(255,255,255,0.08)',
+                        border: minimapSettings?.[option.key] ? '1px solid rgba(76,175,80,0.35)' : '1px solid rgba(255,255,255,0.12)',
+                        flex: '0 0 auto',
+                    }"
                 >
-                    <span
-                        :style="{
-                            width: '22px',
-                            height: '22px',
-                            borderRadius: '6px',
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: minimapSettings?.[option.key] ? 'rgba(76,175,80,0.95)' : 'rgba(255,255,255,0.08)',
-                            border: minimapSettings?.[option.key] ? '1px solid rgba(76,175,80,0.35)' : '1px solid rgba(255,255,255,0.12)',
-                            flex: '0 0 auto',
-                        }"
-                    >
-                        <i
-                            class="pi pi-check"
-                            :style="{ fontSize: '12px', opacity: minimapSettings?.[option.key] ? '1' : '0' }"
-                        />
-                    </span>
                     <i
-                        :class="option.iconClass"
-                        style="font-size:18px;opacity:0.9;width:18px"
+                        class="pi pi-check"
+                        :style="{ fontSize: '12px', opacity: minimapSettings?.[option.key] ? '1' : '0' }"
                     />
+                </span>
+                <i
+                    :class="option.iconClass"
+                    style="font-size:18px;opacity:0.9;width:18px"
+                />
+                <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
                     <div style="font-size:13px;font-weight:600">
                         {{ option.label }}
                     </div>
-                </button>
-            </div>
+                    <div style="font-size:11px;color:rgba(255,255,255,0.58)">
+                        {{ minimapSettings?.[option.key] ? 'On' : 'Off' }}
+                    </div>
+                </div>
+            </button>
+        </div>
 
+        <div style="display:flex;gap:10px;align-items:stretch;margin-top:10px">
             <canvas
                 ref="canvasRef"
-                style="width:100%;height:120px;border-radius:8px;margin-top:0;background:rgba(0,0,0,0.25);border:1px solid var(--mjr-border, rgba(255,255,255,0.12))"
+                :style="{
+                    width: '100%',
+                    height: canvasHeight,
+                    borderRadius: '10px',
+                    marginTop: '0',
+                    background: 'linear-gradient(180deg, rgba(7, 12, 18, 0.95) 0%, rgba(10, 16, 24, 0.92) 100%)',
+                    border: '1px solid var(--mjr-border, rgba(255,255,255,0.12))',
+                    boxShadow: 'inset 0 0 0 1px rgba(255,255,255,0.03)',
+                }"
             />
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;font-size:11px;color:rgba(255,255,255,0.58)">
+            <span>Viewport overlay {{ minimapSettings.showViewport ? 'enabled' : 'disabled' }}</span>
+            <span>{{ currentSizeOption.label }} density</span>
         </div>
 
         <details

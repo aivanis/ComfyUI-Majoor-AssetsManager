@@ -1,6 +1,11 @@
 import { parseA1111Parameters } from "./a1111ParamsParser.js";
 import { looksLikeComfyPromptGraph, parseComfyUIWorkflow } from "./comfyWorkflowParser.js";
 
+const FILEPATH_PROMPT_RE =
+    /^(?:[a-z]:[\\/]|[\\/]{1,2}|\.{1,2}[\\/]|~[\\/]).+?[\\/][^\\/\n]+\.(?:png|jpe?g|webp|gif|bmp|tiff?|avif|heic|heif|apng|hdr|svg|mp4|webm|mov|mkv|avi|m4v|mp3|wav|flac|ogg|glb|gltf|obj|fbx|ply|stl|ckpt|safetensors|pt|pth|bin|gguf|json|ya?ml)$/i;
+const FILEPATH_SEGMENTED_PROMPT_RE =
+    /^(?!.*[,;])(?!.*\b(?:cinematic|portrait|landscape|lighting|style|detailed|masterpiece|photo|render)\b).*(?:[\\/][^\\/\n]+){2,}\.(?:png|jpe?g|webp|gif|bmp|tiff?|avif|heic|heif|apng|hdr|svg|mp4|webm|mov|mkv|avi|m4v|mp3|wav|flac|ogg|glb|gltf|obj|fbx|ply|stl|ckpt|safetensors|pt|pth|bin|gguf|json|ya?ml)$/i;
+
 export function normalizeGenerationMetadata(raw) {
     if (!raw) return null;
 
@@ -245,9 +250,21 @@ export function normalizeGenerationMetadata(raw) {
     return null;
 }
 
+export function looksLikeFilePathPrompt(value) {
+    const raw = typeof value === "string" ? value.trim() : "";
+    if (!raw || raw.includes("\n")) return false;
+    return FILEPATH_PROMPT_RE.test(raw) || FILEPATH_SEGMENTED_PROMPT_RE.test(raw);
+}
+
+export function sanitizePromptForDisplay(value) {
+    const text = typeof value === "string" ? value.trim() : "";
+    if (!text) return "";
+    return looksLikeFilePathPrompt(text) ? "" : text;
+}
+
 export function normalizePromptsForDisplay(positive, negative) {
-    let pos = typeof positive === "string" ? positive : "";
-    let neg = typeof negative === "string" ? negative : "";
+    let pos = sanitizePromptForDisplay(positive);
+    let neg = sanitizePromptForDisplay(negative);
 
     // Always check if positive contains a negative block, even if negative is already provided.
     // This prevents the "pos/neg concatenation" bug where both sources appear.
@@ -262,9 +279,9 @@ export function normalizePromptsForDisplay(positive, negative) {
                 maybeParamsIdx >= 0 ? tail.slice(0, maybeParamsIdx) : tail
             ).trim();
 
-            if (extractedPos) pos = extractedPos;
+            if (extractedPos) pos = sanitizePromptForDisplay(extractedPos);
             // Only use extractedNeg if we don't already have an explicit negative
-            if (!neg && extractedNeg) neg = extractedNeg;
+            if (!neg && extractedNeg) neg = sanitizePromptForDisplay(extractedNeg);
         }
     }
 

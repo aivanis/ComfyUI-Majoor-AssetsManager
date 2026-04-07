@@ -52,6 +52,10 @@ _A1111_PARAMS_RE = re.compile(
     r"|Seed resize from)\s*:",
     re.IGNORECASE,
 )
+_PATH_LIKE_PROMPT_RE = re.compile(
+    r"^(?:[a-z]:[\\/]|[\\/]{1,2}|\.{1,2}[\\/]|~[\\/]).+?[\\/][^\\/\n]+\.(?:png|jpe?g|webp|gif|bmp|tiff?|avif|heic|heif|apng|hdr|svg|mp4|webm|mov|mkv|avi|m4v|mp3|wav|flac|ogg|glb|gltf|obj|fbx|ply|stl|ckpt|safetensors|pt|pth|bin|gguf|json|ya?ml)$",
+    re.IGNORECASE,
+)
 
 # Regex to split prompts into semantic segments (commas, periods, semicolons)
 _SEGMENT_SPLIT_RE = re.compile(r"[,;.]+")
@@ -932,7 +936,34 @@ def _sanitize_prompt_text(value: str) -> str:
         prev = base
         base = _WEIGHT_SYNTAX_RE.sub(r"\2", base)
 
-    return _normalise_whitespace(base).strip(" ,")
+    base = _normalise_whitespace(base).strip(" ,")
+    if _looks_like_path_prompt(base):
+        return ""
+    return base
+
+
+def _looks_like_path_prompt(value: str) -> bool:
+    raw = str(value or "").strip()
+    if not raw or "\n" in raw:
+        return False
+    if _PATH_LIKE_PROMPT_RE.match(raw):
+        return True
+    normalised = raw.replace("\\", "/")
+    if "/" not in normalised or re.search(r"[,;]", normalised):
+        return False
+    if re.search(
+        r"\b(?:cinematic|portrait|landscape|lighting|style|detailed|masterpiece|photo|render)\b",
+        normalised,
+        re.IGNORECASE,
+    ):
+        return False
+    return bool(
+        re.search(
+            r"(?:/[^/\n]+){2,}\.(?:png|jpe?g|webp|gif|bmp|tiff?|avif|heic|heif|apng|hdr|svg|mp4|webm|mov|mkv|avi|m4v|mp3|wav|flac|ogg|glb|gltf|obj|fbx|ply|stl|ckpt|safetensors|pt|pth|bin|gguf|json|ya?ml)$",
+            normalised,
+            re.IGNORECASE,
+        )
+    )
 
 
 def _normalise_title_caption(raw_caption: str, *, fallback_title: str = "Untitled") -> str:

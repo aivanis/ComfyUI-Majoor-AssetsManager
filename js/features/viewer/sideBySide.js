@@ -1,4 +1,7 @@
-import { normalizeGenerationMetadata } from "../../components/sidebar/parsers/geninfoParser.js";
+import {
+    normalizeGenerationMetadata,
+    sanitizePromptForDisplay,
+} from "../../components/sidebar/parsers/geninfoParser.js";
 import { isModel3DAsset } from "./model3dRenderer.js";
 
 // ── Compact grid gen-info helpers ─────────────────────────────────────────────
@@ -21,7 +24,10 @@ function _extractGridGenInfo(asset) {
         const norm = normalizeGenerationMetadata(candidate) || null;
         if (norm && typeof norm === "object") {
             const out = {
-                prompt: norm.prompt || (candidate?.prompt ? String(candidate.prompt) : "") || "",
+                prompt:
+                    sanitizePromptForDisplay(norm.prompt) ||
+                    (candidate?.prompt ? sanitizePromptForDisplay(String(candidate.prompt)) : "") ||
+                    "",
                 seed: norm.seed != null ? String(norm.seed) : "",
                 sampler: norm.sampler ? String(norm.sampler) : "",
                 scheduler: norm.scheduler ? String(norm.scheduler) : "",
@@ -42,7 +48,7 @@ function _extractGridGenInfo(asset) {
     const meta = asset.meta || asset.metadata || asset.parsed_meta || asset;
     const ms = asset.generation_time_ms ?? meta?.generation_time_ms ?? 0;
     return {
-        prompt: meta?.prompt || meta?.text || "",
+        prompt: sanitizePromptForDisplay(meta?.prompt || meta?.text || ""),
         seed:
             meta?.seed != null
                 ? String(meta.seed)

@@ -12,7 +12,10 @@ import { comfyToast } from "../../app/toast.js";
 import { buildViewURL, buildAssetViewURL } from "../../api/endpoints.js";
 import { ensureViewerMetadataAsset } from "./genInfo.js";
 import { getAssetMetadata, getFileMetadataScoped } from "../../api/client.js";
-import { normalizeGenerationMetadata } from "../../components/sidebar/parsers/geninfoParser.js";
+import {
+    normalizeGenerationMetadata,
+    sanitizePromptForDisplay,
+} from "../../components/sidebar/parsers/geninfoParser.js";
 import {
     createModel3DMediaElement,
     isModel3DInteractionTarget,
@@ -856,7 +859,7 @@ export class FloatingViewer {
             };
             if (norm && typeof norm === "object") {
                 // Extract positive prompt (primary field)
-                if (norm.prompt) out.prompt = String(norm.prompt);
+                if (norm.prompt) out.prompt = sanitizePromptForDisplay(String(norm.prompt));
                 if (norm.seed != null) out.seed = String(norm.seed);
                 if (norm.model)
                     out.model = Array.isArray(norm.model)
@@ -876,7 +879,9 @@ export class FloatingViewer {
                 if (norm.cfg != null) out.cfg = String(norm.cfg);
                 if (norm.steps != null) out.step = String(norm.steps);
                 // Fallback to candidate prompt if norm.prompt is empty
-                if (!out.prompt && candidate?.prompt) out.prompt = String(candidate.prompt || "");
+                if (!out.prompt && candidate?.prompt) {
+                    out.prompt = sanitizePromptForDisplay(String(candidate.prompt || ""));
+                }
 
                 const genTimeMs =
                     fileData.generation_time_ms ??
@@ -916,7 +921,7 @@ export class FloatingViewer {
             step: "",
             genTime: "",
         };
-        out.prompt = meta?.prompt || meta?.text || "";
+        out.prompt = sanitizePromptForDisplay(meta?.prompt || meta?.text || "");
         out.seed =
             meta?.seed != null
                 ? String(meta.seed)

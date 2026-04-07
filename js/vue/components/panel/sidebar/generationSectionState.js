@@ -5,6 +5,7 @@ import {
     formatModelLabel,
     normalizeGenerationMetadata,
     normalizePromptsForDisplay,
+    sanitizePromptForDisplay,
 } from "../../../../components/sidebar/parsers/geninfoParser.js";
 
 const IMAGE_EXTENSIONS = new Set([
@@ -156,10 +157,10 @@ function hasDisplayableFields(obj) {
     try {
         if (!obj || typeof obj !== "object") return false;
         if (obj.engine && typeof obj.engine === "object" && obj.engine.type) return true;
-        if (typeof obj.prompt === "string" && obj.prompt.trim()) return true;
+        if (sanitizePromptForDisplay(obj.prompt)) return true;
         if (
             typeof (obj.negative_prompt || obj.negativePrompt) === "string" &&
-            (obj.negative_prompt || obj.negativePrompt).trim()
+            sanitizePromptForDisplay(obj.negative_prompt || obj.negativePrompt)
         ) {
             return true;
         }
@@ -276,11 +277,19 @@ export function buildGenerationSectionState(asset) {
     const promptTabs =
         Array.isArray(metadata.all_positive_prompts) && metadata.all_positive_prompts.length > 1
             ? metadata.all_positive_prompts
-                  .map((positive, index) => ({
-                      label: `Prompt ${index + 1}`,
-                      positive: String(positive || "").trim(),
-                      negative: String(metadata.all_negative_prompts?.[index] || "").trim(),
-                  }))
+                  .map((positive, index) => {
+                      const prompts = normalizePromptsForDisplay(
+                          typeof positive === "string" ? positive : "",
+                          typeof metadata.all_negative_prompts?.[index] === "string"
+                              ? metadata.all_negative_prompts[index]
+                              : "",
+                      );
+                      return {
+                          label: `Prompt ${index + 1}`,
+                          positive: sanitizePromptForDisplay(prompts.positive),
+                          negative: sanitizePromptForDisplay(prompts.negative),
+                      };
+                  })
                   .filter((item) => item.positive)
             : [];
 
@@ -456,7 +465,7 @@ export function buildGenerationSectionState(asset) {
         positivePrompt: promptTabs.length ? "" : String(cleanedPrompts.positive || "").trim(),
         negativePrompt: promptTabs.length ? "" : String(cleanedPrompts.negative || "").trim(),
         promptTabs,
-        showAlignment: !!asset?.id,
+        showAlignment: !!asset?.id && (!!String(cleanedPrompts.positive || "").trim() || promptTabs.length > 0),
         isImageAsset: isImageLikeAsset(asset),
         lyrics: String(metadata.lyrics || "").trim(),
         modelFields,

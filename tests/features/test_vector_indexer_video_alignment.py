@@ -87,6 +87,34 @@ async def test_index_asset_vector_video_without_prompt_stores_null_alignment(mon
     assert store_params[2] is None
 
 
+@pytest.mark.asyncio
+async def test_index_asset_vector_video_filepath_prompt_stores_null_alignment(monkeypatch):
+    db = _DB()
+    vs = _VS()
+
+    monkeypatch.setattr(m, "is_vector_search_enabled", lambda: True)
+
+    async def _noop_autotags(_db, _vs, _asset_id, _image_vector):
+        return None
+
+    monkeypatch.setattr(m, "_apply_autotags", _noop_autotags)
+
+    out = await m.index_asset_vector(
+        db,
+        vs,
+        asset_id=789,
+        filepath="C:/videos/sample-path-prompt.mp4",
+        kind="video",
+        metadata_raw={"prompt": "d:/__comfy_outputs/projects/veille/02_out/videos/260402/lidox.mp4"},
+    )
+
+    assert out.ok and out.data is True
+    assert db.calls
+    _, store_params = db.calls[0]
+    assert store_params[0] == 789
+    assert store_params[2] is None
+
+
 class _AutotagVS:
     def __init__(self, model_name="model-a"):
         self._model_name = model_name

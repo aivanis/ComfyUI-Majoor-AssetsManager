@@ -19,6 +19,12 @@ Welcome to the documentation hub for **Majoor Assets Manager** for ComfyUI.
 - **[Changelog](../CHANGELOG.md)** - Recent releases and fixes
 - **[Architecture Map](ARCHITECTURE_MAP.md)** - Backend boundaries and refactor guide
 
+### Privacy And Offline Use
+- **[PRIVACY_OFFLINE.md](PRIVACY_OFFLINE.md)** - Dedicated privacy, offline, and token explanation page
+- **[AI_FEATURES.md](AI_FEATURES.md)** - Local AI processing, model downloads, offline behavior, and token clarification
+- **[SECURITY_ENV_VARS.md](SECURITY_ENV_VARS.md)** - Remote access security, API token behavior, and safe defaults
+- **[SETTINGS_CONFIGURATION.md](SETTINGS_CONFIGURATION.md)** - UI security settings and token storage behavior
+
 ## Documentation Categories
 
 ### Getting Started
@@ -41,6 +47,7 @@ Welcome to the documentation hub for **Majoor Assets Manager** for ComfyUI.
 ### Configuration And Security
 | Document | Description |
 |----------|-------------|
+| **[PRIVACY_OFFLINE.md](PRIVACY_OFFLINE.md)** | Dedicated privacy, offline behavior, and token clarification guide |
 | **[SETTINGS_CONFIGURATION.md](SETTINGS_CONFIGURATION.md)** | UI and runtime settings |
 | **[SECURITY_ENV_VARS.md](SECURITY_ENV_VARS.md)** | Environment variables and security model |
 | **[THREAT_MODEL.md](THREAT_MODEL.md)** | Threats, mitigations, and residual risk |

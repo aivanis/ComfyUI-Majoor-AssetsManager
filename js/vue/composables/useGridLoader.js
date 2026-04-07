@@ -136,6 +136,14 @@ function formatLoadErrorMessage(prefix, err) {
     }
 }
 
+function getAdaptivePageLimit(baseLimit, emptyAppendBatches) {
+    const safeBaseLimit = Math.max(1, Math.min(APP_CONFIG.MAX_PAGE_SIZE, Number(baseLimit) || 1));
+    const growthStep = Math.max(0, Number(emptyAppendBatches) || 0);
+    if (growthStep <= 0) return safeBaseLimit;
+    const multiplier = 2 ** Math.min(growthStep, 5);
+    return Math.max(1, Math.min(APP_CONFIG.MAX_PAGE_SIZE, safeBaseLimit * multiplier));
+}
+
 function resetAssetCollectionsState(state) {
     state.seenKeys = new Set();
     state.assetIdSet = new Set();
@@ -279,7 +287,10 @@ export function useGridLoader({
         const gridContainer = getGridContainer();
         if (!gridContainer || state.loading || state.done) return { ok: true, skipped: true };
 
-        const limit = Math.max(1, Math.min(APP_CONFIG.MAX_PAGE_SIZE, APP_CONFIG.DEFAULT_PAGE_SIZE));
+        const baseLimit = Math.max(
+            1,
+            Math.min(APP_CONFIG.MAX_PAGE_SIZE, APP_CONFIG.DEFAULT_PAGE_SIZE),
+        );
         const loadingStartedAt = Date.now();
         // Dynamically calculate max empty batches based on total assets
         // For 7000+ assets: allows ~200+ empty batches before giving up
@@ -294,7 +305,8 @@ export function useGridLoader({
         try {
             let emptyAppendBatches = 0;
             while (!state.done) {
-                const page = await fetchPage(state.query, limit, state.offset, {
+                const currentLimit = getAdaptivePageLimit(baseLimit, emptyAppendBatches);
+                const page = await fetchPage(state.query, currentLimit, state.offset, {
                     requestId: Number(state.requestId ?? 0) || 0,
                     signal: state.abortController?.signal || null,
                 });
@@ -317,7 +329,7 @@ export function useGridLoader({
                 const fetchedCount = Number(page.count || 0) || 0;
                 const consumedCount = resolvePageAdvanceCount({
                     count: fetchedCount,
-                    limit: Number(page.limit || limit) || limit,
+                    limit: Number(page.limit || currentLimit) || currentLimit,
                     offset: state.offset,
                     total: page.total != null ? page.total : state.total,
                 });
@@ -332,7 +344,7 @@ export function useGridLoader({
 
                 // Debug logging
                 if (emptyAppendBatches > 0 || state.done) {
-                    console.debug(`[Grid LoadPage] offset=${state.offset}, fetched=${fetchedCount}, consumed=${consumedCount}, added=${addedCount}, done=${state.done}, visibleCount=${state.assets.length}, total=${state.total}, emptyBatches=${emptyAppendBatches}/${MAX_EMPTY_APPEND_BATCHES}`);
+                    console.debug(`[Grid LoadPage] offset=${state.offset}, fetched=${fetchedCount}, consumed=${consumedCount}, added=${addedCount}, limit=${currentLimit}, done=${state.done}, visibleCount=${state.assets.length}, total=${state.total}, emptyBatches=${emptyAppendBatches}/${MAX_EMPTY_APPEND_BATCHES}`);
                 }
 
                 if (state.done || addedCount > 0) {

@@ -35,6 +35,7 @@ export function createPlayerBarManager({
         state._videoControlsDestroy = null;
         state._videoControlsMounted = null;
         state._activeVideoEl = null;
+        state._activeVideoAssetId = null;
         state.nativeFps = null;
         try {
             state._videoSyncAbort?.abort?.();
@@ -80,6 +81,7 @@ export function createPlayerBarManager({
     async function syncPlayerBar() {
         try {
             const current = state.assets[state.currentIndex];
+            const currentAssetId = current?.id ?? null;
             if (!isPlayableViewerKind(current?.kind)) {
                 destroyPlayerBar();
                 return;
@@ -113,6 +115,7 @@ export function createPlayerBarManager({
             if (
                 state._activeVideoEl &&
                 state._activeVideoEl === mediaEl &&
+                state._activeVideoAssetId === currentAssetId &&
                 state._videoControlsDestroy
             ) {
                 try {
@@ -196,6 +199,7 @@ export function createPlayerBarManager({
             state._videoControlsMounted = mounted || null;
             state._videoControlsDestroy = mounted?.destroy || null;
             state._activeVideoEl = mediaEl;
+            state._activeVideoAssetId = currentAssetId;
             try {
                 state.nativeFps = Number(initialFps) > 0 ? Number(initialFps) : null;
             } catch (e) {

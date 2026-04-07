@@ -976,12 +976,16 @@ Force re-computation of embedding for a single asset.
 
 ## Privacy & Security
 
+For a dedicated user-facing explanation focused on privacy, offline behavior, and token meaning, see [PRIVACY_OFFLINE.md](PRIVACY_OFFLINE.md).
+
 ### Data Privacy
 
 - **Local Processing**: All AI inference runs locally on your machine
 - **No Cloud Upload**: Images and prompts never leave your computer
 - **Local Cache**: Models cached in `~/.cache/huggingface/hub/`
 - **No Telemetry**: No usage data sent to developers
+
+In practice, semantic search, find-similar, prompt alignment, caption generation, and auto-tagging run against models loaded inside your local ComfyUI / Majoor process after those models are available locally.
 
 ### Network Access
 
@@ -990,11 +994,27 @@ Initial model download requires internet access:
 - Downloads from HuggingFace CDN
 - One-time download per model
 - Subsequent uses work offline
+- Optional HuggingFace token only affects HuggingFace Hub downloads and rate limits
+
+### Token Clarification
+
+Majoor exposes two different token concepts that are easy to confuse:
+
+- **HuggingFace token**: optional, used for downloading model files from HuggingFace Hub with better rate limits. It is not a hosted AI inference key.
+- **Majoor API token**: used to secure remote write access to the local Majoor backend when ComfyUI is reachable over LAN, reverse proxy, or tunnel. It is not used to send prompts or images to an external AI service.
+
+### Offline Use
+
+Offline use is supported once the required models are already cached locally.
+
+- If AI models are already present in the HuggingFace cache, AI features can run without internet access.
+- If models are not cached yet, the first model bootstrap requires network access.
+- Non-AI Majoor features do not depend on HuggingFace model downloads.
 
 ### Security Considerations
 
 1. **Model Integrity**: Models downloaded from official HuggingFace repos
-2. **Code Execution**: No arbitrary code execution from models
+2. **Model Code Surface**: AI inference is local, but some model loading still depends on upstream HuggingFace/Transformers model packages and compatibility loaders
 3. **Sandboxing**: Models run in same process as ComfyUI
 4. **Resource Limits**: Built-in rate limiting prevents abuse
 
