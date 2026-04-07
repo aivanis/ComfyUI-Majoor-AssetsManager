@@ -111,15 +111,27 @@ def _normalize_viewer_resource_relpath(value: str) -> Path | None:
     # Decode percent-encoded characters (e.g. %00, %2F) before validation
     # to prevent bypass via double-encoding like %2500 → %00
     decoded = unquote(raw)
+    # Reject empty values and paths containing NUL bytes outright
     if not decoded or "\x00" in decoded:
         return None
+    # Normalize directory separators to a POSIX-style form for consistent handling
     text = decoded.replace("\\", "/")
+    # Disallow absolute paths
     if text.startswith("/"):
         return None
+    # Disallow Windows-style drive-prefixed paths (e.g. C:\, D:/)
     drive, _tail = os.path.splitdrive(text)
     if drive:
         return None
-    return Path(text)
+    # Split into path components and reject any attempts at directory traversal
+    parts = [p for p in text.split("/") if p not in ("", ".")]
+    if any(p == ".." for p in parts):
+        return None
+    # Rebuild a normalized relative path from the safe components
+    safe_rel = "/".join(parts)
+    if not safe_rel:
+        return None
+    return Path(safe_rel)
 
 
 async def _resolve_asset_from_id(asset_id: int) -> tuple[dict | None, Result | None]:
