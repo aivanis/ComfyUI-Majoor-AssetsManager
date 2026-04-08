@@ -11,7 +11,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any, ClassVar, Protocol, cast
 
 from aiohttp import web
-from mjr_am_backend.config import INDEX_DB
+from mjr_am_backend.config import INDEX_DB, SERVICES_PREWARM_ON_STARTUP
 from mjr_am_backend.observability import ensure_observability
 from mjr_am_backend.shared import Result, get_logger
 from mjr_am_backend.utils import parse_bool
@@ -483,6 +483,8 @@ def register_routes(app: web.Application, user_manager=None) -> None:
 def _schedule_services_prewarm() -> None:
     """Schedule build_services() as a fire-and-forget background task so the
     first real API request doesn't incur the full DB + watcher init latency."""
+    if not SERVICES_PREWARM_ON_STARTUP:
+        return
     import asyncio
     try:
         loop = asyncio.get_running_loop()

@@ -99,6 +99,22 @@ async def test_db_backup_restore_not_found_and_save_service_unavailable(monkeypa
 
 
 @pytest.mark.asyncio
+async def test_db_backup_save_rejected_while_generation_busy(monkeypatch):
+    app = _app()
+    monkeypatch.setattr(m, "_csrf_error", lambda _request: None)
+    monkeypatch.setattr(m, "_require_write_access", lambda _request: Result.Ok({}))
+    monkeypatch.setattr(m, "is_generation_busy", lambda **_kwargs: True)
+
+    req = make_mocked_request("POST", "/mjr/am/db/backup-save", app=app)
+    match = await app.router.resolve(req)
+    resp = await match.handler(req)
+    body = json.loads(resp.text)
+
+    assert body.get("ok") is False
+    assert body.get("code") == "COMFY_BUSY"
+
+
+@pytest.mark.asyncio
 async def test_db_backup_restore_requested_name_not_found_and_missing_db(monkeypatch):
     app = _app()
     monkeypatch.setattr(m, "_csrf_error", lambda _request: None)

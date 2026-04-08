@@ -20,6 +20,7 @@ from typing import Any
 from aiohttp import web
 from mjr_am_backend.config import INDEX_DB_PATH, get_runtime_output_root, is_vector_search_enabled
 from mjr_am_backend.custom_roots import resolve_custom_root
+from mjr_am_backend.runtime_activity import is_generation_busy
 from mjr_am_backend.shared import FileKind, Result, get_logger
 
 from ..core import (
@@ -486,6 +487,13 @@ def set_db_maintenance_active(active: bool) -> None:
     global _DB_MAINTENANCE_ACTIVE
     with _DB_MAINT_LOCK:
         _DB_MAINTENANCE_ACTIVE = bool(active)
+
+
+def _generation_busy_result() -> Result[dict[str, Any]]:
+    return Result.Err(
+        "COMFY_BUSY",
+        "ComfyUI is currently executing. Retry this database operation when the queue is idle.",
+    )
 
 
 async def _stop_watcher_if_running(svc: dict | None) -> bool:
@@ -1199,6 +1207,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
 
         svc, error_result = await _require_services()
         if error_result:
@@ -1250,6 +1260,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         csrf = _csrf_error(request)
         if csrf:
             return _json_response(Result.Err("CSRF", csrf))
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
@@ -1532,6 +1544,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
 
         svc, error_result = await _require_services()
         if error_result:
@@ -1631,6 +1645,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
 
         svc, error_result = await _require_services()
         if error_result:
@@ -1708,6 +1724,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
 
         if not is_vector_search_enabled():
             return _json_response(
@@ -1884,6 +1902,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
 
         svc, error_result = await _require_services()
         if error_result:
@@ -1942,6 +1962,8 @@ def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
 
         payload_res = await _read_json(request)
         if not payload_res.ok:

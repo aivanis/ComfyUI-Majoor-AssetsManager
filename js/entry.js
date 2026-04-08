@@ -16,7 +16,7 @@
  *   already prefers the native API.
  */
 
-import { runStartupWarmup, testAPI, triggerStartupScan } from "./app/bootstrap.js";
+import { testAPI, triggerStartupScan } from "./app/bootstrap.js";
 import { checkMajoorVersion } from "./app/versionCheck.js";
 import { ensureStyleLoaded } from "./app/style.js";
 import { buildMajoorSettings, registerMajoorSettings } from "./app/settings.js";
@@ -45,6 +45,7 @@ import { post } from "./api/client.js";
 import { ENDPOINTS } from "./api/endpoints.js";
 import { comfyToast } from "./app/toast.js";
 import { t } from "./app/i18n.js";
+import { APP_CONFIG } from "./app/config.js";
 import { getEnrichmentState, setEnrichmentState } from "./app/runtimeState.js";
 import { reportError } from "./utils/logging.js";
 import { app } from "../../scripts/app.js";
@@ -82,6 +83,8 @@ let nodeStreamModule = null;
 const SIDEBAR_TAB_ID = "majoor-assets";
 const EXECUTION_RUNTIME_KEY = "__MJR_EXECUTION_RUNTIME__";
 const EXTENSION_NAME = "Majoor.AssetsManager";
+let _lastExecutionBackendSync = { active: null, promptId: "" };
+let _deferredGridReloadTimer = null;
 
 // ── execution runtime helpers ─────────────────────────────────────────────────
 
@@ -122,6 +125,57 @@ function emitRuntimeStatus(partial = {}) {
     } catch (e) {
         console.debug?.(e);
     }
+}
+
+async function syncExecutionBackendState({ active, promptId = "" } = {}) {
+    const nextActive = !!active;
+    const nextPromptId = String(promptId || "").trim();
+    if (
+        _lastExecutionBackendSync.active === nextActive &&
+        _lastExecutionBackendSync.promptId === nextPromptId
+    ) {
+        return;
+    }
+    _lastExecutionBackendSync = { active: nextActive, promptId: nextPromptId };
+    try {
+        await post(ENDPOINTS.RUNTIME_EXECUTION, {
+            active: nextActive,
+            prompt_id: nextPromptId || undefined,
+            cooldown_ms: Number(APP_CONFIG.EXECUTION_IDLE_GRACE_MS) || 6000,
+        });
+    } catch (e) {
+        reportError(e, "entry.execution_state_sync");
+    }
+}
+
+function isExecutionActive() {
+    try {
+        return !!String(ensureExecutionRuntime()?.active_prompt_id || "").trim();
+    } catch (e) {
+        console.debug?.(e);
+        return false;
+    }
+}
+
+function scheduleGridReloadWhenIdle(delayMs = 1200) {
+    try {
+        if (_deferredGridReloadTimer) {
+            clearTimeout(_deferredGridReloadTimer);
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    _deferredGridReloadTimer = setTimeout(() => {
+        _deferredGridReloadTimer = null;
+        if (isExecutionActive()) {
+            scheduleGridReloadWhenIdle(delayMs);
+            return;
+        }
+        const grid = getActiveGridContainer();
+        if (grid) {
+            loadAssets(grid);
+        }
+    }, Math.max(250, Number(delayMs) || 0));
 }
 
 // ── lazy module initialisation ─────────────────────────────────────────────────
@@ -200,6 +254,7 @@ async function setupApiListeners(runtimeApp, executionRuntime) {
         t,
         reportError,
         registerCleanableListener,
+        syncExecutionBackendState,
     });
 }
 
@@ -283,7 +338,12 @@ app.registerExtension({
         // 6. Settings runtime init (applies settings to APP_CONFIG, starts watcher sync…).
         registerMajoorSettings(runtimeApp, () => {
             const grid = getActiveGridContainer();
-            if (grid) loadAssets(grid);
+            if (!grid) return;
+            if (APP_CONFIG.DEFER_GRID_FETCH_DURING_EXECUTION && isExecutionActive()) {
+                scheduleGridReloadWhenIdle();
+                return;
+            }
+            loadAssets(grid);
         });
 
         // 7. Fallback command registration for older ComfyUI versions that don't
@@ -319,11 +379,7 @@ app.registerExtension({
         // 11. Bottom panel tab is registered declaratively via `bottomPanelTabs`.
 
         // 12. Startup warmup: API/DB/counters first, then idle index scan.
-        void runStartupWarmup({ delayMs: 200, idleOnly: true }).catch((e) =>
-            reportError(e, "entry.startup_warmup"),
-        );
-
-        // 13. Debug API surface (development/support).
+        // 12. Debug API surface (development/support).
         exposeDebugApis({
             resolveNodeStreamModule: async () => {
                 if (!nodeStreamModule) {

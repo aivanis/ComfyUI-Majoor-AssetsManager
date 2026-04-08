@@ -8,11 +8,17 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from ...config import FFPROBE_TIMEOUT
+from ...config import FFPROBE_TIMEOUT, TOOL_LOW_PRIORITY_SUBPROCESSES
 from ...shared import ErrorCode, Result, get_logger
 
 logger = get_logger(__name__)
 _FFPROBE_CANDIDATE_NAMES = ("ffprobe", "ffprobe.exe")
+
+
+def _low_priority_creationflags() -> int:
+    if not TOOL_LOW_PRIORITY_SUBPROCESSES or os.name != "nt":
+        return 0
+    return int(getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0) or 0)
 
 class FFProbe:
     """
@@ -177,6 +183,7 @@ class FFProbe:
             text=True,
             shell=False,
             close_fds=os.name != "nt",
+            creationflags=_low_priority_creationflags(),
         )
         try:
             stdout, stderr = process.communicate(timeout=self.timeout)
@@ -282,6 +289,7 @@ class FFProbe:
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             close_fds=os.name != "nt",
+            creationflags=_low_priority_creationflags(),
         )
 
     async def _communicate_with_timeout(

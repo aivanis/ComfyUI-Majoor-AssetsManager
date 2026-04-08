@@ -1,4 +1,5 @@
 import { APP_CONFIG } from "../../app/config.js";
+import { EVENTS } from "../../app/events.js";
 
 function clamp(n, min, max) {
     const v = Number(n);
@@ -296,8 +297,17 @@ void main() {
     };
 }
 
-export function createAudioVisualizer({ canvas, audioEl, mode: modeOverride } = {}) {
+export function createAudioVisualizer({
+    canvas,
+    audioEl,
+    mode: modeOverride,
+    pauseDuringExecution = null,
+} = {}) {
     if (!canvas || !audioEl) return { destroy() {} };
+    const shouldPauseDuringExecution =
+        pauseDuringExecution == null
+            ? !!APP_CONFIG?.VIEWER_PAUSE_DURING_EXECUTION
+            : !!pauseDuringExecution;
 
     let raf = null;
     let disposed = false;
@@ -308,6 +318,7 @@ export function createAudioVisualizer({ canvas, audioEl, mode: modeOverride } = 
     let timeData = null;
     let drawer = null;
     let lastAt = 0;
+    let runtimePaused = false;
     const targetFps = clamp(APP_CONFIG?.VIEWER_AUDIO_VIS_FPS ?? 24, 8, 60);
     const minDt = 1000 / targetFps;
     let currentMode = resolveMode(modeOverride);
@@ -384,6 +395,7 @@ export function createAudioVisualizer({ canvas, audioEl, mode: modeOverride } = 
             raf = null;
             return;
         }
+        if (runtimePaused) return;
         if (!analyser || !drawer) return;
         if (ts - lastAt < minDt) return;
         lastAt = ts;
@@ -399,6 +411,7 @@ export function createAudioVisualizer({ canvas, audioEl, mode: modeOverride } = 
 
     const start = async () => {
         try {
+            if (runtimePaused) return;
             init();
             if (!audioCtx) return;
             if (audioCtx.state === "suspended") {
@@ -429,6 +442,18 @@ export function createAudioVisualizer({ canvas, audioEl, mode: modeOverride } = 
     const onPause = () => stop();
     const onEnded = () => stop();
     const onResize = () => resize();
+    const onRuntimeStatus = (event) => {
+        if (!shouldPauseDuringExecution) return;
+        const activePromptId = String(event?.detail?.active_prompt_id || "").trim();
+        runtimePaused = !!activePromptId;
+        if (runtimePaused) {
+            stop();
+            return;
+        }
+        if (!audioEl?.paused) {
+            void start();
+        }
+    };
 
     try {
         resize();
@@ -441,6 +466,12 @@ export function createAudioVisualizer({ canvas, audioEl, mode: modeOverride } = 
         audioEl.addEventListener("pause", onPause, { passive: true });
         audioEl.addEventListener("ended", onEnded, { passive: true });
         window.addEventListener("resize", onResize, { passive: true });
+        if (shouldPauseDuringExecution) {
+            window.addEventListener(EVENTS.RUNTIME_STATUS, onRuntimeStatus);
+            if (String(window?.__MJR_EXECUTION_RUNTIME__?.active_prompt_id || "").trim()) {
+                runtimePaused = true;
+            }
+        }
     } catch (e) {
         console.debug?.(e);
     }
@@ -459,6 +490,7 @@ export function createAudioVisualizer({ canvas, audioEl, mode: modeOverride } = 
                 audioEl.removeEventListener("pause", onPause);
                 audioEl.removeEventListener("ended", onEnded);
                 window.removeEventListener("resize", onResize);
+                window.removeEventListener(EVENTS.RUNTIME_STATUS, onRuntimeStatus);
             } catch (e) {
                 console.debug?.(e);
             }

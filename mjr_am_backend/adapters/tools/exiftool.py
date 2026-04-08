@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 from typing import Any
 
-from ...config import EXIFTOOL_TIMEOUT
+from ...config import EXIFTOOL_TIMEOUT, TOOL_LOW_PRIORITY_SUBPROCESSES
 from ...shared import ErrorCode, Result, get_logger
 from ...tool_candidates import iter_exiftool_candidates
 
@@ -20,6 +20,12 @@ _TAG_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_:-]*$")
 _EXIFTOOL_EXECUTABLE_RE = re.compile(r"^exiftool(?:\(-k\))?(?:\.exe)?$", re.IGNORECASE)
 _WINDOWS_CMDLINE_TOO_LONG = 206
 _MAX_WRITE_VALUE_CHARS = 8192
+
+
+def _low_priority_creationflags() -> int:
+    if not TOOL_LOW_PRIORITY_SUBPROCESSES or os.name != "nt":
+        return 0
+    return int(getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0) or 0)
 
 
 def _decode_bytes_best_effort(blob: bytes | None) -> tuple[str, bool]:
@@ -396,6 +402,7 @@ class ExifTool:
             timeout=timeout_s,
             input=stdin_input,
             shell=False,
+            creationflags=_low_priority_creationflags(),
         )
 
     def _retry_windows_batch_file_not_found(
@@ -588,6 +595,7 @@ class ExifTool:
             timeout=timeout,
             input=stdin_bytes,
             shell=False,
+            creationflags=_low_priority_creationflags(),
         )
 
     def _build_single_read_command(
@@ -919,6 +927,7 @@ class ExifTool:
             timeout=self.timeout,
             input=(stdin_input.encode("utf-8", errors="replace") if stdin_input is not None else None),
             shell=False,
+            creationflags=_low_priority_creationflags(),
         )
 
     def _handle_write_process_result(self, process: subprocess.CompletedProcess, path: str) -> Result[bool]:

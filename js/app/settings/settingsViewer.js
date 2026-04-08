@@ -55,6 +55,41 @@ export function registerViewerSettings(safeAddSetting, settings, notifyApplied) 
         },
     });
 
+    safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Viewer.PauseDuringExecution`,
+        category: cat(t("cat.viewer"), t("setting.viewer.pauseExecution.name").replace("Majoor: ", "")),
+        name: t("setting.viewer.pauseExecution.name"),
+        tooltip: t("setting.viewer.pauseExecution.desc"),
+        type: "boolean",
+        defaultValue: !!settings.viewer?.pauseDuringExecution,
+        onChange: (value) => {
+            settings.viewer = settings.viewer || {};
+            settings.viewer.pauseDuringExecution = !!value;
+            saveMajoorSettings(settings);
+            applySettingsToConfig(settings);
+            notifyApplied("viewer.pauseDuringExecution");
+        },
+    });
+
+    safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Viewer.FloatingPauseDuringExecution`,
+        category: cat(
+            t("cat.viewer"),
+            t("setting.viewer.floatingPauseExecution.name").replace("Majoor: ", ""),
+        ),
+        name: t("setting.viewer.floatingPauseExecution.name"),
+        tooltip: t("setting.viewer.floatingPauseExecution.desc"),
+        type: "boolean",
+        defaultValue: !!settings.viewer?.floatingPauseDuringExecution,
+        onChange: (value) => {
+            settings.viewer = settings.viewer || {};
+            settings.viewer.floatingPauseDuringExecution = !!value;
+            saveMajoorSettings(settings);
+            applySettingsToConfig(settings);
+            notifyApplied("viewer.floatingPauseDuringExecution");
+        },
+    });
+
     const registerMinimapToggle = (idKey, stateKey, nameKey, descKey) => {
         safeAddSetting({
             id: `${SETTINGS_PREFIX}.WorkflowMinimap.${idKey}`,

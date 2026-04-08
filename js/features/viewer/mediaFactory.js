@@ -352,6 +352,7 @@ export function createViewerMediaFactory({
                 canvas: viz,
                 audioEl: audio,
                 mode: state?.audioVisualizerMode,
+                pauseDuringExecution: true,
             });
             // Keep lifecycle compatibility: audio cleanup + canvas processor cleanup.
             audio._mjrAudioViz = vizProc;
@@ -383,6 +384,7 @@ export function createViewerMediaFactory({
             return createModel3DMediaElement(asset, url, {
                 hostClassName: "mjr-model3d-host mjr-viewer-model3d-host",
                 canvasClassName: "mjr-viewer-media mjr-model3d-render-canvas",
+                pauseDuringExecution: true,
                 scheduleOverlayRedraw,
                 onReady: () => {
                     try {
@@ -482,6 +484,7 @@ export function createViewerMediaFactory({
                     canvas,
                     videoEl: video,
                     disableWebGL: disableWebGL || !!APP_CONFIG.VIEWER_DISABLE_WEBGL_VIDEO,
+                    pauseDuringExecution: true,
                     getGradeParams,
                     isDefaultGrade,
                     tonemap,
@@ -622,6 +625,7 @@ export function createViewerMediaFactory({
             return createModel3DMediaElement(asset, url, {
                 hostClassName: "mjr-model3d-host mjr-viewer-model3d-host",
                 canvasClassName: "mjr-viewer-media mjr-model3d-render-canvas",
+                pauseDuringExecution: true,
                 scheduleOverlayRedraw,
                 onReady: () => {
                     try {
@@ -723,6 +727,7 @@ export function createViewerMediaFactory({
                 canvas._mjrProc = createVideoProcessor({
                     canvas,
                     videoEl: video,
+                    pauseDuringExecution: true,
                     getGradeParams,
                     isDefaultGrade,
                     tonemap,

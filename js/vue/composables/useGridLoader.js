@@ -1,5 +1,6 @@
 import { nextTick } from "vue";
 import { get } from "../../api/client.js";
+import { EVENTS } from "../../app/events.js";
 import { buildListURL } from "../../api/endpoints.js";
 import { APP_CONFIG } from "../../app/config.js";
 import { loadMajoorSettings } from "../../app/settings.js";
@@ -352,6 +353,7 @@ export function useGridLoader({
     canLoadMore = null,
 } = {}) {
     let deferVisualResetUntilNextPage = false;
+    let deferredExecutionReload = null;
 
     function getGridContainer() {
         return resolveElement(gridContainerRef);
@@ -397,6 +399,78 @@ export function useGridLoader({
             console.debug?.(e);
         }
         return isGridHostVisible(getGridContainer(), readScrollElement());
+    }
+
+    function isExecutionBusy() {
+        if (!APP_CONFIG.DEFER_GRID_FETCH_DURING_EXECUTION) {
+            return false;
+        }
+        try {
+            return !!String(window?.__MJR_EXECUTION_RUNTIME__?.active_prompt_id || "").trim();
+        } catch (e) {
+            console.debug?.(e);
+            return false;
+        }
+    }
+
+    function clearDeferredExecutionReload() {
+        try {
+            if (deferredExecutionReload?.timer) {
+                clearTimeout(deferredExecutionReload.timer);
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        try {
+            if (deferredExecutionReload?.listener) {
+                window.removeEventListener(EVENTS.RUNTIME_STATUS, deferredExecutionReload.listener);
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        deferredExecutionReload = null;
+    }
+
+    function scheduleDeferredExecutionReload(query, options = {}) {
+        clearDeferredExecutionReload();
+        const retry = () => {
+            if (isExecutionBusy()) {
+                try {
+                    deferredExecutionReload = {
+                        ...deferredExecutionReload,
+                        timer: setTimeout(retry, 1250),
+                    };
+                } catch (e) {
+                    console.debug?.(e);
+                }
+                return;
+            }
+            clearDeferredExecutionReload();
+            Promise.resolve()
+                .then(() =>
+                    loadAssets(query, {
+                        ...(options || {}),
+                        reset: true,
+                        preserveVisibleUntilReady: true,
+                    }),
+                )
+                .catch((e) => console.debug?.(e));
+        };
+        const listener = (event) => {
+            const activePromptId = String(event?.detail?.active_prompt_id || "").trim();
+            if (!activePromptId) {
+                retry();
+            }
+        };
+        deferredExecutionReload = {
+            listener,
+            timer: setTimeout(retry, 1250),
+        };
+        try {
+            window.addEventListener(EVENTS.RUNTIME_STATUS, listener);
+        } catch (e) {
+            console.debug?.(e);
+        }
     }
 
     function assetKey(asset, gridContainer = null) {
@@ -574,6 +648,9 @@ export function useGridLoader({
         if (!canLoadFromHost()) {
             return { ok: true, skipped: true, hidden: true };
         }
+        if (isExecutionBusy()) {
+            return { ok: true, skipped: true, busy: true };
+        }
 
         const baseLimit = Math.max(
             1,
@@ -720,6 +797,17 @@ export function useGridLoader({
             : requestedQuery;
         const safeQuery = sanitizeQuery(normalizedRequestedQuery) || normalizedRequestedQuery;
         state.query = safeQuery;
+
+        if (reset && isExecutionBusy()) {
+            setLoadingMessage("Grid refresh deferred while ComfyUI is generating...");
+            scheduleDeferredExecutionReload(safeQuery, options || {});
+            return {
+                ok: true,
+                deferred: true,
+                count: Number(state.offset || 0) || 0,
+                total: Number(state.total || 0) || 0,
+            };
+        }
 
         if (reset) {
             deferVisualResetUntilNextPage = shouldPreserveVisibleOnReset({
@@ -1091,6 +1179,7 @@ export function useGridLoader({
 
     function dispose() {
         rememberSnapshot(state.query || "Cached");
+        clearDeferredExecutionReload();
         try {
             state.abortController?.abort?.();
         } catch (e) {

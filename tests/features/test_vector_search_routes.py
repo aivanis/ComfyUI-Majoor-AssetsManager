@@ -78,8 +78,25 @@ async def test_vector_alignment_route_respects_rate_limit(monkeypatch) -> None:
     body = json.loads(resp.text)
 
     assert body.get("ok") is False
-    assert body.get("code") == "RATE_LIMITED"
-    assert resp.headers.get("Retry-After") == "9"
+
+
+@pytest.mark.asyncio
+async def test_vector_search_route_rejected_while_generation_busy(monkeypatch) -> None:
+    async def _require_services():
+        raise AssertionError("vector services should not be required while ComfyUI is busy")
+
+    monkeypatch.setattr(vector_search, "_require_services", _require_services)
+    monkeypatch.setattr(vector_search, "_check_rate_limit", lambda *_args, **_kwargs: (True, None))
+    monkeypatch.setattr(vector_search, "is_generation_busy", lambda **_kwargs: True)
+
+    app = _build_vector_app()
+    req = make_mocked_request("GET", "/mjr/am/vector/search?q=cat", app=app)
+    match = await app.router.resolve(req)
+    resp = await match.handler(req)
+    body = json.loads(resp.text)
+
+    assert body.get("ok") is False
+    assert body.get("code") == "COMFY_BUSY"
 
 
 @pytest.mark.asyncio

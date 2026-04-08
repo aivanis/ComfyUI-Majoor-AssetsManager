@@ -23,10 +23,12 @@ from mjr_am_backend.config import (
     BG_SCAN_MIN_INTERVAL_SECONDS,
     BG_SCAN_ON_LIST,
     FS_LIST_CACHE_MAX,
+    FS_LIST_CACHE_WATCHER_ENABLED,
     FS_LIST_CACHE_TTL_SECONDS,
     MANUAL_BG_SCAN_GRACE_SECONDS,
     SCAN_PENDING_MAX,
 )
+from mjr_am_backend.runtime_activity import is_generation_busy
 from mjr_am_backend.shared import Result, classify_file, get_logger, sanitize_error_message
 from mjr_am_shared.scan_throttle import normalize_scan_directory, should_skip_background_scan
 
@@ -273,6 +275,8 @@ def _background_scan_can_enqueue(
         return False
     if is_db_maintenance_active():
         return False
+    if is_generation_busy():
+        return False
     normalized_dir = normalize_scan_directory(directory)
     return not should_skip_background_scan(normalized_dir, source, root_id, MANUAL_BG_SCAN_GRACE_SECONDS)
 
@@ -357,6 +361,9 @@ async def _worker_loop() -> None:
             await asyncio.sleep(0.5)
             continue
         if is_db_maintenance_active():
+            await asyncio.sleep(0.5)
+            continue
+        if is_generation_busy():
             await asyncio.sleep(0.5)
             continue
 
@@ -830,7 +837,8 @@ def _filesystem_dir_cache_state(base: Path, target_dir_resolved: Path) -> Result
     except OSError as exc:
         return Result.Err("DIR_NOT_FOUND", sanitize_error_message(exc, "Directory not found"))
     try:
-        ensure_fs_list_cache_watching(str(base))
+        if FS_LIST_CACHE_WATCHER_ENABLED and not is_generation_busy(include_cooldown=False):
+            ensure_fs_list_cache_watching(str(base))
     except Exception:
         pass
     try:
@@ -1465,5 +1473,3 @@ async def _dispatch_filesystem_listing_path(
         offset=offset,
         index_service=index_service,
     )
-
-

@@ -21,6 +21,7 @@ except Exception:
     folder_paths = _FolderPathsStub()  # type: ignore
 
 from mjr_am_backend.config import (
+    EXECUTION_IDLE_GRACE_SECONDS,
     MEDIA_PROBE_BACKEND,
     OUTPUT_ROOT,
     TO_THREAD_TIMEOUT_S,
@@ -30,6 +31,11 @@ from mjr_am_backend.config import (
     set_index_directory_override,
 )
 from mjr_am_backend.custom_roots import resolve_custom_root
+from mjr_am_backend.runtime_activity import (
+    get_runtime_activity_status,
+    mark_generation_finished,
+    mark_generation_started,
+)
 from mjr_am_backend.shared import ErrorCode, Result, get_logger, sanitize_error_message
 from mjr_am_backend.tool_detect import get_tool_status
 from mjr_am_backend.utils import parse_bool
@@ -308,6 +314,7 @@ def _runtime_status_payload(db: object, index: object, watcher: object) -> dict:
             "enabled": _safe_watcher_is_running(watcher),
             "pending_files": _safe_watcher_pending_count(watcher),
         },
+        "execution": get_runtime_activity_status(),
         "maintenance_active": is_db_maintenance_active(),
     }
 
@@ -544,6 +551,49 @@ def register_health_routes(routes: web.RouteTableDef) -> None:
         watcher = svc.get("watcher") if isinstance(svc, dict) else None
 
         payload = _runtime_status_payload(db, index, watcher)
+        return _json_response(Result.Ok(payload))
+
+    @routes.get("/mjr/am/runtime/execution")
+    async def get_execution_runtime(request):
+        return _json_response(Result.Ok(get_runtime_activity_status()))
+
+    @routes.post("/mjr/am/runtime/execution")
+    async def update_execution_runtime(request):
+        csrf = _csrf_error(request)
+        if csrf:
+            return _json_response(Result.Err("CSRF", csrf))
+        auth = _require_write_access(request)
+        if not auth.ok:
+            return _json_response(auth)
+        body_res = await _read_json(request)
+        if not body_res.ok:
+            return _json_response(body_res)
+        body = body_res.data or {}
+
+        if "active" not in body and "running" not in body:
+            return _json_response(Result.Err("INVALID_INPUT", "Missing active flag"))
+
+        active = parse_bool(body.get("active", body.get("running")), False)
+        prompt_id = str(body.get("prompt_id") or body.get("promptId") or "").strip()
+        raw_cooldown_ms = body.get("cooldown_ms", body.get("cooldownMs"))
+        try:
+            cooldown_ms = max(
+                0,
+                min(
+                    300_000,
+                    int(raw_cooldown_ms if raw_cooldown_ms is not None else int(EXECUTION_IDLE_GRACE_SECONDS * 1000.0)),
+                ),
+            )
+        except Exception:
+            cooldown_ms = int(EXECUTION_IDLE_GRACE_SECONDS * 1000.0)
+
+        if active:
+            payload = mark_generation_started(prompt_id)
+        else:
+            payload = mark_generation_finished(
+                prompt_id,
+                cooldown_seconds=float(cooldown_ms) / 1000.0,
+            )
         return _json_response(Result.Ok(payload))
 
     @routes.get("/mjr/am/config")

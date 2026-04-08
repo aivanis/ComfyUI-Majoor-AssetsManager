@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from aiohttp import web
 
+from .config import OBS_INSTALL_GLOBAL_ASYNCIO_HANDLER
 from .shared import get_logger, request_id_var
 from .utils import env_float
 
@@ -397,6 +398,8 @@ def _install_asyncio_exception_handler() -> None:
     connection before the server finished sending data.
     """
     global _ASYNCIO_HANDLER_INSTALLED
+    if not OBS_INSTALL_GLOBAL_ASYNCIO_HANDLER:
+        return
     with _ASYNCIO_HANDLER_LOCK:
         if _ASYNCIO_HANDLER_INSTALLED:
             return

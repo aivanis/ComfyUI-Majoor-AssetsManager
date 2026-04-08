@@ -78,6 +78,10 @@ export const APP_DEFAULTS = Object.freeze({
     // Auto-scan on startup
     AUTO_SCAN_ON_STARTUP: false,
     EXECUTION_GROUPING_ENABLED: true,
+    EXECUTION_IDLE_GRACE_MS: 6000,
+    DEFER_GRID_FETCH_DURING_EXECUTION: true,
+    VIEWER_PAUSE_DURING_EXECUTION: true,
+    FLOATING_VIEWER_PAUSE_DURING_EXECUTION: false,
 
     // Rating/tags hydration (grid)
     RT_HYDRATE_CONCURRENCY: 2,

@@ -1,4 +1,6 @@
 import { buildViewerResourceURL } from "../../api/endpoints.js";
+import { APP_CONFIG } from "../../app/config.js";
+import { EVENTS } from "../../app/events.js";
 import { drawMediaError } from "./imageProcessor.js";
 
 export const MODEL3D_EXT_TO_LOADER = Object.freeze({
@@ -868,6 +870,10 @@ export function buildModel3DMouseButtons(eventLike, MOUSE_ENUM) {
  * @returns {HTMLDivElement} The 3D viewer host element (append to DOM to activate)
  */
 export function createModel3DMediaElement(asset, url, options = {}) {
+    const shouldPauseDuringExecution =
+        options?.pauseDuringExecution == null
+            ? !!APP_CONFIG?.VIEWER_PAUSE_DURING_EXECUTION
+            : !!options.pauseDuringExecution;
     const host = document.createElement("div");
     host.className = options.hostClassName || "mjr-model3d-host mjr-viewer-model3d-host";
     host.style.cssText =
@@ -1015,6 +1021,8 @@ export function createModel3DMediaElement(asset, url, options = {}) {
     let orthographicCamera = null;
     let controls = null;
     let rafId = null;
+    let renderFrameFn = null;
+    let runtimePaused = false;
     let statusState = null;
     let interactionCleanup = null;
     let gridHelper = null;
@@ -1440,6 +1448,9 @@ export function createModel3DMediaElement(asset, url, options = {}) {
     const destroy = () => {
         destroyed = true;
         try {
+            window.removeEventListener(EVENTS.RUNTIME_STATUS, onRuntimeStatus);
+        } catch (_) {}
+        try {
             host._mjr3D = null;
         } catch (_) {}
         try {
@@ -1563,6 +1574,7 @@ export function createModel3DMediaElement(asset, url, options = {}) {
         loadedObject = null;
         modelGroup = null;
         objectFrame = null;
+        renderFrameFn = null;
         try {
             const gl = canvas.getContext("webgl2") || canvas.getContext("webgl");
             if (gl) gl.getExtension("WEBGL_lose_context")?.loseContext?.();
@@ -1571,8 +1583,54 @@ export function createModel3DMediaElement(asset, url, options = {}) {
         }
     };
 
-    const proc = { setParams: () => {}, destroy, captureCanvas: () => canvas };
+    const pauseRendering = () => {
+        runtimePaused = true;
+        try {
+            if (rafId != null) cancelAnimationFrame(rafId);
+        } catch (e) {
+            console.debug?.(e);
+        }
+        rafId = null;
+    };
+
+    const resumeRendering = () => {
+        runtimePaused = false;
+        if (destroyed || rafId != null || typeof renderFrameFn !== "function") return;
+        try {
+            rafId = requestAnimationFrame(renderFrameFn);
+        } catch (e) {
+            console.debug?.(e);
+        }
+    };
+
+    const onRuntimeStatus = (event) => {
+        if (!shouldPauseDuringExecution) return;
+        const activePromptId = String(event?.detail?.active_prompt_id || "").trim();
+        if (activePromptId) {
+            pauseRendering();
+            return;
+        }
+        resumeRendering();
+    };
+
+    const proc = {
+        setParams: () => {},
+        destroy,
+        captureCanvas: () => canvas,
+        pause: pauseRendering,
+        resume: resumeRendering,
+    };
     canvas._mjrProc = proc;
+    try {
+        if (shouldPauseDuringExecution) {
+            window.addEventListener(EVENTS.RUNTIME_STATUS, onRuntimeStatus);
+            if (String(window?.__MJR_EXECUTION_RUNTIME__?.active_prompt_id || "").trim()) {
+                runtimePaused = true;
+            }
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
     setStatus("Preparing 3D preview", modelName);
 
     // ── Async init ────────────────────────────────────────────────────────────
@@ -1926,7 +1984,7 @@ export function createModel3DMediaElement(asset, url, options = {}) {
 
                 // ── Render loop ──────────────────────────────────────────────────
                 const renderFrame = () => {
-                    if (destroyed || !renderer || !scene || !activeCamera) return;
+                    if (destroyed || runtimePaused || !renderer || !scene || !activeCamera) return;
                     try {
                         controls?.update?.();
                         if (animationMixer && animationClock) {
@@ -1966,8 +2024,11 @@ export function createModel3DMediaElement(asset, url, options = {}) {
                     } catch (e) {
                         console.debug?.(e);
                     }
-                    rafId = requestAnimationFrame(renderFrame);
+                    if (!runtimePaused) {
+                        rafId = requestAnimationFrame(renderFrame);
+                    }
                 };
+                renderFrameFn = renderFrame;
 
                 // ── Viewport button events ───────────────────────────────────────
                 const stopClick = (e) => _stopEvent(e, { preventDefault: true });
@@ -1998,7 +2059,9 @@ export function createModel3DMediaElement(asset, url, options = {}) {
                     syncViewportButtons();
                 });
 
-                renderFrame();
+                if (!runtimePaused) {
+                    renderFrame();
+                }
             } catch (error) {
                 console.warn("[MJR 3D] preview init failed", error);
                 setStatus(

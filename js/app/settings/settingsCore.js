@@ -85,6 +85,8 @@ export const DEFAULT_SETTINGS = {
     viewer: {
         allowPanAtZoom1: APP_DEFAULTS.VIEWER_ALLOW_PAN_AT_ZOOM_1,
         disableWebGL: APP_DEFAULTS.VIEWER_DISABLE_WEBGL_VIDEO,
+        pauseDuringExecution: APP_DEFAULTS.VIEWER_PAUSE_DURING_EXECUTION,
+        floatingPauseDuringExecution: APP_DEFAULTS.FLOATING_VIEWER_PAUSE_DURING_EXECUTION,
         videoGradeThrottleFps: APP_DEFAULTS.VIEWER_VIDEO_GRADE_THROTTLE_FPS,
         scopesFps: APP_DEFAULTS.VIEWER_SCOPES_FPS,
         metaTtlMs: APP_DEFAULTS.VIEWER_META_TTL_MS,
@@ -481,6 +483,13 @@ export const applySettingsToConfig = (settings) => {
 
     APP_CONFIG.VIEWER_ALLOW_PAN_AT_ZOOM_1 = !!settings.viewer?.allowPanAtZoom1;
     APP_CONFIG.VIEWER_DISABLE_WEBGL_VIDEO = !!settings.viewer?.disableWebGL;
+    APP_CONFIG.VIEWER_PAUSE_DURING_EXECUTION = !!(
+        settings.viewer?.pauseDuringExecution ?? APP_DEFAULTS.VIEWER_PAUSE_DURING_EXECUTION
+    );
+    APP_CONFIG.FLOATING_VIEWER_PAUSE_DURING_EXECUTION = !!(
+        settings.viewer?.floatingPauseDuringExecution ??
+        APP_DEFAULTS.FLOATING_VIEWER_PAUSE_DURING_EXECUTION
+    );
     APP_CONFIG.VIEWER_VIDEO_GRADE_THROTTLE_FPS = Math.max(
         1,
         Math.min(

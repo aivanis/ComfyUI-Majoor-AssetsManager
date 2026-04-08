@@ -22,6 +22,7 @@ from ...config import (
 )
 from ...features.index.searcher import _build_filter_clauses
 from ...features.index.vector_runtime import ensure_vector_runtime
+from ...runtime_activity import is_generation_busy
 from ...shared import Result, get_logger
 from ..core import _json_response, _require_services, safe_error_message
 from ..core.security import _check_rate_limit
@@ -34,6 +35,17 @@ _VECTOR_RATE_LIMIT_WINDOW = 60
 _VECTOR_HEAVY_RATE_LIMIT_MAX = 10
 _VECTOR_HEAVY_RATE_LIMIT_WINDOW = 60
 _VECTOR_VALID_SCOPES = {"output", "input", "custom", "all"}
+
+
+def _vector_busy_response() -> web.Response | None:
+    if not is_generation_busy(include_cooldown=False):
+        return None
+    return _json_response(
+        Result.Err(
+            "COMFY_BUSY",
+            "ComfyUI is currently executing. Retry vector and AI actions when the queue is idle.",
+        )
+    )
 
 
 def _hits_to_asset_ids(hits: list[dict[str, Any]]) -> list[int]:
@@ -561,6 +573,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         )
         if not allowed:
             return _json_response(Result.Err("RATE_LIMITED", "Rate limit exceeded", retry_after=retry))
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:
@@ -637,6 +652,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         )
         if not allowed:
             return _json_response(Result.Err("RATE_LIMITED", "Rate limit exceeded", retry_after=retry))
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:
@@ -697,6 +715,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         rate_limited = _vector_rate_limit_response(request, "vector_alignment")
         if rate_limited is not None:
             return rate_limited
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:
@@ -729,6 +750,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         rate_limited = _vector_rate_limit_response(request, "vector_index")
         if rate_limited is not None:
             return rate_limited
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:
@@ -780,6 +804,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         rate_limited = _vector_rate_limit_response(request, "vector_caption")
         if rate_limited is not None:
             return rate_limited
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:
@@ -816,6 +843,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         rate_limited = _vector_rate_limit_response(request, "vector_caption")
         if rate_limited is not None:
             return rate_limited
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:
@@ -852,6 +882,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
     @routes.get("/mjr/am/vector/stats")
     async def vector_stats(request: web.Request) -> web.Response:
         """Return basic statistics about the vector index."""
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
         services, err = await _require_services()
         if err:
             return _json_response(err)
@@ -878,6 +911,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         rate_limited = _vector_rate_limit_response(request, "vector_auto_tags")
         if rate_limited is not None:
             return rate_limited
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:
@@ -927,6 +963,9 @@ def register_vector_search_routes(routes: web.RouteTableDef) -> None:
         )
         if not allowed:
             return _json_response(Result.Err("RATE_LIMITED", "Rate limit exceeded", retry_after=retry))
+        busy = _vector_busy_response()
+        if busy is not None:
+            return busy
 
         services, err = await _require_services()
         if err:

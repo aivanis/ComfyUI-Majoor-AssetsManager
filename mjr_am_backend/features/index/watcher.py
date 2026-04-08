@@ -39,6 +39,7 @@ from ...config import (
     WATCHER_STREAM_ALERT_THRESHOLD,
     WATCHER_STREAM_ALERT_WINDOW_SECONDS,
 )
+from ...runtime_activity import is_generation_busy
 from ...shared import EXTENSIONS, get_logger
 from ..watcher_settings import get_watcher_settings
 
@@ -413,6 +414,9 @@ class DebouncedWatchHandler(FileSystemEventHandler):
         candidates = self._drain_pending_candidates()
         if not candidates:
             return
+        if is_generation_busy():
+            self._requeue_runtime_deferred_files(candidates)
+            return
 
         async with self._flush_semaphore:
             _record_flush_volume(len(candidates))
@@ -438,6 +442,16 @@ class DebouncedWatchHandler(FileSystemEventHandler):
             for f in files:
                 if _MAX_PENDING_FILES <= 0 or len(self._overflow) < _MAX_PENDING_FILES:
                     self._overflow[f] = now
+
+    def _requeue_runtime_deferred_files(self, files: list[str]) -> None:
+        now = time.time()
+        with self._lock:
+            for f in files:
+                if not f:
+                    continue
+                if f not in self._pending and f not in self._overflow:
+                    self._overflow[f] = now
+            self._schedule_flush()
 
     def _drain_pending_candidates(self) -> list[str]:
         with self._lock:

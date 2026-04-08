@@ -372,6 +372,11 @@ MEDIA_PROBE_BACKEND = str(_env_raw("MJR_AM_MEDIA_PROBE_BACKEND", "MAJOOR_MEDIA_P
 # 15s/10s are conservative defaults that keep UI responsive while allowing slow media probes.
 EXIFTOOL_TIMEOUT = _env_int(15, "MJR_AM_EXIFTOOL_TIMEOUT", "MAJOOR_EXIFTOOL_TIMEOUT", min_value=1, max_value=120)
 FFPROBE_TIMEOUT = _env_int(10, "MJR_AM_FFPROBE_TIMEOUT", "MAJOOR_FFPROBE_TIMEOUT", min_value=1, max_value=120)
+TOOL_LOW_PRIORITY_SUBPROCESSES = _env_bool(
+    True,
+    "MJR_AM_TOOL_LOW_PRIORITY_SUBPROCESSES",
+    "MAJOOR_TOOL_LOW_PRIORITY_SUBPROCESSES",
+)
 
 # Database tuning.
 # 2 MiB default metadata JSON cap limits DB bloat from oversized embedded metadata blobs.
@@ -379,6 +384,13 @@ DB_TIMEOUT = _env_float(10.0, "MJR_AM_DB_TIMEOUT", "MAJOOR_DB_TIMEOUT", min_valu
 DB_MAX_CONNECTIONS = _env_int(8, "MJR_AM_DB_MAX_CONNECTIONS", "MAJOOR_DB_MAX_CONNECTIONS", min_value=1, max_value=64)
 DB_QUERY_TIMEOUT = _env_float(60.0, "MJR_AM_DB_QUERY_TIMEOUT", "MAJOOR_DB_QUERY_TIMEOUT", min_value=1.0, max_value=600.0)
 TO_THREAD_TIMEOUT_S = _env_float(30.0, "MJR_AM_TO_THREAD_TIMEOUT", "MAJOOR_TO_THREAD_TIMEOUT", min_value=1.0, max_value=300.0)
+EXECUTION_IDLE_GRACE_SECONDS = _env_float(
+    6.0,
+    "MJR_AM_EXECUTION_IDLE_GRACE_SECONDS",
+    "MAJOOR_EXECUTION_IDLE_GRACE_SECONDS",
+    min_value=0.0,
+    max_value=300.0,
+)
 MAX_METADATA_JSON_BYTES = _env_int(2 * 1024 * 1024, "MJR_AM_MAX_METADATA_JSON_BYTES", "MAJOOR_MAX_METADATA_JSON_BYTES", min_value=64 * 1024, max_value=32 * 1024 * 1024)
 METADATA_CACHE_MAX = _env_int(100_000, "MJR_AM_METADATA_CACHE_MAX", "MAJOOR_METADATA_CACHE_MAX", min_value=1000, max_value=5_000_000)
 METADATA_CACHE_TTL_SECONDS = _env_float(90.0 * 24.0 * 3600.0, "MJR_AM_METADATA_CACHE_TTL_SECONDS", "MAJOOR_METADATA_CACHE_TTL_SECONDS", min_value=60.0, max_value=3650.0 * 24.0 * 3600.0)
@@ -463,6 +475,11 @@ SEARCH_MAX_OFFSET = _env_int(10_000, "MJR_AM_SEARCH_MAX_OFFSET", "MAJOOR_SEARCH_
 # 1.5s TTL smooths repeated UI queries without serving stale lists for long.
 FS_LIST_CACHE_MAX = _env_int(32, "MJR_AM_FS_LIST_CACHE_MAX", "MAJOOR_FS_LIST_CACHE_MAX", min_value=1, max_value=10000)
 FS_LIST_CACHE_TTL_SECONDS = _env_float(1.5, "MJR_AM_FS_LIST_CACHE_TTL_SECONDS", "MAJOOR_FS_LIST_CACHE_TTL_SECONDS", min_value=0.1, max_value=3600.0)
+FS_LIST_CACHE_WATCHER_ENABLED = _env_bool(
+    False,
+    "MJR_AM_ENABLE_FS_LIST_CACHE_WATCHER",
+    "MAJOOR_ENABLE_FS_LIST_CACHE_WATCHER",
+)
 # Scanner batching (bounded transactions)
 # Tweak only if you know your workload; larger batches reduce transaction overhead but increase lock time.
 SCAN_BATCH_SMALL_THRESHOLD = _env_int(100, "MJR_AM_SCAN_BATCH_SMALL_THRESHOLD", "MAJOOR_SCAN_BATCH_SMALL_THRESHOLD", min_value=1, max_value=1_000_000)
@@ -625,6 +642,16 @@ VECTOR_PREWARM_ON_STARTUP = _env_bool(
     False,
     "MJR_AM_VECTOR_PREWARM_ON_STARTUP",
     "MAJOOR_VECTOR_PREWARM_ON_STARTUP",
+)
+SERVICES_PREWARM_ON_STARTUP = _env_bool(
+    False,
+    "MJR_AM_SERVICES_PREWARM_ON_STARTUP",
+    "MAJOOR_SERVICES_PREWARM_ON_STARTUP",
+)
+OBS_INSTALL_GLOBAL_ASYNCIO_HANDLER = _env_bool(
+    sys.platform.startswith("win"),
+    "MJR_AM_OBS_INSTALL_GLOBAL_ASYNCIO_HANDLER",
+    "MAJOOR_OBS_INSTALL_GLOBAL_ASYNCIO_HANDLER",
 )
 
 # Auto-tagging: minimum cosine similarity to assign a tag.

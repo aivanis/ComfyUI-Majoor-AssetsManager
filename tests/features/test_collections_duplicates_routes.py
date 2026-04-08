@@ -291,6 +291,9 @@ async def test_duplicates_analyze_uses_default_limit_on_bad_input(monkeypatch) -
         return {"duplicates": _Dup()}, None
 
     async def _read_json(_request):
+        return Result.Ok({"limit": 10})
+
+    async def _read_json(_request):
         return Result.Ok({"limit": "abc"})
 
     app = _app_with(duplicates_mod.register_duplicates_routes)
@@ -307,6 +310,36 @@ async def test_duplicates_analyze_uses_default_limit_on_bad_input(monkeypatch) -
 
     assert payload.get("ok") is True
     assert captured["limit"] == 250
+
+
+@pytest.mark.asyncio
+async def test_duplicates_analyze_deferred_while_generation_busy(monkeypatch) -> None:
+    class _Dup:
+        async def start_background_analysis(self, limit=250):
+            _ = limit
+            raise AssertionError("duplicate analysis should not start while ComfyUI is busy")
+
+    async def _require_services():
+        return {"duplicates": _Dup()}, None
+
+    async def _read_json(_request):
+        return Result.Ok({"limit": 10})
+
+    app = _app_with(duplicates_mod.register_duplicates_routes)
+    monkeypatch.setattr(duplicates_mod, "is_db_maintenance_active", lambda: False)
+    monkeypatch.setattr(duplicates_mod, "is_generation_busy", lambda **_kwargs: True)
+    monkeypatch.setattr(duplicates_mod, "_csrf_error", lambda _request: None)
+    monkeypatch.setattr(duplicates_mod, "_require_write_access", _ok_write)
+    monkeypatch.setattr(duplicates_mod, "_require_services", _require_services)
+    monkeypatch.setattr(duplicates_mod, "_read_json", _read_json)
+
+    req = make_mocked_request("POST", "/mjr/am/duplicates/analyze", app=app)
+    match = await app.router.resolve(req)
+    resp = await match.handler(req)
+    payload = json.loads(resp.text)
+
+    assert payload.get("ok") is False
+    assert payload.get("code") == "COMFY_BUSY"
 
 
 @pytest.mark.asyncio

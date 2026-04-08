@@ -334,6 +334,7 @@ def test_filesystem_dir_cache_state_handles_watch_token(tmp_path: Path, monkeypa
 
     monkeypatch.setattr(fs, "ensure_fs_list_cache_watching", _watch)
     monkeypatch.setattr(fs, "get_fs_list_cache_token", lambda _b: 9)
+    monkeypatch.setattr(fs, "FS_LIST_CACHE_WATCHER_ENABLED", True)
 
     res = fs._filesystem_dir_cache_state(base, target)
     assert res.ok

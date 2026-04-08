@@ -17,6 +17,7 @@
 
 import { get } from "../../api/client.js";
 import { buildListURL } from "../../api/endpoints.js";
+import { runStartupWarmup } from "../../app/bootstrap.js";
 import { APP_CONFIG } from "../../app/config.js";
 import {
     activateSidebarTabCompat,
@@ -46,7 +47,18 @@ let _earlyFetchKey = null;
 const EARLY_FETCH_TTL_MS = 5000; // Prefetch valid for 5 seconds
 let _earlyFetchTimestamp = 0;
 
+function isExecutionBusy() {
+    try {
+        return !!String(window?.__MJR_EXECUTION_RUNTIME__?.active_prompt_id || "").trim();
+    } catch {
+        return false;
+    }
+}
+
 function startEarlyFetch() {
+    if (isExecutionBusy()) {
+        return null;
+    }
     const now = Date.now();
     const key = "output:*:mtime_desc"; // Default browse context
     
@@ -220,9 +232,12 @@ export function registerAssetsSidebar(runtimeApp, { sidebarTabId }) {
         type: "custom",
 
         render(el) {
-            // Start fetching assets immediately to reduce perceived load time.
-            // The Vue app will consume this prefetched data when it mounts.
-            startEarlyFetch();
+            if (!isExecutionBusy()) {
+                // Start fetching assets immediately to reduce perceived load time.
+                // The Vue app will consume this prefetched data when it mounts.
+                startEarlyFetch();
+                void runStartupWarmup({ idleOnly: true }).catch(() => null);
+            }
             // Mount the Vue app once; subsequent calls reuse the live instance.
             mountKeepAlive(el, AssetsManagerApp, SIDEBAR_MOUNT_KEY);
         },

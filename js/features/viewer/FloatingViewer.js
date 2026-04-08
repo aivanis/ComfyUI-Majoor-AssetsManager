@@ -7,6 +7,7 @@
  */
 
 import { EVENTS } from "../../app/events.js";
+import { APP_CONFIG } from "../../app/config.js";
 import { t } from "../../app/i18n.js";
 import { comfyToast } from "../../app/toast.js";
 import { buildViewURL, buildAssetViewURL } from "../../api/endpoints.js";
@@ -268,6 +269,7 @@ function _buildMediaEl(fileData, { fill = false } = {}) {
             canvasClassName: `mjr-mfv-media mjr-model3d-render-canvas${fill ? " mjr-mfv-media--fill" : ""}`,
             hintText: "Rotate: left drag  Pan: right drag  Zoom: wheel or middle drag",
             disableViewerTransform: true,
+            pauseDuringExecution: !!APP_CONFIG.FLOATING_VIEWER_PAUSE_DURING_EXECUTION,
         });
     }
 

@@ -68,7 +68,7 @@ if WEB_DIRECTORY is None:
 try:
     root_str = str(root)
     if root_str not in sys.path:
-        sys.path.insert(0, root_str)
+        sys.path.append(root_str)
 except Exception:
     _logger.debug("failed to ensure extension root on sys.path", exc_info=True)
 
@@ -81,6 +81,13 @@ def init_prompt_server() -> None:
     """
     global _REGISTRY_HOOKS_DONE
     try:
+        try:
+            from mjr_am_backend.runtime_activity import ensure_prompt_lifecycle_provider_registered
+
+            ensure_prompt_lifecycle_provider_registered()
+        except Exception:
+            _logger.debug("failed to register prompt lifecycle provider", exc_info=True)
+
         _registry = importlib.import_module("mjr_am_backend.routes.registry")
 
         register_all_routes = getattr(_registry, "register_all_routes", None)
@@ -91,11 +98,6 @@ def init_prompt_server() -> None:
         if not _REGISTRY_HOOKS_DONE and callable(register_all_routes):
             register_all_routes()
 
-        # Keep legacy behavior expected by import-hook tests and older runtime wiring.
-        if not _REGISTRY_HOOKS_DONE and callable(install_observability):
-            install_observability()
-        _REGISTRY_HOOKS_DONE = True
-
         from server import PromptServer  # type: ignore
         prompt_server = getattr(PromptServer, "instance", None)
         app = getattr(prompt_server, "app", None)
@@ -103,6 +105,9 @@ def init_prompt_server() -> None:
         if app is None:
             _logger.debug("PromptServer app is not available yet; route table registered only")
             return
+        if not _REGISTRY_HOOKS_DONE and callable(install_observability):
+            install_observability()
+        _REGISTRY_HOOKS_DONE = True
         if callable(register_routes):
             app_id = id(app)
             if app_id not in _REGISTERED_APPS:

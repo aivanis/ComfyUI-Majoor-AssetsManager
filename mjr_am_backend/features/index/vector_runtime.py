@@ -11,6 +11,7 @@ import asyncio
 from typing import Any
 
 from ...config import is_vector_search_enabled
+from ...runtime_activity import is_generation_busy
 
 
 def _get_vector_runtime_lock(services: dict[str, Any]) -> asyncio.Lock:
@@ -59,6 +60,17 @@ async def ensure_vector_runtime(
     runtime = _current_runtime(services)
     if _has_runtime(runtime):
         return runtime
+
+    if is_generation_busy(include_cooldown=False):
+        if logger is not None:
+            try:
+                logger.info(
+                    "Vector runtime initialization deferred while ComfyUI is executing (%s)",
+                    str(reason or "runtime"),
+                )
+            except Exception:
+                pass
+        return None, None
 
     if services.get("db") is None:
         return None, None

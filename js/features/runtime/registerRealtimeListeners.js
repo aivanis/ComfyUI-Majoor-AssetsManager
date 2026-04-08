@@ -47,6 +47,7 @@ export async function registerRealtimeListeners({
     t,
     reportError,
     registerCleanableListener,
+    syncExecutionBackendState,
 }) {
     api._mjrExecutedHandler = (event) => {
         try {
@@ -62,6 +63,10 @@ export async function registerRealtimeListeners({
             executionRuntime.handleExecutionStart(event, {
                 setCurrentJobId: (jobId) => liveStreamModule?.setCurrentJobId(jobId),
             });
+            void syncExecutionBackendState?.({
+                active: true,
+                promptId: event?.detail?.prompt_id || event?.detail?.promptId || "",
+            });
         } catch (error) {
             reportError(error, "entry.execution_start");
         }
@@ -70,6 +75,10 @@ export async function registerRealtimeListeners({
         try {
             executionRuntime.handleExecutionEnd(event, {
                 setCurrentJobId: (jobId) => liveStreamModule?.setCurrentJobId(jobId),
+            });
+            void syncExecutionBackendState?.({
+                active: false,
+                promptId: event?.detail?.prompt_id || event?.detail?.promptId || "",
             });
         } catch (error) {
             reportError(error, "entry.execution_end");
@@ -163,17 +172,6 @@ export async function registerRealtimeListeners({
             const grid = getActiveGridContainer();
             if (grid && event?.detail) {
                 const liveEvent = executionRuntime.prepareLiveAssetEvent(event.detail);
-                // Deferred assets (multi-output, awaiting stack_id) are buffered so they
-                // can be replayed once notifyStacksUpdated fires refreshGeneratedFeedHosts.
-                // Previously they were silently dropped, causing invisible assets when stack
-                // finalization succeeded but the WS event arrived before stack assignment.
-                if (liveEvent?.defer) {
-                    const detail = liveEvent?.detail || event.detail;
-                    if (executionRuntime.isRenderableLiveAsset(detail)) {
-                        pushGeneratedAsset(detail);
-                    }
-                    return;
-                }
                 const detail = liveEvent?.detail || event.detail;
                 const renderable = executionRuntime.isRenderableLiveAsset(detail);
                 if (renderable) {
@@ -184,16 +182,7 @@ export async function registerRealtimeListeners({
                 const query = grid.dataset?.mjrQuery || "*";
                 const canDirectUpsert = String(query).trim() === "*";
                 if (canDirectUpsert && renderable) {
-                    const handled = !!upsertAsset(grid, detail);
-                    if (handled) {
-                        try {
-                            window.__mjrLastAssetUpsert = Date.now();
-                            window.__mjrLastAssetUpsertCount =
-                                (Number(window.__mjrLastAssetUpsertCount || 0) || 0) + 1;
-                        } catch (e) {
-                            console.debug?.(e);
-                        }
-                    }
+                    upsertLiveAssetIntoGrid(grid, detail);
                 }
             }
         } catch (error) {
@@ -207,7 +196,6 @@ export async function registerRealtimeListeners({
             const grid = getActiveGridContainer();
             if (grid && event?.detail) {
                 const liveEvent = executionRuntime.prepareLiveAssetEvent(event.detail);
-                if (liveEvent?.defer) return;
                 const detail = liveEvent?.detail || event.detail;
                 if (executionRuntime.isRenderableLiveAsset(detail)) {
                     pushGeneratedAsset(detail);
@@ -257,7 +245,6 @@ export async function registerRealtimeListeners({
             const grid = getActiveGridContainer();
             if (grid && detail) {
                 const liveEvent = executionRuntime.prepareLiveAssetEvent(detail);
-                if (liveEvent?.defer) return;
                 const nextDetail = liveEvent?.detail || detail;
                 if (executionRuntime.isRenderableLiveAsset(nextDetail)) {
                     pushGeneratedAsset(nextDetail);

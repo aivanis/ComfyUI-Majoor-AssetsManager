@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 from ...adapters.db.sqlite import Sqlite
+from ...runtime_activity import is_generation_busy
 from ...shared import Result, get_logger
 from ..metadata import MetadataService
 
@@ -203,6 +204,9 @@ class MetadataEnricher:
         try:
             while True:
                 if self._scan_pause_count > 0:
+                    await asyncio.sleep(0.25)
+                    continue
+                if is_generation_busy():
                     await asyncio.sleep(0.25)
                     continue
                 now = time.monotonic()

@@ -209,6 +209,13 @@ const DICTIONARY = {
         // --- Settings: Viewer ---
         "setting.viewer.pan.name": "Majoor: Pan without Zoom",
         "setting.viewer.pan.desc": "Allow panning the image even at zoom level 1.",
+        "setting.viewer.pauseExecution.name": "Majoor: Pause Main Viewer During Execution",
+        "setting.viewer.pauseExecution.desc":
+            "Pause the main viewer render processors while ComfyUI is generating to reduce competition for CPU/GPU.",
+        "setting.viewer.floatingPauseExecution.name":
+            "Majoor: Pause Floating Viewer During Execution",
+        "setting.viewer.floatingPauseExecution.desc":
+            "Pause the Floating Viewer during generation. Disable this if you want to keep live generation steps visible.",
         "setting.minimap.enabled.name": "Majoor: Enable Minimap",
         "setting.minimap.enabled.desc": "Global activation of the workflow minimap.",
 
@@ -1007,6 +1014,14 @@ const DICTIONARY = {
         "setting.ai.vector.enabled.name": "Activer la recherche semantique IA",
         "setting.ai.vector.enabled.desc":
             "Active la recherche semantique basee sur CLIP. Desactivez pour une recherche par mots-cles uniquement.",
+        "setting.viewer.pauseExecution.name":
+            "Majoor : Pause du viewer principal pendant l'execution",
+        "setting.viewer.pauseExecution.desc":
+            "Met en pause les processeurs de rendu du viewer principal pendant une generation ComfyUI pour reduire la concurrence CPU/GPU.",
+        "setting.viewer.floatingPauseExecution.name":
+            "Majoor : Pause du Floating Viewer pendant l'execution",
+        "setting.viewer.floatingPauseExecution.desc":
+            "Met en pause le Floating Viewer pendant la generation. Desactivez cette option pour garder les steps visibles en direct.",
 
         "runtime.unavailable": "Runtime indisponible",
         "runtime.metricsTitle":

@@ -14,6 +14,7 @@ export const ENDPOINTS = {
     HEALTH_COUNTERS: "/mjr/am/health/counters",
     HEALTH_DB: "/mjr/am/health/db",
     STATUS: "/mjr/am/status",
+    RUNTIME_EXECUTION: "/mjr/am/runtime/execution",
     CONFIG: "/mjr/am/config",
     VERSION: "/mjr/am/version",
 

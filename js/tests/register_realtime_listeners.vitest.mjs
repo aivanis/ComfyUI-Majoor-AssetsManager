@@ -92,7 +92,7 @@ describe("registerRealtimeListeners", () => {
         expect(harness.upsertAsset).toHaveBeenCalledWith(harness.grid, detail);
     });
 
-    it("n upsert pas un asset indexe differe tant que le gate live le bloque", async () => {
+    it("upsert un asset indexe differe tout en laissant la finalisation lourde au gate", async () => {
         ensureBrowserShims();
         const harness = createRuntimeHarness({ defer: true });
 
@@ -126,8 +126,15 @@ describe("registerRealtimeListeners", () => {
             },
         });
 
-        expect(harness.pushGeneratedAsset).not.toHaveBeenCalled();
-        expect(harness.upsertAsset).not.toHaveBeenCalled();
+        expect(harness.pushGeneratedAsset).toHaveBeenCalledTimes(1);
+        expect(harness.upsertAsset).toHaveBeenCalledTimes(1);
+        expect(harness.upsertAsset).toHaveBeenCalledWith(harness.grid, {
+            id: 43,
+            kind: "image",
+            filename: "gen_0043.png",
+            filepath: "output/gen_0043.png",
+            type: "output",
+        });
     });
 
     it("upsert apres generation puis indexation sur la grille active", async () => {
@@ -177,5 +184,44 @@ describe("registerRealtimeListeners", () => {
         expect(harness.upsertAsset).toHaveBeenCalledTimes(1);
         expect(harness.upsertAsset).toHaveBeenCalledWith(harness.grid, detail);
         expect(Number(window.__mjrLastAssetUpsertCount || 0)).toBeGreaterThan(0);
+    });
+
+    it("synchronise l etat d execution vers le backend au start et a la fin", async () => {
+        ensureBrowserShims();
+        const harness = createRuntimeHarness();
+        const syncExecutionBackendState = vi.fn(() => Promise.resolve());
+
+        await registerRealtimeListeners({
+            api: harness.api,
+            runtime: harness.runtime,
+            executionRuntime: harness.executionRuntime,
+            appRef: {},
+            liveStreamModule: null,
+            ensureExecutionRuntime: () => ({ queue_remaining: 0, active_prompt_id: null }),
+            emitRuntimeStatus: () => {},
+            getActiveGridContainer: () => harness.grid,
+            pushGeneratedAsset: harness.pushGeneratedAsset,
+            upsertAsset: harness.upsertAsset,
+            removeAssetsFromGrid: () => {},
+            getEnrichmentState: () => ({ active: false }),
+            setEnrichmentState: () => {},
+            comfyToast: () => {},
+            t: (_k, fallback) => fallback,
+            reportError: () => {},
+            registerCleanableListener: () => {},
+            syncExecutionBackendState,
+        });
+
+        harness.api._mjrExecutionStartHandler({ detail: { prompt_id: "job-1" } });
+        harness.api._mjrExecutionEndHandler({ detail: { prompt_id: "job-1" } });
+
+        expect(syncExecutionBackendState).toHaveBeenNthCalledWith(1, {
+            active: true,
+            promptId: "job-1",
+        });
+        expect(syncExecutionBackendState).toHaveBeenNthCalledWith(2, {
+            active: false,
+            promptId: "job-1",
+        });
     });
 });

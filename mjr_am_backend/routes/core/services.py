@@ -5,6 +5,7 @@ import asyncio
 import threading
 from typing import Any
 
+from mjr_am_backend.adapters.fs.list_cache_watcher import stop_global_fs_list_cache_watcher
 from mjr_am_backend.config import VECTOR_PREWARM_ON_STARTUP
 from mjr_am_backend.deps import build_services
 from mjr_am_backend.shared import Result, get_logger
@@ -39,6 +40,47 @@ async def _dispose_services():
         return
 
     disposal_errors = []
+
+    watcher = _services.get("watcher")
+    if watcher:
+        try:
+            await watcher.stop()
+            logger.debug("Watcher stopped successfully")
+        except Exception as exc:
+            error_msg = f"Error stopping watcher: {exc}"
+            logger.warning(error_msg, exc_info=True)
+            disposal_errors.append(error_msg)
+
+    index_service = _services.get("index")
+    if index_service:
+        try:
+            stop_enrichment = getattr(index_service, "stop_enrichment", None)
+            if callable(stop_enrichment):
+                await stop_enrichment(clear_queue=False)
+                logger.debug("Index enrichment stopped successfully")
+        except Exception as exc:
+            error_msg = f"Error stopping index enrichment: {exc}"
+            logger.warning(error_msg, exc_info=True)
+            disposal_errors.append(error_msg)
+
+    rating_sync = _services.get("rating_tags_sync")
+    if rating_sync:
+        try:
+            stop_rating_sync = getattr(rating_sync, "stop", None)
+            if callable(stop_rating_sync):
+                await asyncio.to_thread(stop_rating_sync)
+                logger.debug("Rating/tags sync worker stopped successfully")
+        except Exception as exc:
+            error_msg = f"Error stopping rating/tags sync worker: {exc}"
+            logger.warning(error_msg, exc_info=True)
+            disposal_errors.append(error_msg)
+
+    try:
+        stop_global_fs_list_cache_watcher()
+    except Exception as exc:
+        error_msg = f"Error stopping filesystem list-cache watcher: {exc}"
+        logger.warning(error_msg, exc_info=True)
+        disposal_errors.append(error_msg)
 
     # Dispose database connection
     db = _services.get("db")

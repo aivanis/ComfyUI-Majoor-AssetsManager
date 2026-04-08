@@ -17,6 +17,7 @@ except Exception:
 
 from mjr_am_backend.config import get_runtime_output_root
 from mjr_am_backend.custom_roots import resolve_custom_root
+from mjr_am_backend.runtime_activity import is_generation_busy
 from mjr_am_backend.shared import Result
 
 from ..core import (
@@ -98,6 +99,13 @@ def _duplicate_alerts_params(request: web.Request) -> tuple[int, int, int]:
     )
 
 
+def _generation_busy_result() -> Result[dict]:
+    return Result.Err(
+        "COMFY_BUSY",
+        "ComfyUI is currently executing. Retry duplicate analysis when the queue is idle.",
+    )
+
+
 async def _get_duplicate_alerts_safe(
     dup: object,
     *,
@@ -128,6 +136,8 @@ def register_duplicates_routes(routes: web.RouteTableDef) -> None:
     async def start_duplicates_analysis(request):
         if is_db_maintenance_active():
             return _json_response(Result.Err("DB_MAINTENANCE", "Database maintenance in progress. Please wait."))
+        if is_generation_busy(include_cooldown=False):
+            return _json_response(_generation_busy_result())
         csrf = _csrf_error(request)
         if csrf:
             return _json_response(Result.Err("CSRF", csrf))

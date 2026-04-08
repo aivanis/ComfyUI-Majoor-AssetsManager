@@ -36,11 +36,16 @@ export function createExecutionRuntimeController({
         ttlMs: EXECUTION_START_TTL_MS,
         maxSize: EXECUTION_STARTS_MAX,
     });
+    const executionIdleGraceMs = Math.max(
+        0,
+        Number(APP_CONFIG.EXECUTION_IDLE_GRACE_MS) || 6000,
+    );
     const orphanGenerationEntries = new Map();
     const executionAssetBuffer = createExecutionAssetBuffer();
     const liveAssetGate = createLiveAssetGate();
     let lastStacksUpdateSignature = "";
     let lastStacksUpdateAt = 0;
+    let postExecutionWorkTimer = null;
 
     function isJobTrackingDebugEnabled() {
         try {
@@ -189,6 +194,26 @@ export function createExecutionRuntimeController({
         return Math.min(INDEX_RETRY_MAX_DELAY_MS, INDEX_RETRY_BASE_DELAY_MS * 2 ** exp);
     }
 
+    function clearPostExecutionWorkTimer() {
+        if (postExecutionWorkTimer) {
+            clearTimeout(postExecutionWorkTimer);
+            postExecutionWorkTimer = null;
+        }
+    }
+
+    function schedulePostExecutionWork(work, delayMs = executionIdleGraceMs) {
+        const waitMs = Math.max(0, Number(delayMs) || 0, executionIdleGraceMs);
+        clearPostExecutionWorkTimer();
+        postExecutionWorkTimer = setTimeout(() => {
+            postExecutionWorkTimer = null;
+            try {
+                work?.();
+            } catch (error) {
+                reportError(error, "executionRuntime.post_execution");
+            }
+        }, waitMs);
+    }
+
     function shouldRetryIndexResponse(res) {
         const code = String(res?.code || "")
             .trim()
@@ -334,15 +359,14 @@ export function createExecutionRuntimeController({
     }
 
     function schedulePostExecutionScan(delayMs = 1200) {
-        const waitMs = Math.max(0, Number(delayMs) || 0);
-        setTimeout(() => {
+        schedulePostExecutionWork(() => {
             post(ENDPOINTS.SCAN, {
                 recursive: true,
                 incremental: true,
                 fast: true,
                 background_metadata: true,
             }).catch((error) => reportError(error, "executionRuntime.execution_end.scan"));
-        }, waitMs);
+        }, delayMs);
     }
 
     function flushBufferedGenerationIndex(jobId) {
@@ -466,6 +490,7 @@ export function createExecutionRuntimeController({
             timestamp: Number(ts) || null,
         });
         rememberExecutionStart(promptId, ts);
+        clearPostExecutionWorkTimer();
         setCurrentJobId?.(promptId || null);
         emitRuntimeStatus({
             active_prompt_id: promptId || null,
@@ -503,6 +528,7 @@ export function createExecutionRuntimeController({
                 prompt_id: String(promptId || ""),
                 reason: String(event?.type || ""),
             });
+            clearPostExecutionWorkTimer();
             executionAssetBuffer.clear(promptId);
             if (policy.allowLiveStackFinalize) {
                 liveAssetGate.clearPendingJob(promptId);
@@ -511,12 +537,14 @@ export function createExecutionRuntimeController({
         }
         if (String(event?.type || "") === "execution_success") {
             if (policy.usePostExecutionScan) {
-                schedulePostExecutionScan(1800);
+                schedulePostExecutionScan(executionIdleGraceMs);
             } else {
-                if (promptId) {
-                    flushOrphanGenerationEntries(promptId);
-                }
-                flushBufferedGenerationIndex(promptId);
+                schedulePostExecutionWork(() => {
+                    if (promptId) {
+                        flushOrphanGenerationEntries(promptId);
+                    }
+                    flushBufferedGenerationIndex(promptId);
+                }, executionIdleGraceMs);
             }
         }
     }

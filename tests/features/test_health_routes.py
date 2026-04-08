@@ -7,6 +7,7 @@ import pytest
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 from mjr_am_backend.routes.handlers import health as health_mod
+from mjr_am_backend.runtime_activity import mark_generation_finished
 from mjr_am_backend.shared import Result
 
 
@@ -112,6 +113,7 @@ async def test_runtime_status_payload(monkeypatch) -> None:
     assert body.get("ok") is True
     data = body.get("data") or {}
     assert data.get("watcher", {}).get("pending_files") == 7
+    assert "execution" in data
 
 
 @pytest.mark.asyncio
@@ -139,6 +141,28 @@ async def test_runtime_status_watcher_callable_state(monkeypatch) -> None:
     data = body.get("data") or {}
     assert data.get("watcher", {}).get("enabled") is False
     assert data.get("watcher", {}).get("pending_files") == 2
+
+
+@pytest.mark.asyncio
+async def test_update_execution_runtime_route(monkeypatch) -> None:
+    mark_generation_finished(None, cooldown_seconds=0.0)
+    monkeypatch.setattr(health_mod, "_csrf_error", lambda _req: None)
+    monkeypatch.setattr(health_mod, "_require_write_access", lambda _req: Result.Ok({}))
+
+    async def _read_json(_req):
+        return Result.Ok({"active": True, "prompt_id": "job-42"})
+
+    monkeypatch.setattr(health_mod, "_read_json", _read_json)
+
+    app = _build_health_app()
+    req = make_mocked_request("POST", "/mjr/am/runtime/execution", app=app)
+    resp = await (await app.router.resolve(req)).handler(req)
+    body = json.loads(resp.text)
+    data = body.get("data") or {}
+    assert body.get("ok") is True
+    assert data.get("generation_active") is True
+    assert data.get("active_prompt_id") == "job-42"
+    mark_generation_finished("job-42", cooldown_seconds=0.0)
 
 
 @pytest.mark.asyncio

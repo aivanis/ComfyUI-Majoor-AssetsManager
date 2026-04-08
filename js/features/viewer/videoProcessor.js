@@ -1,3 +1,5 @@
+import { APP_CONFIG } from "../../app/config.js";
+import { EVENTS } from "../../app/events.js";
 import { clamp01 } from "./state.js";
 import { computeProcessorScale } from "./processorUtils.js";
 import { drawMediaError } from "./imageProcessor.js";
@@ -7,6 +9,7 @@ export function createVideoProcessor({
     canvas,
     videoEl,
     disableWebGL,
+    pauseDuringExecution = null,
     getGradeParams,
     isDefaultGrade,
     _tonemap,
@@ -16,6 +19,10 @@ export function createVideoProcessor({
     safeCall,
     onReady,
 } = {}) {
+    const shouldPauseDuringExecution =
+        pauseDuringExecution == null
+            ? !!APP_CONFIG?.VIEWER_PAUSE_DURING_EXECUTION
+            : !!pauseDuringExecution;
     // Attempt WebGL first
     let glProc = null;
     if (!disableWebGL && isWebGLAvailable()) {
@@ -83,6 +90,7 @@ export function createVideoProcessor({
         _lutKey: "",
         _lastFrameTime: -1,
         _lastHeavySig: "",
+        _runtimePaused: false,
     };
 
     const unsubs = [];
@@ -364,6 +372,7 @@ export function createVideoProcessor({
 
     const scheduleRender = () => {
         if (proc._destroyed) return;
+        if (proc._runtimePaused) return;
         if (proc._rendering) return;
         if (!canvas?.isConnected) {
             scheduleWhenConnected();
@@ -420,6 +429,7 @@ export function createVideoProcessor({
 
     const startFrameLoop = () => {
         if (proc._destroyed) return;
+        if (proc._runtimePaused) return;
         // Cancel any previously-registered frame loops before starting new ones.
         // Without this, every pause→play cycle (including seeks that temporarily
         // pause the video) accumulates an extra rVFC/RAF callback.  After N cycles
@@ -488,6 +498,47 @@ export function createVideoProcessor({
         scheduleRender();
     };
 
+    const pauseProcessing = () => {
+        proc._runtimePaused = true;
+        try {
+            if (proc._throttleTimer) clearTimeout(proc._throttleTimer);
+        } catch (e) {
+            console.debug?.(e);
+        }
+        proc._throttleTimer = null;
+        try {
+            if (proc._rvfc != null && typeof videoEl?.cancelVideoFrameCallback === "function") {
+                videoEl.cancelVideoFrameCallback(proc._rvfc);
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        proc._rvfc = null;
+        try {
+            if (proc._rafIdLoop != null) cancelAnimationFrame(proc._rafIdLoop);
+        } catch (e) {
+            console.debug?.(e);
+        }
+        proc._rafIdLoop = null;
+        try {
+            if (proc._rafIdSchedule != null) cancelAnimationFrame(proc._rafIdSchedule);
+        } catch (e) {
+            console.debug?.(e);
+        }
+        proc._rafIdSchedule = null;
+        proc._rendering = false;
+    };
+
+    const resumeProcessing = () => {
+        proc._runtimePaused = false;
+        if (videoEl?.paused) {
+            scheduleRender();
+            return;
+        }
+        startFrameLoop();
+        scheduleRender();
+    };
+
     const sampleAtOriginal = (x, y) => {
         try {
             if (!proc.ready) ensureSizeFromVideo();
@@ -539,8 +590,21 @@ export function createVideoProcessor({
         }
     };
 
+    const onRuntimeStatus = (event) => {
+        if (!shouldPauseDuringExecution) return;
+        const activePromptId = String(event?.detail?.active_prompt_id || "").trim();
+        if (activePromptId) {
+            pauseProcessing();
+            return;
+        }
+        resumeProcessing();
+    };
+
     try {
-        const onPlay = () => startFrameLoop();
+        const onPlay = () => {
+            if (proc._runtimePaused) return;
+            startFrameLoop();
+        };
         const onError = () => {
             proc.ready = false;
             try {
@@ -589,6 +653,12 @@ export function createVideoProcessor({
                 (() => {}),
         );
         unsubs.push(safeAddListener?.(videoEl, "error", onError, { passive: true }) || (() => {}));
+        if (shouldPauseDuringExecution) {
+            window.addEventListener(EVENTS.RUNTIME_STATUS, onRuntimeStatus);
+            if (String(window?.__MJR_EXECUTION_RUNTIME__?.active_prompt_id || "").trim()) {
+                pauseProcessing();
+            }
+        }
     } catch (e) {
         console.debug?.(e);
     }
@@ -597,9 +667,16 @@ export function createVideoProcessor({
         setParams,
         sampleAtOriginal,
         getInfo: () => ({ ...proc, renderer: glProc ? "webgl" : "2d" }),
+        pause: pauseProcessing,
+        resume: resumeProcessing,
         destroy: () => {
             if (glProc) glProc.destroy();
             proc._destroyed = true;
+            try {
+                window.removeEventListener(EVENTS.RUNTIME_STATUS, onRuntimeStatus);
+            } catch (e) {
+                console.debug?.(e);
+            }
             try {
                 if (proc._throttleTimer) clearTimeout(proc._throttleTimer);
             } catch (e) {
