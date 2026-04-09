@@ -1,7 +1,7 @@
 # Plan de refacto complet — ComfyUI-Majoor-AssetsManager
 
-> Dernière mise à jour : 2026-04-03
-> Statut global : migration frontend Vue largement réalisée, plan maître réadapté au code actuel
+> Dernière mise à jour : 2026-04-09 (révision audit)
+> Statut global : migration frontend Vue clôturée ; split DB largement terminé (non commité) ; handlers assets/search encore denses ; security.py et registry.py ont grossi malgré les extractions ; gouvernance docs toujours à zéro
 
 ## 1. But du document
 
@@ -60,7 +60,7 @@ La réalité actuelle est la suivante :
 
 - Vue 3 + Pinia sont intégrés ;
 - les racines Vue existent (`js/vue/App.vue`, `js/vue/GeneratedFeedApp.vue`, `js/vue/GlobalRuntime.vue`) ;
-- le panel principal, la grille, la sidebar, le feed généré, les menus contextuels et les hosts viewer sont désormais portés par Vue ;
+- le panel principal, la grille, la sidebar, le feed généré, les menus contextuels, les hosts viewer et l’ownership runtime DnD sont désormais portés par Vue ;
 - `AssetsManagerPanel.js`, `panelState.js`, plusieurs factories DOM legacy et plusieurs shims historiques ont déjà été supprimés ;
 - le runtime panel a commencé à être redécoupé via :
   - `js/features/panel/panelRuntime.js`
@@ -71,7 +71,12 @@ La réalité actuelle est la suivante :
   - `js/features/panel/panelSettingsSync.js`
   - `js/features/panel/panelSimilarSearch.js`
   - `js/features/panel/panelContextMenuExtraActions.js`
-  - `js/features/panel/panelRuntimeRefs.js`
+  - `js/features/panel/panelRuntimeRefs.js` ;
+- des tests Vitest ciblés existent déjà pour plusieurs zones critiques de l’après-migration, notamment :
+  - `js/tests/viewer_vue_hosts.vitest.mjs`
+  - `js/tests/viewer_context_menu_vue.vitest.mjs`
+  - `js/tests/viewer_runtime_hosts.vitest.mjs`
+  - `js/tests/create_vue_app_keep_alive.vitest.mjs`
 
 Conséquence :
 
@@ -92,22 +97,36 @@ Le backend est déjà structuré par grands domaines :
 - `mjr_am_backend/routes/*`
 - `mjr_am_backend/adapters/*`
 
-Mais plusieurs points restent denses :
+La réalité 2026-04-09 est plus avancée que la version précédente du plan :
 
-- `mjr_am_backend/routes/handlers/assets_impl.py`
-- `mjr_am_backend/routes/handlers/search_impl.py`
-- `mjr_am_backend/routes/registry.py`
-- certaines zones security / observability / bootstrap
+- `mjr_am_backend/routes/core/*` centralise déjà une partie importante des helpers de sécurité, réponses, chemins et résolution de services ;
+- `mjr_am_backend/routes/assets/*` et `mjr_am_backend/routes/search/*` existent déjà comme premières extractions ciblées ;
+- `mjr_am_backend/routes/assets/asset_lookup.py`, `rating_tags.py`, `downloads.py`, `route_actions.py` / `route_actions_crud.py` et `mjr_am_backend/routes/search/route_helpers.py` / `route_endpoints.py` / `listing_endpoint.py` / `listing_scopes.py` ont encore aminci les gros handlers ;
+- `mjr_am_backend/routes/registry_prompt.py`, `registry_logging.py`, `registry_app.py`, `routes/core/security_policy.py` et `routes/core/security_tokens.py` ont commencé à dédensifier la couche transversale routes/security ;
+- `mjr_am_backend/observability.py` est maintenant une façade fine, avec le runtime dans `observability_runtime.py` et l’installation dans `observability_install.py` ;
+- `mjr_am_backend/features/assets/service.py`, `mjr_am_backend/features/search/service.py` et `mjr_am_backend/features/runtime/bootstrap.py` existent déjà ;
+- `mjr_am_backend/adapters/db/sqlite.py` est désormais un point d’entrée très fin ; le vrai hotspot DB reste `sqlite_facade.py`.
 
-La couche DB est **déjà amorcée** côté découpage, avec par exemple :
+Plusieurs points restent denses ou ont grossi malgré les extractions :
 
-- `mjr_am_backend/adapters/db/sqlite_facade.py`
-- `mjr_am_backend/adapters/db/connection_pool.py`
-- `mjr_am_backend/adapters/db/transaction_manager.py`
-- `mjr_am_backend/adapters/db/db_recovery.py`
-- `mjr_am_backend/adapters/db/schema.py`
+- `mjr_am_backend/routes/registry.py` — **a grossi** à 326 L malgré les splits registry_*
+- `mjr_am_backend/routes/core/security.py` — **a grossi** à 836 L malgré l’extraction security_policy / security_tokens
+- `mjr_am_backend/routes/handlers/assets_impl.py` — **a grossi** à 522 L
+- `mjr_am_backend/routes/handlers/search_impl.py` — à 244 L, stable
+- certaines zones bootstrap/import-time dans `__init__.py`
+- `route_actions_rename.py` (286 L) et `listing_all_scope.py` (294 L) restent denses
 
-Donc ici aussi, l’objectif n’est plus “inventer le split”, mais **finir et clarifier le split existant**.
+La couche DB est **majoritairement splitée** (non commité) :
+
+- `mjr_am_backend/adapters/db/sqlite_facade.py` — réduit à 1195 L, délègue à 4 nouveaux modules
+- `mjr_am_backend/adapters/db/sqlite_connections.py` — connexions et pool (144 L, non commité)
+- `mjr_am_backend/adapters/db/sqlite_execution.py` — exécution SQL (455 L, non commité)
+- `mjr_am_backend/adapters/db/sqlite_lifecycle.py` — transactions, lifecycle, reset (613 L, non commité)
+- `mjr_am_backend/adapters/db/sqlite_recovery.py` — recovery (222 L, non commité)
+- `mjr_am_backend/adapters/db/connection_pool.py`, `transaction_manager.py`, `db_recovery.py`
+- `mjr_am_backend/adapters/db/schema.py` — 951 L, à surveiller
+
+Donc ici, l’objectif est **commiter le split DB existant et finir les zones résiduelles** (`schema.py`, SQL guards encore dans `sqlite_facade.py`).
 
 ## 3.3 Gouvernance dépendances et docs
 
@@ -116,12 +135,54 @@ Le repo possède déjà :
 - `requirements.txt`
 - `requirements-vector.txt`
 - `pyproject.toml`
+- `docs/VUE_MIGRATION_PLAN.md`
+- `docs/ARCHITECTURE_MAP.md`
+- `docs/adr/`
 
 Mais à ce stade, la gouvernance n’est pas encore totalement verrouillée :
 
 - `requirements-dev.txt` n’est pas encore officialisé ;
 - la politique de vérité unique n’est pas encore formalisée dans une doc dédiée ;
-- le README, les scripts d’installation et les règles de contribution doivent rester alignés.
+- le README, les scripts d’installation et les règles de contribution doivent rester alignés ;
+- les ADR dédiées au frontend Vue post-migration et au split du runtime restent à écrire.
+
+## 3.4 Hotspots encore denses
+
+Tailles réelles au 2026-04-09 (audit) :
+
+**Frontend (non mesuré, estimations antérieures conservées) :**
+- `js/components/Viewer_impl.js` : ~2963 lignes
+- `js/features/viewer/FloatingViewer.js` : ~2848 lignes
+- `js/features/viewer/model3dRenderer.js` : ~1944 lignes
+- `js/features/viewer/toolbar.js` : ~1526 lignes
+- `js/features/panel/panelRuntime.js` : ~1003 lignes
+
+**Backend DB :**
+- `mjr_am_backend/adapters/db/sqlite_facade.py` : **1195 L** (était ~1900, réduit par le split)
+- `mjr_am_backend/adapters/db/sqlite_lifecycle.py` : 613 L (non commité)
+- `mjr_am_backend/adapters/db/sqlite_execution.py` : 455 L (non commité)
+- `mjr_am_backend/adapters/db/schema.py` : **951 L** (non splitée, à surveiller)
+- `mjr_am_backend/adapters/db/sqlite_recovery.py` : 222 L (non commité)
+- `mjr_am_backend/adapters/db/sqlite_connections.py` : 144 L (non commité)
+
+**Backend routes / handlers :**
+- `mjr_am_backend/routes/core/security.py` : **836 L** ⚠️ (était ~711, a grossi)
+- `mjr_am_backend/routes/handlers/assets_impl.py` : **522 L** ⚠️ (était ~464, a grossi)
+- `mjr_am_backend/routes/registry.py` : **326 L** ⚠️ (était ~265, a grossi)
+- `mjr_am_backend/routes/handlers/search_impl.py` : 244 L (était ~212)
+- `mjr_am_backend/routes/search/listing_all_scope.py` : 294 L
+- `mjr_am_backend/routes/assets/route_actions_rename.py` : 286 L
+- `mjr_am_backend/routes/registry_app.py` : 195 L
+- `mjr_am_backend/routes/core/security_policy.py` : 181 L (non commité)
+- `mjr_am_backend/routes/registry_logging.py` : 149 L
+- `mjr_am_backend/routes/core/security_tokens.py` : 135 L (non commité)
+- `mjr_am_backend/routes/route_catalog.py` : 125 L
+- `mjr_am_backend/observability_runtime.py` : 376 L (non commité)
+- `mjr_am_backend/observability_install.py` : 73 L (non commité)
+- `mjr_am_backend/observability.py` : 13 L ✓ (façade fine)
+- `mjr_am_backend/routes/registry_prompt.py` : 63 L
+
+⚠️ = fichier qui a **grossi** malgré les extractions déjà faites — priorité à investiguer avant la prochaine passe.
 
 ---
 
@@ -177,13 +238,13 @@ La cible est un projet avec des frontières lisibles entre :
 
 | Chantier | État actuel | Dernière revue | Prochaine vérification | Remarques |
 |---|---|---|---|---|
-| Migration Vue des surfaces UI majeures | Fait | 2026-04-03 | À clôturer dans ce plan | Voir `docs/VUE_MIGRATION_PLAN.md` |
-| Consolidation frontend post-Vue | En cours | 2026-04-03 | Après chaque lot de tests / cleanup | Nouveau chantier frontend prioritaire |
-| Découpage DB | En cours | 2026-04-03 | Après chaque extraction interne | Split déjà amorcé |
-| Split handlers assets/search | À lancer proprement | 2026-04-03 | Lors du prochain lot backend | `assets_impl.py` reste trop dense |
-| Registry / middlewares / bootstrap routes | À faire | 2026-04-03 | Après handlers | `registry.py` reste central |
-| Clarification security / observability | À faire | 2026-04-03 | Après registry | Important mais pas premier |
-| Gouvernance dépendances / docs / ADR | Partiellement fait | 2026-04-03 | À la prochaine passe docs | `requirements-vector.txt` existe, politique incomplète |
+| Migration Vue des surfaces UI majeures | Fait / clôturé | 2026-04-09 | Seulement en cas de régression structurelle | Voir `docs/VUE_MIGRATION_PLAN.md` |
+| Consolidation frontend post-Vue | En cours | 2026-04-09 | Après chaque lot de tests / cleanup | Viewer (~2963 L), FloatingViewer (~2848 L), toolbar (~1526 L) intacts ; tests panel manquants |
+| Découpage DB | **Fait (non commité)** | 2026-04-09 | Après commit du lot DB | 4 modules extraits de sqlite_facade ; façade à 1195 L ; SQL guards et schema.py encore à sortir |
+| Split handlers assets/search | En cours — handlers ont grossi | 2026-04-09 | Prochaine passe backend | `assets_impl.py` 522 L, `search_impl.py` 244 L ; `features/assets/` vide des sous-services cibles |
+| Registry / middlewares / bootstrap routes | En cours — registry a grossi | 2026-04-09 | Prochaine passe backend | `registry.py` à 326 L malgré les splits registry_* ; wiring pas encore déclaratif |
+| Clarification security / observability | En cours — security a grossi | 2026-04-09 | Prochaine passe sécurité | `security.py` à 836 L malgré extraction policy/tokens ; proxies/rate-limit/auth context encore là |
+| Gouvernance dépendances / docs / ADR | **Rien de fait** | 2026-04-09 | À la prochaine passe docs | `requirements-dev.txt`, `DEPENDENCY_POLICY.md`, 2 ADR manquent — risque double-vérité croissant |
 
 ---
 
@@ -197,23 +258,32 @@ La cible est un projet avec des frontières lisibles entre :
 - [x] Introduire `panelRuntime.js` en remplacement du shell panel historique
 - [x] Supprimer plusieurs factories DOM et shims legacy devenus obsolètes
 - [x] Introduire des tests ciblés pour les composants Vue viewer critiques
+- [x] Centraliser des helpers backend partagés dans `mjr_am_backend/routes/core/*`
+- [x] Amorcer des extractions dédiées dans `mjr_am_backend/routes/assets/*` et `mjr_am_backend/routes/search/*`
+- [x] Extraire un bootstrap runtime dédié dans `mjr_am_backend/features/runtime/bootstrap.py`
+- [x] Extraire un premier catalogue déclaratif des routes dans `mjr_am_backend/routes/route_catalog.py`
+- [x] Réduire `mjr_am_backend/adapters/db/sqlite.py` à un point d’entrée fin / compatibilité
 
 ## 6.2 À terminer côté frontend
 
-- [ ] Formaliser la fin de la migration frontend dans le plan maître
+- [x] Formaliser la fin de la migration frontend dans le plan maître
 - [ ] Réduire les bridges legacy encore nécessaires mais trop implicites
 - [ ] Continuer le découpage du runtime viewer impératif derrière la façade Vue
 - [ ] Continuer le découpage des helpers DnD / runtime encore trop transverses
-- [ ] Étendre la couverture de tests Vue sur les composants les plus critiques
+- [ ] Étendre la couverture de tests Vue sur les composants panel les plus critiques et sur les régressions de teardown restantes
 - [ ] Clarifier par écrit ce qui reste impératif “par design” et ce qui reste impératif “temporairement”
 
 ## 6.3 À terminer côté backend
 
-- [ ] Finaliser le découpage interne de la couche DB
-- [ ] Découper `assets_impl.py` en routes et services par responsabilité
-- [ ] Découper `search_impl.py` si la densité continue d’augmenter
-- [ ] Amincir `routes/registry.py`
-- [ ] Revoir la séparation security / auth / tokens / proxies / rate-limit
+- [x] Extraire les modules DB internes de `sqlite_facade.py` (connections, execution, lifecycle, recovery) — **fait, non commité**
+- [ ] Committer le lot DB et mettre à jour les checklists 8.4
+- [ ] Extraire les SQL guards encore dans `sqlite_facade.py` (_validate_in_base_query, _build_in_query, _try_repair_column_name…)
+- [ ] Surveiller / découper `schema.py` (951 L)
+- [ ] Découper `assets_impl.py` (522 L) — a grossi, les helpers download sont encore inline
+- [ ] Sortir les sous-services métier dans `features/assets/` (rename, delete, rating_tags, download, path_resolution)
+- [ ] Poursuivre le découpage de `search_impl.py` si la densité le justifie après la prochaine mesure
+- [ ] Comprendre pourquoi `registry.py` a grossi à 326 L malgré les splits registry_* avant d'ouvrir une nouvelle extraction
+- [ ] Revoir la séparation security / auth / tokens / proxies / rate-limit dans `security.py` (836 L)
 - [ ] Clarifier les politiques de fallback et de mode strict dev
 
 ## 6.4 À terminer côté gouvernance technique
@@ -253,6 +323,8 @@ Le but est de :
 - context menus Vue
 - viewer runtime hosts Vue
 - stores Pinia
+- ownership runtime DnD Vue
+- premiers tests Vitest sur hosts viewer et menus contextuels Vue
 
 ### Encore sensibles
 
@@ -279,8 +351,8 @@ frontend_runtime_services/
 - [ ] Identifier les bridges frontend encore provisoires
 - [ ] Regrouper les conventions de lifecycle Vue/runtime dans une doc courte
 - [ ] Étendre les tests Vue pour :
-  - [ ] hosts viewer
-  - [ ] menus contextuels viewer/grid
+  - [x] hosts viewer
+  - [x] menus contextuels viewer/grid
   - [ ] composants panel critiques
   - [ ] régressions de teardown / listeners
 - [ ] Réduire progressivement les accès implicites à `window.*`
@@ -306,6 +378,13 @@ Terminer le découpage de la couche SQLite en gardant une façade publique stabl
 Le split a déjà commencé.
 Le plan doit donc évoluer de “imaginer la structure” vers “stabiliser la structure existante”.
 
+Points déjà observables dans le repo :
+
+- `sqlite.py` est déjà un shim très fin ;
+- `transaction_manager.py` et `db_recovery.py` portent déjà une partie du découpage ;
+- `sqlite_facade.py` reste le vrai point de concentration ;
+- `schema.py` reste un second bloc DB conséquent à surveiller.
+
 ## 8.3 Structure cible mise à jour
 
 ```text
@@ -326,13 +405,17 @@ Le nom exact des fichiers peut évoluer, mais la règle reste la même :
 
 ## 8.4 Checklist
 
-- [ ] Cartographier ce qui reste encore concentré dans `sqlite_facade.py` et `sqlite.py`
-- [ ] Isoler clairement l’exécution SQL
-- [ ] Isoler clairement les transactions
-- [ ] Isoler clairement recovery / reset / heal
-- [ ] Isoler clairement les helpers de guards SQL
-- [ ] Isoler clairement le spécifique Windows si encore mélangé ailleurs
-- [ ] Ajouter des tests ciblés par sous-zone extraite
+- [x] Réduire `sqlite.py` à un point d’entrée fin / compatibilité
+- [x] Cartographier ce qui reste encore concentré dans `sqlite_facade.py` et `schema.py` — audit fait
+- [x] Isoler clairement l’exécution SQL encore logée dans `sqlite_facade.py` → `sqlite_execution.py` (455 L, non commité)
+- [x] Continuer à réduire la logique transactionnelle encore portée par `sqlite_facade.py` → `sqlite_lifecycle.py` (613 L, non commité)
+- [x] Continuer à réduire recovery / reset / heal → `sqlite_recovery.py` (222 L, non commité)
+- [x] Isoler connexions / pool → `sqlite_connections.py` (144 L, non commité)
+- [ ] **Committer** les 4 nouveaux modules DB
+- [ ] Isoler les SQL guards encore dans `sqlite_facade.py` (`_validate_in_base_query`, `_build_in_query`, `_try_repair_column_name`, `_validate_and_repair_column_name`, `_find_unresolved_sql_template`)
+- [ ] Vérifier si du spécifique Windows reste dans `sqlite_facade.py` hors zones dédiées
+- [ ] Décider du sort de `schema.py` (951 L) — split ou stabilisation
+- [ ] Ajouter des tests ciblés pour `sqlite_execution`, `sqlite_lifecycle`, `sqlite_recovery`, `sqlite_connections`
 
 ## 8.5 Critères d’acceptation
 
@@ -353,41 +436,71 @@ Le nom exact des fichiers peut évoluer, mais la règle reste la même :
 - `mjr_am_backend/routes/handlers/assets_impl.py`
 - `mjr_am_backend/routes/handlers/assets.py`
 - `mjr_am_backend/routes/handlers/search_impl.py`
+- `mjr_am_backend/routes/assets/*`
+- `mjr_am_backend/routes/search/*`
+- `mjr_am_backend/features/assets/service.py`
+- `mjr_am_backend/features/search/service.py`
 
 ## 9.3 Structure cible
 
 ```text
+mjr_am_backend/routes/assets/
+  filename_validator.py
+  path_guard.py
+  ...
+
+mjr_am_backend/routes/search/
+  query_sanitizer.py
+  result_filter.py
+  result_hydrator.py
+  ...
+
 mjr_am_backend/routes/handlers/
-  asset_mutation_routes.py
-  asset_rating_tags_routes.py
-  asset_download_routes.py
-  asset_docs_routes.py
-  search_query_routes.py
-  search_similarity_routes.py
-  asset_ops_shared.py
+  assets_impl.py
+  asset_docs.py
+  search_impl.py
+  ...
 ```
 
 Et côté métier :
 
 ```text
 mjr_am_backend/features/assets/
+  service.py
   request_contexts.py
   rename_service.py
   delete_service.py
   rating_tags_service.py
   download_service.py
   path_resolution_service.py
+
+mjr_am_backend/features/search/
+  service.py
+  ...
 ```
 
 ## 9.4 Checklist
 
-- [ ] Séparer les routes rename / delete / batch delete
-- [ ] Séparer les routes rating / tags / autocomplete
-- [ ] Séparer les routes download / download-clean / preview
+- [x] Amorcer des helpers dédiés dans `routes/assets/*` et `routes/search/*`
+- [x] Extraire les routes docs / route-index hors de `assets_impl.py`
+- [x] Extraire les helpers asset lookup / rating-tags hors de `assets_impl.py`
+- [x] Extraire le bloc download / download-clean / preview hors de `assets_impl.py`
+- [x] Extraire les endpoints retry / rating / tags / open-in-folder / tags-list hors de `assets_impl.py`
+- [x] Extraire les endpoints rename / delete / batch delete hors de `assets_impl.py`
+- [x] Scinder `route_actions.py` / `route_actions_crud.py` en façades + sous-modules CRUD dédiés
+- [x] Ajouter `filename_validator.py` et `path_guard.py` dans `routes/assets/`
+- [x] Extraire les helpers browser mode / workflow quick query hors de `search_impl.py`
+- [x] Extraire les endpoints autocomplete / batch / workflow-quick hors de `search_impl.py`
+- [x] Extraire les endpoints list / search / asset-detail hors de `search_impl.py`
+- [x] Scinder `listing_endpoint.py` / `listing_scopes.py` en façade + modules par scope
+- [x] Séparer les routes rating / tags / autocomplete
+- [x] Ajouter `query_sanitizer.py`, `result_filter.py`, `result_hydrator.py` dans `routes/search/`
+- [x] Réévaluer `search_impl.py` — réduit à une façade de wiring (244 L acceptable)
+- [ ] ⚠️ Investiguer pourquoi `assets_impl.py` a grossi à 522 L (les helpers download sont encore inline)
 - [ ] Sortir les helpers HTTP partagés dans un module commun léger
-- [ ] Déplacer les validations request → context dans `features/assets`
+- [ ] Créer les sous-services dans `features/assets/` : `rename_service.py`, `delete_service.py`, `rating_tags_service.py`, `download_service.py`, `path_resolution_service.py`
+- [ ] Déplacer les validations request → context dans `features/assets/`
 - [ ] Réduire les accès DB/filesystem directs dans les handlers
-- [ ] Réévaluer `search_impl.py` avec la même logique si la densité le justifie
 
 ## 9.5 Critères d’acceptation
 
@@ -439,14 +552,21 @@ Séparer autant que possible :
 ### Bootstrap
 
 Conserver `__init__.py` compatible ComfyUI, mais réduire les side effects directs.
+`mjr_am_backend/features/runtime/bootstrap.py` est déjà une première extraction utile ; le chantier consiste maintenant à poursuivre dans ce sens.
 
 ## 10.4 Checklist
 
-- [ ] Extraire un catalogue de routes déclaratif
-- [ ] Sortir les middlewares / bridges PromptServer si encore entremêlés
-- [ ] Revoir le bootstrap import-side-effects
-- [ ] Clarifier les sous-zones de `security.py`
-- [ ] Clarifier les sous-zones de `observability.py`
+- [x] Extraire un premier bootstrap runtime dédié (`mjr_am_backend/features/runtime/bootstrap.py`)
+- [x] Extraire un catalogue de routes déclaratif (`route_catalog.py`)
+- [x] Sortir les middlewares / bridges PromptServer si encore entremêlés
+- [x] Extraire un premier split `security_policy.py` (181 L) / `security_tokens.py` (135 L) — non commité
+- [x] Extraire `observability_runtime.py` (376 L) / `observability_install.py` (73 L) — non commité
+- [x] `observability.py` réduit à 13 L (façade fine ✓)
+- [ ] ⚠️ Investiguer pourquoi `security.py` a grossi à 836 L malgré l'extraction policy/tokens
+- [ ] Clarifier les sous-zones restantes de `security.py` : trusted proxies / auth context / rate-limit / CSRF
+- [ ] ⚠️ Investiguer pourquoi `registry.py` a grossi à 326 L malgré les splits registry_*
+- [ ] Rendre l'ordre d'enregistrement des routes plus déclaratif dans `registry.py`
+- [ ] Revoir le bootstrap import-side-effects dans `__init__.py`
 - [ ] Ajouter un mode strict dev plus explicite pour les fallbacks critiques
 
 ## 10.5 Critères d’acceptation
@@ -471,6 +591,8 @@ Déjà présent :
 - `requirements-vector.txt`
 - `pyproject.toml`
 - `README.md`
+- `docs/VUE_MIGRATION_PLAN.md`
+- `docs/ARCHITECTURE_MAP.md`
 - `docs/adr/`
 
 Encore manquant ou à formaliser :
@@ -502,8 +624,8 @@ Encore manquant ou à formaliser :
 
 ## Phase 0 — Alignement documentaire et suivi
 
-- [ ] Valider ce plan maître
-- [ ] Rattacher explicitement le frontend terminé à `docs/VUE_MIGRATION_PLAN.md`
+- [x] Réviser ce plan maître contre l’état réel du repo
+- [x] Rattacher explicitement le frontend terminé à `docs/VUE_MIGRATION_PLAN.md`
 - [ ] Ajouter la politique de dépendances
 - [ ] Créer le tableau de suivi vivant dans les revues
 
@@ -516,22 +638,29 @@ Encore manquant ou à formaliser :
 
 ## Phase 2 — Finalisation du split DB
 
-- [ ] Terminer les extractions internes DB
-- [ ] Réduire la façade à un rôle d’assemblage
-- [ ] Ajouter les tests par sous-module
+- [x] Extraire connections, execution, lifecycle, recovery de sqlite_facade (non commité)
+- [ ] Committer le lot DB
+- [ ] Extraire les SQL guards résiduels de sqlite_facade
+- [ ] Décider du sort de schema.py (951 L)
+- [ ] Ajouter les tests par sous-module extrait
 
 ## Phase 3 — Split handlers assets/search
 
-- [ ] Réduire `assets_impl.py`
-- [ ] Réduire `search_impl.py` si nécessaire
-- [ ] Déplacer la logique métier côté `features/*`
+- [ ] Investiguer la croissance de `assets_impl.py` (464 → 522 L)
+- [ ] Extraire les helpers download encore inline dans `assets_impl.py`
+- [ ] Créer les sous-services dans `features/assets/` (rename, delete, download, rating_tags, path_resolution)
+- [ ] Sortir les validations request → context dans `features/assets/`
+- [ ] `search_impl.py` à 244 L — acceptable, surveiller seulement
 
 ## Phase 4 — Registry / security / observability
 
-- [ ] Amincir `registry.py`
-- [ ] Rendre les modules de routes plus déclaratifs
-- [ ] Clarifier `security.py`
-- [ ] Clarifier `observability.py`
+- [x] Extraire registry_prompt / registry_logging / registry_app
+- [x] Extraire security_policy / security_tokens (non commité)
+- [x] Extraire observability_runtime / observability_install (non commité)
+- [ ] Committer le lot observability + security (non commité)
+- [ ] Investiguer la croissance de `registry.py` (265 → 326 L) et clarifier
+- [ ] Clarifier `security.py` (836 L) : trusted proxies / auth context / rate-limit / CSRF en modules dédiés
+- [ ] `observability.py` est déjà une façade fine (13 L ✓)
 
 ## Phase 5 — Nettoyage final et durcissement
 
@@ -583,7 +712,7 @@ Le refacto sera considéré comme réussi si :
 - les services impératifs restants sont volontairement identifiés ;
 - les gros handlers backend cessent d’être des points de congestion ;
 - la couche DB devient plus lisible à maintenir ;
-- `registry.py`, `security.py` et `observability.py` cessent d’être des zones “à ne pas toucher” ;
+- `registry.py`, `security.py` et `observability.py` cessent progressivement d’être des zones “à ne pas toucher” ;
 - les docs et dépendances reflètent enfin le repo réel ;
 - le suivi du chantier est faisable simplement en cochant ce document.
 
@@ -592,18 +721,40 @@ Le refacto sera considéré comme réussi si :
 ## 16. Résumé opérationnel condensé
 
 ```text
-FAIT
-- migration majeure du frontend vers Vue
-- panel/grid/sidebar/feed/context menus/hôtes viewer en Vue
-- premier split du runtime panel
+FAIT (commité)
+- migration majeure du frontend vers Vue clôturée pour les surfaces UI
+- panel/grid/sidebar/feed/context menus/hôtes viewer et ownership DnD en Vue
+- premiers tests Vitest en place sur hosts viewer et menus contextuels Vue
+- centralisation initiale routes/core/* + extractions routes/assets/* / routes/search/*
+- filename_validator.py et path_guard.py ajoutés dans routes/assets/
+- query_sanitizer.py / result_filter.py / result_hydrator.py dans routes/search/
+- catalogue déclaratif initial des routes dans route_catalog.py
+- helpers asset_lookup / rating_tags / downloads / route_actions* / route_helpers / route_endpoints / listing_endpoint / listing_scopes / listing_*_scope extraits des gros handlers
+- search_impl.py réduit à une façade de wiring (244 L)
+- registry.py aminci via registry_prompt / registry_logging / registry_app
+- premier split du runtime panel et du bootstrap backend
 
-PROCHAINES PRIORITÉS
-- consolider l’après-migration Vue
-- étendre les tests Vue critiques
-- finaliser le split DB
-- casser assets_impl.py par responsabilités
-- aminci registry/security/observability
-- formaliser dependency policy + ADR + suivi
+FAIT (non commité — à committer)
+- sqlite_facade.py réduit à 1195 L via 4 nouveaux modules :
+  sqlite_connections (144 L) / sqlite_execution (455 L) / sqlite_lifecycle (613 L) / sqlite_recovery (222 L)
+- security_policy.py (181 L) / security_tokens.py (135 L) extraits de security.py
+- observability_runtime.py (376 L) / observability_install.py (73 L) extraits — observability.py = 13 L ✓
+
+PROBLÈMES DÉTECTÉS (fichiers qui ont grossi malgré les extractions)
+- assets_impl.py : 464 → 522 L ⚠️ (helpers download encore inline)
+- security.py : 711 → 836 L ⚠️ (proxies/auth context/rate-limit/CSRF toujours là)
+- registry.py : 265 → 326 L ⚠️ (cause à identifier)
+
+CE QUI RESTE À FAIRE
+1. Committer le lot DB (sqlite_connections/execution/lifecycle/recovery)
+2. Committer le lot observability + security (policy/tokens/runtime/install)
+3. Investiguer et réduire assets_impl.py / security.py / registry.py
+4. Créer les sous-services dans features/assets/ (rename/delete/download/rating_tags/path_resolution)
+5. Extraire les SQL guards résiduels de sqlite_facade.py
+6. Décider du sort de schema.py (951 L)
+7. Étendre les tests Vue critiques côté panel / teardown
+8. Documenter ce qui reste impératif par design dans le viewer
+9. Créer requirements-dev.txt + docs/DEPENDENCY_POLICY.md + 2 ADR manquantes
 ```
 
 ---
@@ -614,6 +765,7 @@ Le plan précédent restait pertinent sur le fond, mais il n’était plus align
 
 - il traitait encore le frontend Vue comme un chantier principalement à faire ;
 - il ne reflétait pas le découpage déjà effectué dans le panel runtime ;
+- il sous-estimait le travail déjà fait dans `routes/core/*`, `routes/assets/*`, `routes/search/*` et le bootstrap runtime ;
 - il ne proposait pas de mécanisme simple de suivi par vérification.
 
 La nouvelle version conserve l’intention d’origine, mais la remet dans le bon ordre :

@@ -13,15 +13,32 @@ from collections import OrderedDict
 from collections.abc import Mapping
 from contextvars import ContextVar, Token
 from functools import lru_cache
-from http.cookies import SimpleCookie
 from typing import Any
 from urllib.parse import urlparse
 
 from aiohttp import web
 from mjr_am_backend.shared import Result, get_logger
+from .security_policy import (
+    _WARNED_TOKEN_SOURCES,
+    _env_truthy,
+    _require_operation_enabled,
+    _resolve_security_prefs,
+    _safe_mode_enabled,
+    _validate_token_format,
+)
+from .security_tokens import (
+    _extract_bearer_token,
+    _extract_mjr_token_header,
+    _extract_write_token_from_cookie,
+    _extract_write_token_from_headers,
+    _get_write_token,
+    _get_write_token_hash,
+    _hash_token,
+    _hash_token_pbkdf2,
+    _token_hash_matches,
+)
 
 logger = get_logger(__name__)
-_WARNED_TOKEN_SOURCES: set[str] = set()
 
 # Per-client rate limiting state: {client_id: {endpoint: [timestamps]}}
 # Use LRU eviction to prevent unbounded memory growth from spoofed client IPs.
@@ -31,7 +48,6 @@ _DEFAULT_RATE_LIMIT_MIN_WINDOW_SECONDS = 60
 _DEFAULT_CLIENT_ID_HASH_HEX_CHARS = 16
 _DEFAULT_TRUSTED_PROXIES = "127.0.0.1,::1"
 _DEFAULT_RATE_LIMIT_BACKGROUND_CLEANUP_SECONDS = 60
-_PBKDF2_TOKEN_PEPPER_FALLBACK = "mjr_api_token_pepper_fallback"
 
 try:
     _MAX_RATE_LIMIT_CLIENTS = int(
@@ -87,341 +103,6 @@ try:
 except Exception:
     _RATE_LIMIT_BACKGROUND_CLEANUP_SECONDS = _DEFAULT_RATE_LIMIT_BACKGROUND_CLEANUP_SECONDS
 _RATE_LIMIT_BACKGROUND_CLEANUP_SECONDS = max(10, _RATE_LIMIT_BACKGROUND_CLEANUP_SECONDS)
-
-
-def _env_truthy(name: str, default: bool = False) -> bool:
-    try:
-        raw = os.environ.get(name)
-    except Exception:
-        raw = None
-    if raw is None:
-        return bool(default)
-    return str(raw).strip().lower() in ("1", "true", "yes", "on")
-
-
-def _warn_invalid_token_once(source: str, message: str, *args: Any) -> None:
-    if source in _WARNED_TOKEN_SOURCES:
-        return
-    _WARNED_TOKEN_SOURCES.add(source)
-    logger.warning(message, *args)
-
-
-def _validate_token_format(token: str, source: str) -> str | None:
-    normalized = str(token or "").strip()
-    if not normalized:
-        return None
-    length = len(normalized)
-    if length < 16:
-        _warn_invalid_token_once(
-            source,
-            "Token from %s too short (%d chars), minimum 16",
-            source,
-            length,
-        )
-        return None
-    if length > 512:
-        _warn_invalid_token_once(
-            source,
-            "Token from %s too long (%d chars), maximum 512",
-            source,
-            length,
-        )
-        return None
-    return normalized
-
-
-@lru_cache(maxsize=1)
-def _safe_mode_enabled() -> bool:
-    """
-    Return True when Majoor Safe Mode is enabled.
-
-    Safe Mode is enabled by default to reduce risk when ComfyUI is exposed to remote clients
-    (via --listen, tunnels, reverse proxies, etc.).
-
-    NOTE: This result is cached on the first call via @lru_cache and does NOT update at
-    runtime. Changing the MAJOOR_SAFE_MODE environment variable requires a **process
-    restart** to take effect. This is intentional — safe mode is a startup-time security
-    policy, not a hot-reloadable setting. The cache is cleared in tests via
-    ``_safe_mode_enabled.cache_clear()``.
-    """
-    # Default: enabled when unset.
-    try:
-        raw = os.environ.get("MAJOOR_SAFE_MODE")
-    except Exception:
-        raw = None
-    if raw is None:
-        return True
-    return str(raw).strip().lower() in ("1", "true", "yes", "on")
-
-
-def _resolve_safe_mode(prefs: Mapping[str, Any] | None) -> bool:
-    if prefs and "safe_mode" in prefs:
-        _sm_raw = prefs.get("safe_mode")
-        return _sm_raw is True or str(_sm_raw).strip().lower() in ("1", "true", "yes", "on")
-    return _safe_mode_enabled()
-
-
-def _coerce_pref_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, (int, float)):
-        return bool(value)
-    if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes", "on")
-    return bool(value)
-
-
-def _pref_truthy(key: str, env_var: str, prefs: Mapping[str, Any] | None) -> bool:
-    if prefs is not None and key in prefs:
-        try:
-            return _coerce_pref_bool(prefs[key])
-        except Exception:
-            pass
-    return _env_truthy(env_var)
-
-
-def _require_operation_enabled(
-    operation: str, *, prefs: Mapping[str, Any] | None = None
-) -> Result[bool]:
-    """
-    Gate "dangerous" or state-changing operations behind explicit opt-ins.
-
-    Policy:
-      - Safe Mode enabled by default: blocks write operations unless explicitly allowed.
-      - Delete/Rename/Open-in-folder are always opt-in (even when Safe Mode is off).
-
-    Environment variables:
-      - MAJOOR_SAFE_MODE=0 to disable safe mode
-      - MAJOOR_ALLOW_WRITE=1 to enable rating/tags writes while in safe mode
-      - MAJOOR_ALLOW_DELETE=1 to enable deletion
-      - MAJOOR_ALLOW_RENAME=1 to enable renaming
-      - MAJOOR_ALLOW_OPEN_IN_FOLDER=1 to enable open-in-folder
-    """
-    from ...shared import Result
-
-    op = str(operation or "").strip().lower()
-    safe_mode = _resolve_safe_mode(prefs)
-
-    def _pt(key: str, env_var: str) -> bool:
-        return _pref_truthy(key, env_var, prefs)
-
-    static_gates = _operation_static_gates()
-    for ops, pref_key, env_var, message in static_gates:
-        if op not in ops:
-            continue
-        if _pt(pref_key, env_var):
-            return Result.Ok(True, operation=op, safe_mode=safe_mode)
-        return Result.Err("FORBIDDEN", message, operation=op, safe_mode=safe_mode)
-
-    if op in ("write", "rating", "tags", "asset_rating", "asset_tags"):
-        if _write_allowed_in_context(safe_mode=safe_mode, pref_truthy=_pt):
-            return Result.Ok(True, operation=op, safe_mode=safe_mode)
-        return Result.Err(
-            "FORBIDDEN",
-            "Write operations are disabled in Safe Mode. Set MAJOOR_SAFE_MODE=0 to disable safe mode, or MAJOOR_ALLOW_WRITE=1 to allow rating/tags writes.",
-            operation=op,
-            safe_mode=safe_mode,
-        )
-
-    if safe_mode:
-        return Result.Err(
-            "FORBIDDEN",
-            "Operation blocked in Safe Mode (unknown operation).",
-            operation=op,
-            safe_mode=safe_mode,
-        )
-    return Result.Ok(True, operation=op, safe_mode=safe_mode)
-
-
-def _operation_static_gates() -> tuple[tuple[tuple[str, ...], str, str, str], ...]:
-    return (
-        (
-            ("reset_index",),
-            "allow_reset_index",
-            "MAJOOR_ALLOW_RESET_INDEX",
-            "Reset index is disabled by default. Enable 'allow_reset_index' in settings or set MAJOOR_ALLOW_RESET_INDEX=1.",
-        ),
-        (
-            ("delete", "asset_delete", "assets_delete"),
-            "allow_delete",
-            "MAJOOR_ALLOW_DELETE",
-            "Delete is disabled by default. Set MAJOOR_ALLOW_DELETE=1 to enable asset deletion.",
-        ),
-        (
-            ("rename", "asset_rename"),
-            "allow_rename",
-            "MAJOOR_ALLOW_RENAME",
-            "Rename is disabled by default. Set MAJOOR_ALLOW_RENAME=1 to enable asset renaming.",
-        ),
-        (
-            ("open_in_folder", "open-in-folder"),
-            "allow_open_in_folder",
-            "MAJOOR_ALLOW_OPEN_IN_FOLDER",
-            "Open-in-folder is disabled by default. Set MAJOOR_ALLOW_OPEN_IN_FOLDER=1 to enable it.",
-        ),
-    )
-
-
-def _write_allowed_in_context(*, safe_mode: bool, pref_truthy) -> bool:
-    if not safe_mode:
-        return True
-    return bool(pref_truthy("allow_write", "MAJOOR_ALLOW_WRITE"))
-
-
-async def _resolve_security_prefs(services: Mapping[str, Any] | None) -> Mapping[str, Any] | None:
-    """
-    Extract stored security preferences from the services container safely.
-    """
-    if not services:
-        return None
-    settings_service = services.get("settings")
-    if not settings_service:
-        return None
-    try:
-        return await settings_service.get_security_prefs()
-    except Exception:
-        return None
-
-
-def _get_write_token() -> str:
-    """
-    Return configured API token used to authorize destructive/write operations.
-
-    Supported env vars:
-      - MAJOOR_API_TOKEN (preferred)
-      - MJR_API_TOKEN (compat / shorter alias)
-    """
-    try:
-        raw = (os.environ.get("MAJOOR_API_TOKEN") or os.environ.get("MJR_API_TOKEN") or "").strip()
-    except Exception:
-        raw = ""
-    return _validate_token_format(raw, "MAJOOR_API_TOKEN") or ""
-
-
-def _hash_token(value: str) -> str:
-    try:
-        normalized = str(value or "").strip()
-    except Exception:
-        normalized = ""
-    try:
-        pepper = str(os.environ.get("MAJOOR_API_TOKEN_PEPPER") or "").strip()
-    except Exception:
-        pepper = ""
-    payload = f"{pepper}\0{normalized}".encode("utf-8", errors="ignore")
-    # Use a computationally expensive password hashing function instead of a fast hash.
-    # PBKDF2-HMAC-SHA256 with a fixed salt and sufficient iterations provides a stronger
-    # defense against brute-force attacks while remaining deterministic for comparison.
-    dk = hashlib.pbkdf2_hmac(
-        "sha256",
-        payload,
-        b"mjr_am_backend.api_token_salt",
-        100_000,
-    )
-    return dk.hex()
-
-
-def _hash_token_pbkdf2(value: str) -> str:
-    try:
-        normalized = str(value or "").strip()
-    except Exception:
-        normalized = ""
-    try:
-        pepper = str(os.environ.get("MAJOOR_API_TOKEN_PEPPER") or "").strip()
-    except Exception:
-        pepper = ""
-    if not pepper:
-        pepper = _PBKDF2_TOKEN_PEPPER_FALLBACK
-    return hashlib.pbkdf2_hmac(
-        "sha256",
-        normalized.encode("utf-8", errors="ignore"),
-        pepper.encode("utf-8", errors="ignore"),
-        100_000,
-    ).hex()
-
-
-def _token_hash_matches(provided: str, configured_hash: str) -> bool:
-    import hmac
-
-    token = str(provided or "").strip()
-    expected = str(configured_hash or "").strip().lower()
-    if not token or not expected:
-        return False
-    return hmac.compare_digest(_hash_token(token), expected) or hmac.compare_digest(
-        _hash_token_pbkdf2(token),
-        expected,
-    )
-
-
-def _get_write_token_hash() -> str:
-    try:
-        configured_hash = (
-            (os.environ.get("MAJOOR_API_TOKEN_HASH") or os.environ.get("MJR_API_TOKEN_HASH") or "")
-            .strip()
-            .lower()
-        )
-    except Exception:
-        configured_hash = ""
-    if configured_hash:
-        return configured_hash
-    configured_plain = _get_write_token()
-    if configured_plain:
-        return _hash_token(configured_plain)
-    return ""
-
-
-def _extract_bearer_token(headers: Mapping[str, str]) -> str:
-    try:
-        auth = str(headers.get("Authorization") or "").strip()
-    except Exception:
-        auth = ""
-    if not auth:
-        return ""
-    prefix = "bearer "
-    if auth.lower().startswith(prefix):
-        return auth[len(prefix) :].strip()
-    return ""
-
-
-def _extract_mjr_token_header(headers: Mapping[str, str]) -> str:
-    try:
-        return str(headers.get("X-MJR-Token") or "").strip()
-    except Exception:
-        return ""
-
-
-def _extract_write_token_from_cookie(headers: Mapping[str, str]) -> str:
-    try:
-        cookie_header = str(headers.get("Cookie") or "").strip()
-    except Exception:
-        return ""
-    if not cookie_header or len(cookie_header) > 4096:
-        return ""
-    try:
-        parsed = SimpleCookie()
-        parsed.load(cookie_header)
-        raw = parsed.get("mjr_write_token")
-        if raw is not None:
-            return str(raw.value or "").strip()
-    except Exception:
-        pass
-    return ""
-
-
-def _extract_write_token_from_headers(headers: Mapping[str, str]) -> str:
-    """
-    Extract a user-provided write token from request headers.
-
-    Accepted:
-      - Authorization: Bearer <token>
-      - X-MJR-Token: <token>
-    """
-    bearer = _extract_bearer_token(headers)
-    if bearer:
-        return bearer
-    token = _extract_mjr_token_header(headers)
-    if token:
-        return token
-    return _extract_write_token_from_cookie(headers)
 
 
 def _resolve_client_ip(peer_ip: str, headers: Mapping[str, str]) -> str:

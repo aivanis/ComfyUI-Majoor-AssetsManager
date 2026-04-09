@@ -20,19 +20,13 @@ from __future__ import annotations
 import asyncio
 import concurrent.futures
 import contextvars
-import ctypes
-import gc
 import os
-import random
 import re
 import sqlite3
-import subprocess
 import threading
-import time
-import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from queue import Empty, Queue
+from queue import Queue
 from typing import Any
 
 import aiosqlite
@@ -79,9 +73,6 @@ from .connection_pool import (
     resolve_user_db_config_path as pool_resolve_user_db_config_path,
 )
 from .connection_pool import (
-    runtime_status as pool_runtime_status,
-)
-from .connection_pool import (
     start_asset_lock_pruner as pool_start_asset_lock_pruner,
 )
 from .connection_pool import (
@@ -117,6 +108,13 @@ from .db_recovery import (
 from .db_recovery import (
     set_recovery_state as recovery_set_recovery_state,
 )
+from . import sqlite_connections as conn_runtime
+from . import sqlite_execution as exec_runtime
+from . import sqlite_lifecycle as life_runtime
+from . import sqlite_recovery as recovery_runtime
+from .transaction_manager import (
+    get_tx_state as tx_get_tx_state,
+)
 from .transaction_manager import (
     begin_stmt_for_mode as tx_begin_stmt_for_mode,
 )
@@ -127,7 +125,7 @@ from .transaction_manager import (
     cursor_write_result as tx_cursor_write_result,
 )
 from .transaction_manager import (
-    get_tx_state as tx_get_tx_state,
+    register_tx_token as tx_register_tx_token,
 )
 from .transaction_manager import (
     is_missing_column_error as tx_is_missing_column_error,
@@ -139,16 +137,7 @@ from .transaction_manager import (
     is_write_sql as tx_is_write_sql,
 )
 from .transaction_manager import (
-    register_tx_token as tx_register_tx_token,
-)
-from .transaction_manager import (
-    rename_or_delete as tx_rename_or_delete,
-)
-from .transaction_manager import (
     rows_to_dicts as tx_rows_to_dicts,
-)
-from .transaction_manager import (
-    schedule_delete_on_reboot as tx_schedule_delete_on_reboot,
 )
 from .transaction_manager import (
     tx_token as tx_ctx_token,
@@ -699,30 +688,7 @@ class Sqlite:
         recovery_set_recovery_state(self, state, error)
 
     async def _maybe_auto_reset_on_corruption(self, error: Exception) -> None:
-        """
-        Auto-reset DB on corruption by default; can be disabled with MAJOOR_DB_AUTO_RESET=false.
-        """
-        if not self._is_auto_reset_enabled():
-            logger.error(
-                "Corruption detected (%s). Auto-reset disabled (MAJOOR_DB_AUTO_RESET=false)",
-                error,
-            )
-            return
-
-        now = time.time()
-        if self._is_auto_reset_throttled(now):
-            logger.warning("Corruption auto-reset throttled (cooldown %.1fs)", float(self._auto_reset_cooldown_s))
-            return
-        self._mark_auto_reset_attempt(now)
-
-        try:
-            reset_res = await self.areset()
-            self._record_auto_reset_result(reset_res)
-        except Exception as exc:
-            logger.error("Database auto-reset exception after corruption: %s", exc)
-            with self._diag_lock:
-                self._diag["auto_reset_failures"] = int(self._diag.get("auto_reset_failures") or 0) + 1
-                self._diag["last_auto_reset_error"] = str(exc)
+        return await recovery_runtime.maybe_auto_reset_on_corruption(self, error)
 
     @staticmethod
     def _is_auto_reset_enabled() -> bool:
@@ -741,11 +707,7 @@ class Sqlite:
         return pool_diagnostics(self)
 
     def _mark_malformed_recovery_window(self, now: float) -> bool:
-        with self._malformed_recovery_lock:
-            if now - float(self._malformed_recovery_last_ts or 0.0) < 5.0:
-                return False
-            self._malformed_recovery_last_ts = now
-            return True
+        return recovery_runtime.mark_malformed_recovery_window(self, now)
 
     async def _run_recovery_pragma(
         self,
@@ -754,268 +716,66 @@ class Sqlite:
         *,
         fetch_one: bool = False,
     ) -> Any | None:
-        for attempt in range(self._lock_retry_attempts + 1):
-            try:
-                cur = await rec_conn.execute(sql)
-                try:
-                    if fetch_one:
-                        return await cur.fetchone()
-                    await cur.fetchall()
-                    return True
-                finally:
-                    try:
-                        await cur.close()
-                    except Exception:
-                        pass
-            except sqlite3.OperationalError as exc:
-                if self._is_locked_error(exc) and attempt < self._lock_retry_attempts:
-                    await self._sleep_backoff(attempt)
-                    continue
-                raise
-        return None
+        return await recovery_runtime.run_recovery_pragma(self, rec_conn, sql, fetch_one=fetch_one)
 
     async def _rebuild_assets_fts(self, rec_conn: aiosqlite.Connection) -> None:
-        try:
-            await self._run_recovery_pragma(rec_conn, "INSERT INTO assets_fts(assets_fts) VALUES('rebuild')")
-        except sqlite3.OperationalError as fts_exc:
-            if not tx_is_missing_table_error(fts_exc):
-                logger.warning("FTS rebuild skipped during recovery: %s", fts_exc)
-        except Exception as fts_exc:
-            logger.warning("FTS rebuild error during recovery: %s", fts_exc)
+        return await recovery_runtime.rebuild_assets_fts(self, rec_conn)
 
     async def _reindex_asset_metadata_fts(self, rec_conn: aiosqlite.Connection) -> None:
-        try:
-            await self._run_recovery_pragma(rec_conn, "DELETE FROM asset_metadata_fts")
-            await self._run_recovery_pragma(
-                rec_conn,
-                "INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)"
-                " SELECT asset_id, COALESCE(tags, ''), COALESCE(tags_text, ''), COALESCE(metadata_text, '')"
-                " FROM asset_metadata",
-            )
-        except sqlite3.OperationalError as fts_exc:
-            if not tx_is_missing_table_error(fts_exc):
-                logger.warning("FTS reindex skipped during recovery (asset_metadata_fts): %s", fts_exc)
-        except Exception as fts_exc:
-            logger.warning("FTS reindex error during recovery (asset_metadata_fts): %s", fts_exc)
+        return await recovery_runtime.reindex_asset_metadata_fts(self, rec_conn)
 
     async def _rebuild_fts_during_recovery(self, rec_conn: aiosqlite.Connection) -> None:
-        lock = self._write_lock
-        fts_lock_acquired = False
-        if lock is not None and not lock.locked():
-            await lock.acquire()
-            fts_lock_acquired = True
-        try:
-            await self._rebuild_assets_fts(rec_conn)
-            await self._reindex_asset_metadata_fts(rec_conn)
-        finally:
-            if fts_lock_acquired and lock is not None:
-                lock.release()
+        return await recovery_runtime.rebuild_fts_during_recovery(self, rec_conn)
 
     async def _attempt_malformed_recovery_async(self) -> bool:
-        """
-        Best-effort online recovery for transient malformed errors.
-
-        Uses a fresh connection (not the dirty one that triggered the error).
-        FTS rebuild acquires the write lock when available.
-        """
-        now = time.time()
-        if not self._mark_malformed_recovery_window(now):
-            return False
-
-        rec_conn: aiosqlite.Connection | None = None
-        try:
-            self._set_recovery_state("in_progress")
-            logger.warning("DB malformed detected; attempting online recovery")
-
-            try:
-                rec_conn = await self._acquire_connection_async()
-            except Exception as conn_exc:
-                logger.warning("Online recovery: could not acquire fresh connection: %s", conn_exc)
-                self._set_recovery_state("failed", str(conn_exc))
-                return False
-
-            # Flush/merge WAL first; malformed bursts can come from partial WAL state.
-            await self._run_recovery_pragma(rec_conn, "PRAGMA wal_checkpoint(TRUNCATE)")
-
-            # Lightweight consistency check.
-            row = await self._run_recovery_pragma(rec_conn, "PRAGMA quick_check", fetch_one=True)
-            if not row or str(row[0]).lower() != "ok":
-                self._set_recovery_state("failed", "quick_check failed")
-                return False
-
-            await self._rebuild_fts_during_recovery(rec_conn)
-
-            self._set_recovery_state("success")
-            return True
-        except sqlite3.OperationalError as rec_exc:
-            if self._is_locked_error(rec_exc):
-                # This can happen during concurrent reset/scan churn; keep signal but avoid noisy hard-error spam.
-                self._mark_locked_event(rec_exc)
-                self._set_recovery_state("skipped_locked", str(rec_exc))
-                logger.warning("Online recovery skipped due to active DB lock: %s", rec_exc)
-                return False
-            self._set_recovery_state("failed", str(rec_exc))
-            logger.error("Online recovery failed: %s", rec_exc)
-            return False
-        finally:
-            if rec_conn is not None:
-                await self._release_connection_async(rec_conn)
+        return await recovery_runtime.attempt_malformed_recovery_async(self)
 
     async def _attempt_missing_table_recovery_async(self) -> bool:
-        """
-        Best-effort schema recovery when a query fails with "no such table".
-        Throttled to avoid repeated heavy repairs under concurrent failures.
-        """
-        now = time.time()
-        with self._schema_repair_lock:
-            if (now - self._schema_repair_last_ts) < 5.0:
-                return False
-            self._schema_repair_last_ts = now
-        try:
-            from .schema import migrate_schema
+        def _update_known_columns_lower(lower: dict[str, str]) -> None:
+            global _KNOWN_COLUMNS_LOWER
+            _KNOWN_COLUMNS_LOWER = lower
 
-            result = await migrate_schema(self)
-            if result and result.ok:
-                try:
-                    global _KNOWN_COLUMNS_LOWER
-                    _KNOWN_COLUMNS_LOWER = recovery_populate_known_columns_from_schema(
-                        self.db_path,
-                        _KNOWN_COLUMNS,
-                        _KNOWN_COLUMNS_LOCK,
-                        _SCHEMA_TABLE_ALIASES,
-                    )
-                except Exception:
-                    pass
-                return True
-        except Exception as exc:
-            logger.warning("Schema self-heal after missing table failed: %s", exc)
-        return False
+        return await recovery_runtime.attempt_missing_table_recovery_async(
+            self,
+            known_columns=_KNOWN_COLUMNS,
+            known_columns_lock=_KNOWN_COLUMNS_LOCK,
+            schema_table_aliases=_SCHEMA_TABLE_ALIASES,
+            update_known_columns_lower=_update_known_columns_lower,
+        )
 
     async def _sleep_backoff(self, attempt: int):
-        base = float(self._lock_retry_base_seconds)
-        max_s = float(self._lock_retry_max_seconds)
-        delay = min(max_s, base * (2 ** max(0, attempt)))
-        delay = delay + (random.random() * 0.03)
-        try:
-            logger.debug("DB lock backoff: attempt=%d delay=%.3fs", int(attempt), float(delay))
-        except Exception:
-            pass
-        await asyncio.sleep(delay)
+        return await recovery_runtime.sleep_backoff(self, attempt)
 
     def get_runtime_status(self) -> dict[str, Any]:
-        return pool_runtime_status(self, busy_timeout_ms=SQLITE_BUSY_TIMEOUT_MS)
+        return conn_runtime.get_runtime_status(self, busy_timeout_ms=SQLITE_BUSY_TIMEOUT_MS)
 
     async def _apply_connection_pragmas(self, conn: aiosqlite.Connection):
-        await conn.execute("PRAGMA journal_mode=WAL")
-        await conn.execute("PRAGMA synchronous=NORMAL")
-        # Int constants only: never interpolate user-controlled values into PRAGMA SQL.
-        if not isinstance(SQLITE_CACHE_SIZE_KIB, int):
-            raise TypeError(f"SQLITE_CACHE_SIZE_KIB must be int, got {type(SQLITE_CACHE_SIZE_KIB).__name__}")
-        await conn.execute(f"PRAGMA cache_size={SQLITE_CACHE_SIZE_KIB}")
-        await conn.execute("PRAGMA temp_store=MEMORY")
-        # Int constants only: never interpolate user-controlled values into PRAGMA SQL.
-        if not isinstance(SQLITE_BUSY_TIMEOUT_MS, int):
-            raise TypeError(f"SQLITE_BUSY_TIMEOUT_MS must be int, got {type(SQLITE_BUSY_TIMEOUT_MS).__name__}")
-        await conn.execute(f"PRAGMA busy_timeout={SQLITE_BUSY_TIMEOUT_MS}")
-        await conn.execute("PRAGMA foreign_keys=ON")
+        return await conn_runtime.apply_connection_pragmas(
+            conn,
+            cache_size_kib=SQLITE_CACHE_SIZE_KIB,
+            busy_timeout_ms=SQLITE_BUSY_TIMEOUT_MS,
+        )
 
     async def _create_connection(self) -> aiosqlite.Connection:
-        # Use autocommit mode; we manage transactions explicitly (BEGIN/COMMIT) when needed.
-        conn = await aiosqlite.connect(str(self.db_path), timeout=self._timeout, isolation_level=None)
-        conn.row_factory = sqlite3.Row
-        await self._apply_connection_pragmas(conn)
-        # Attach secondary databases (e.g. vectors.sqlite as "vec").
-        for schema_name, attach_path in self._attach_dbs.items():
-            Path(attach_path).parent.mkdir(parents=True, exist_ok=True)
-            await conn.execute(f"ATTACH DATABASE ? AS [{schema_name}]", (attach_path,))
-        return conn
+        return await conn_runtime.create_connection(
+            self,
+            cache_size_kib=SQLITE_CACHE_SIZE_KIB,
+            busy_timeout_ms=SQLITE_BUSY_TIMEOUT_MS,
+        )
 
     async def _acquire_connection_async(self) -> aiosqlite.Connection:
-        # C-5: protect lazy semaphore creation with the instance lock so that two
-        # concurrent callers cannot both observe None and both allocate a semaphore.
-        if self._async_sem is None:
-            with self._lock:
-                if self._async_sem is None:
-                    self._async_sem = asyncio.Semaphore(self._max_conn_limit)
-
-        # C-6: read _resetting under the instance lock so the check-and-use is
-        # atomic with the writes in areset() that also hold self._lock.
-        with self._lock:
-            if self._resetting:
-                raise RuntimeError("Database is resetting - connection rejected")
-
-        sem = self._async_sem
-        await sem.acquire()
-        try:
-            # Re-check after waiting: reset may start while this waiter is queued.
-            # C-6: use the instance lock for this re-check as well.
-            with self._lock:
-                if self._resetting:
-                    raise RuntimeError("Database is resetting - connection rejected")
-            try:
-                conn = self._pool.get_nowait()
-            except Empty:
-                conn = await self._create_connection()
-            self._active_conns.add(conn)
-            self._active_conns_idle.clear()
-            return conn
-        except Exception:
-            sem.release()
-            raise
+        return await conn_runtime.acquire_connection_async(self)
 
     async def _release_connection_async(self, conn: aiosqlite.Connection):
-        try:
-            self._active_conns.discard(conn)
-            if not self._active_conns:
-                self._active_conns_idle.set()
-            if not conn:
-                return
-            # Skip connections closed during malformed error recovery.
-            if getattr(conn, "_mjr_closed", False):
-                return
-            if not self._pool.full():
-                self._pool.put(conn)
-            else:
-                try:
-                    await conn.close()
-                except Exception:
-                    pass
-        finally:
-            if self._async_sem:
-                self._async_sem.release()
+        return await conn_runtime.release_connection_async(self, conn)
 
     async def _ensure_initialized_async(self, *, allow_during_reset: bool = False):
-        if self._initialized:
-            return
-        # Only one caller initializes; lock is sync, but init runs once and quickly.
-        with self._lock:
-            if self._initialized:
-                return
-            # mark initialized *after* successful probe
-        direct_conn = bool(self._resetting and allow_during_reset)
-        if direct_conn:
-            # Reset flow cannot use pooled acquisition because reset guard rejects it.
-            conn = await self._create_connection()
-        else:
-            conn = await self._acquire_connection_async()
-        try:
-            await self._apply_connection_pragmas(conn)
-            await conn.commit()
-        finally:
-            if direct_conn:
-                try:
-                    await conn.close()
-                except Exception:
-                    pass
-            else:
-                await self._release_connection_async(conn)
-        # H-3: set _write_lock inside the same lock acquisition that marks
-        # _initialized=True, so any thread that sees _initialized=True is
-        # guaranteed to also see a non-None _write_lock.
-        with self._lock:
-            self._initialized = True
-            if self._write_lock is None:
-                self._write_lock = asyncio.Lock()
+        return await conn_runtime.ensure_initialized_async(
+            self,
+            allow_during_reset=allow_during_reset,
+            cache_size_kib=SQLITE_CACHE_SIZE_KIB,
+            busy_timeout_ms=SQLITE_BUSY_TIMEOUT_MS,
+        )
 
     def _prune_asset_locks_locked(self, now: float) -> None:
         pool_prune_asset_locks_locked(self, now)
@@ -1047,12 +807,8 @@ class Sqlite:
         directly.  We offload the blocking acquire() to a thread via asyncio.to_thread so that
         the event loop is not blocked while waiting for a contended lock.
         """
-        lock = self._get_or_create_asset_lock(asset_id)
-        await asyncio.to_thread(lock.acquire)
-        try:
+        async with conn_runtime.lock_for_asset(self, asset_id):
             yield
-        finally:
-            lock.release()
 
     def _init_db(self):
         pool_init_db(self)
@@ -1065,16 +821,7 @@ class Sqlite:
         return tx_rows_to_dicts(rows)
 
     async def _with_query_timeout(self, coro):
-        try:
-            timeout = float(self._query_timeout or 0)
-        except Exception:
-            timeout = 0.0
-        if timeout > 0:
-            try:
-                return await asyncio.wait_for(coro, timeout=timeout)
-            except asyncio.TimeoutError:
-                return Result.Err(ErrorCode.TIMEOUT, "Database operation timed out")
-        return await coro
+        return await exec_runtime.with_query_timeout(self, coro)
 
     async def _execute_async(
         self,
@@ -1084,37 +831,15 @@ class Sqlite:
         *,
         tx_token: str | None = None,
     ) -> Result[Any]:
-        unresolved_template = _find_unresolved_sql_template(query)
-        if unresolved_template:
-            query_preview = " ".join(str(query or "").split())
-            if len(query_preview) > 220:
-                query_preview = query_preview[:217] + "..."
-            logger.error(
-                "Rejected SQL with unresolved template %s. Query preview: %s",
-                unresolved_template,
-                query_preview,
-            )
-            msg = (
-                f"Rejected SQL query containing unresolved template token {unresolved_template}. "
-                "For IN-list templates use aquery_in()/query_in() so {IN_CLAUSE} is expanded safely."
-            )
-            return Result.Err(ErrorCode.INVALID_INPUT, msg)
-
-        await self._ensure_initialized_async()
-
-        token = tx_token or self._tx_token()
-        if token:
-            conn = self._tx_conns.get(token)
-            if not conn:
-                return Result.Err(ErrorCode.DB_ERROR, "Transaction connection missing")
-            return await self._execute_on_conn_async(conn, query, params, fetch, commit=False, tx_token=token)
-
-        conn = await self._acquire_connection_async()
-        try:
-            res = await self._execute_on_conn_async(conn, query, params, fetch, commit=True, tx_token=None)
-            return res
-        finally:
-            await self._release_connection_async(conn)
+        return await exec_runtime.execute_async(
+            self,
+            query,
+            params,
+            fetch,
+            tx_token=tx_token,
+            find_unresolved_sql_template_fn=_find_unresolved_sql_template,
+            logger=logger,
+        )
 
     @staticmethod
     def _is_write_sql(query: str) -> bool:
@@ -1130,92 +855,18 @@ class Sqlite:
         commit: bool,
         tx_token: str | None = None,
     ) -> Result[Any]:
-        async def _execute_inner() -> Result[Any]:
-            try:
-                lock = self._write_lock
-                is_write = self._is_write_sql(query)
-                # H-3: _write_lock must not be None after initialization completes.
-                # If it is None for a write query, initialization has not finished —
-                # raise a clear error instead of silently skipping the write lock.
-                if is_write and lock is None:
-                    return Result.Err(
-                        ErrorCode.DB_ERROR,
-                        "Write lock unavailable: database not yet initialized",
-                    )
-                if is_write and lock is not None:
-                    # BEGIN acquires the write lock already; avoid deadlocking by reacquiring it
-                    # for statements executed within the same transaction.
-                    if tx_token:
-                        try:
-                            with self._tx_state_lock:
-                                in_tx = tx_token in self._tx_write_lock_tokens
-                        except Exception:
-                            in_tx = False
-                    else:
-                        in_tx = False
-                    if in_tx:
-                        return await self._execute_on_conn_locked_async(conn, query, params, fetch, commit=commit)
-                    async with lock:
-                        return await self._execute_on_conn_locked_async(conn, query, params, fetch, commit=commit)
-                return await self._execute_on_conn_locked_async(conn, query, params, fetch, commit=commit)
-            except sqlite3.IntegrityError as exc:
-                logger.warning("Integrity error: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, f"Integrity error: {exc}")
-            except sqlite3.OperationalError as exc:
-                if "interrupted" in str(exc).lower():
-                    return Result.Err(ErrorCode.TIMEOUT, "Database operation interrupted (query timeout)")
-                if self._is_locked_error(exc):
-                    self._mark_locked_event(exc)
-                if tx_is_missing_column_error(exc):
-                    # Best-effort self-heal for legacy/partial DBs: add missing expected columns,
-                    # then retry the original statement once.
-                    try:
-                        from .schema import ensure_columns_exist
-                        heal_res = await ensure_columns_exist(self)
-                        if heal_res.ok:
-                            return await self._execute_on_conn_locked_async(
-                                conn, query, params, fetch, commit=commit
-                            )
-                    except Exception as heal_exc:
-                        logger.warning("Schema self-heal after missing column failed: %s", heal_exc)
-                if tx_is_missing_table_error(exc):
-                    repaired = await self._attempt_missing_table_recovery_async()
-                    if repaired:
-                        return await self._execute_on_conn_locked_async(
-                            conn, query, params, fetch, commit=commit
-                        )
-                logger.error("Operational error: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, f"Operational error: {exc}")
-            except sqlite3.DatabaseError as exc:
-                if not self._is_malformed_error(exc):
-                    logger.error("Database error: %s", exc)
-                    return Result.Err(ErrorCode.DB_ERROR, str(exc))
-                self._mark_malformed_event(exc)
-                # Close the dirty connection before recovery; mark it so _release_connection_async skips pooling.
-                try:
-                    await conn.close()
-                    conn._mjr_closed = True  # type: ignore[attr-defined]
-                except Exception:
-                    conn._mjr_closed = True  # type: ignore[attr-defined]
-                recovered = await self._attempt_malformed_recovery_async()
-                if recovered:
-                    retry_conn: aiosqlite.Connection | None = None
-                    try:
-                        retry_conn = await self._acquire_connection_async()
-                        return await self._execute_on_conn_locked_async(retry_conn, query, params, fetch, commit=commit)
-                    except Exception as retry_exc:
-                        logger.error("Database malformed after recovery retry: %s", retry_exc)
-                        return Result.Err(ErrorCode.DB_ERROR, str(retry_exc))
-                    finally:
-                        if retry_conn is not None:
-                            await self._release_connection_async(retry_conn)
-                await self._maybe_auto_reset_on_corruption(exc)
-                logger.error("Database malformed and recovery failed: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, str(exc))
-            except Exception as exc:
-                logger.error("Unexpected database error: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, str(exc))
-        return await self._with_query_timeout(_execute_inner())
+        return await exec_runtime.execute_on_conn_async(
+            self,
+            conn,
+            query,
+            params,
+            fetch,
+            commit=commit,
+            tx_token=tx_token,
+            logger=logger,
+            is_missing_column_error_fn=tx_is_missing_column_error,
+            is_missing_table_error_fn=tx_is_missing_table_error,
+        )
 
     async def _execute_on_conn_locked_async(
         self,
@@ -1226,24 +877,14 @@ class Sqlite:
         *,
         commit: bool,
     ) -> Result[Any]:
-        try:
-            for attempt in range(self._lock_retry_attempts + 1):
-                try:
-                    return await self._execute_with_cursor_result(
-                        conn,
-                        query,
-                        params,
-                        fetch=fetch,
-                        commit=commit,
-                    )
-                except sqlite3.OperationalError as exc:
-                    if self._is_locked_error(exc) and attempt < self._lock_retry_attempts:
-                        await self._sleep_backoff(attempt)
-                        continue
-                    raise
-            return Result.Err(ErrorCode.DB_ERROR, "Query failed after retries")
-        except Exception:
-            raise
+        return await exec_runtime.execute_on_conn_locked_async(
+            self,
+            conn,
+            query,
+            params,
+            fetch,
+            commit=commit,
+        )
 
     async def _execute_with_cursor_result(
         self,
@@ -1254,19 +895,14 @@ class Sqlite:
         fetch: bool,
         commit: bool,
     ) -> Result[Any]:
-        cursor = await conn.execute(query, params or ())
-        try:
-            if fetch:
-                rows = await cursor.fetchall()
-                return Result.Ok(self._rows_to_dicts(rows))
-            if commit:
-                await conn.commit()
-            return self._cursor_write_result(cursor)
-        finally:
-            try:
-                await cursor.close()
-            except Exception:
-                pass
+        return await exec_runtime.execute_with_cursor_result(
+            self,
+            conn,
+            query,
+            params,
+            fetch=fetch,
+            commit=commit,
+        )
 
     @staticmethod
     def _cursor_write_result(cursor: Any) -> Result[Any]:
@@ -1318,19 +954,12 @@ class Sqlite:
         *,
         tx_token: str | None = None,
     ) -> Result[int]:
-        await self._ensure_initialized_async()
-        token = tx_token or self._tx_token()
-        if token:
-            conn = self._tx_conns.get(token)
-            if not conn:
-                return Result.Err(ErrorCode.DB_ERROR, "Transaction connection missing")
-            return await self._executemany_on_conn_async(conn, query, params_list, commit=False, tx_token=token)
-
-        conn = await self._acquire_connection_async()
-        try:
-            return await self._executemany_on_conn_async(conn, query, params_list, commit=True, tx_token=None)
-        finally:
-            await self._release_connection_async(conn)
+        return await exec_runtime.executemany_async(
+            self,
+            query,
+            params_list,
+            tx_token=tx_token,
+        )
 
     async def _executemany_on_conn_async(
         self,
@@ -1341,61 +970,26 @@ class Sqlite:
         commit: bool,
         tx_token: str | None = None,
     ) -> Result[int]:
-        async def _execute_inner() -> Result[int]:
-            try:
-                lock = self._write_lock
-                is_write = self._is_write_sql(query)
-                if is_write and lock is not None:
-                    # Check if we're inside an existing transaction that holds the write lock.
-                    # Use _tx_state_lock to avoid race conditions with concurrent rollback/commit.
-                    if tx_token:
-                        try:
-                            with self._tx_state_lock:
-                                in_tx = tx_token in self._tx_write_lock_tokens
-                        except Exception:
-                            in_tx = False
-                    else:
-                        in_tx = False
-                    if in_tx:
-                        return await self._executemany_on_conn_locked_async(conn, query, params_list, commit=commit)
-                    async with lock:
-                        return await self._executemany_on_conn_locked_async(conn, query, params_list, commit=commit)
-                return await self._executemany_on_conn_locked_async(conn, query, params_list, commit=commit)
-            except sqlite3.OperationalError as exc:
-                if "interrupted" in str(exc).lower():
-                    return Result.Err(ErrorCode.TIMEOUT, "Database operation interrupted (query timeout)")
-                logger.error("Batch execute error: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, str(exc))
-            except Exception as exc:
-                logger.error("Batch execute error: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, str(exc))
-        return await self._with_query_timeout(_execute_inner())
+        return await exec_runtime.executemany_on_conn_async(
+            self,
+            conn,
+            query,
+            params_list,
+            commit=commit,
+            tx_token=tx_token,
+            logger=logger,
+        )
 
     async def _executemany_on_conn_locked_async(
         self, conn: aiosqlite.Connection, query: str, params_list: list[tuple], *, commit: bool
     ) -> Result[int]:
-        try:
-            for attempt in range(self._lock_retry_attempts + 1):
-                try:
-                    cursor = await conn.executemany(query, params_list)
-                    try:
-                        if commit:
-                            await conn.commit()
-                        rowcount = getattr(cursor, "rowcount", None)
-                        return Result.Ok(int(rowcount or 0))
-                    finally:
-                        try:
-                            await cursor.close()
-                        except Exception:
-                            pass
-                except sqlite3.OperationalError as exc:
-                    if self._is_locked_error(exc) and attempt < self._lock_retry_attempts:
-                        await self._sleep_backoff(attempt)
-                        continue
-                    raise
-            return Result.Err(ErrorCode.DB_ERROR, "Batch execute failed after retries")
-        except Exception:
-            raise
+        return await exec_runtime.executemany_on_conn_locked_async(
+            self,
+            conn,
+            query,
+            params_list,
+            commit=commit,
+        )
 
     async def aexecutemany(self, query: str, params_list: list[tuple]) -> Result[int]:
         """Execute a parameterized statement over multiple param tuples (async)."""
@@ -1404,48 +998,20 @@ class Sqlite:
         return await asyncio.wrap_future(fut)
 
     async def _executescript_async(self, script: str, *, tx_token: str | None = None) -> Result[bool]:
-        await self._ensure_initialized_async()
-        token = tx_token or self._tx_token()
-        if token:
-            conn = self._tx_conns.get(token)
-            if not conn:
-                return Result.Err(ErrorCode.DB_ERROR, "Transaction connection missing")
-            return await self._executescript_on_conn_async(conn, script, commit=False)
-
-        conn = await self._acquire_connection_async()
-        try:
-            lock = self._write_lock
-            if lock is not None:
-                async with lock:
-                    return await self._executescript_on_conn_async(conn, script, commit=True)
-            return await self._executescript_on_conn_async(conn, script, commit=True)
-        finally:
-            await self._release_connection_async(conn)
+        return await exec_runtime.executescript_async(
+            self,
+            script,
+            tx_token=tx_token,
+        )
 
     async def _executescript_on_conn_async(self, conn: aiosqlite.Connection, script: str, *, commit: bool) -> Result[bool]:
-        async def _execute_inner() -> Result[bool]:
-            try:
-                for attempt in range(self._lock_retry_attempts + 1):
-                    try:
-                        await conn.executescript(script)
-                        if commit:
-                            await conn.commit()
-                        return Result.Ok(True)
-                    except sqlite3.OperationalError as exc:
-                        if self._is_locked_error(exc) and attempt < self._lock_retry_attempts:
-                            await self._sleep_backoff(attempt)
-                            continue
-                        raise
-                return Result.Err(ErrorCode.DB_ERROR, "Script execution failed after retries")
-            except sqlite3.OperationalError as exc:
-                if "interrupted" in str(exc).lower():
-                    return Result.Err(ErrorCode.TIMEOUT, "Database operation interrupted (query timeout)")
-                logger.error("Script execution error: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, str(exc))
-            except Exception as exc:
-                logger.error("Script execution error: %s", exc)
-                return Result.Err(ErrorCode.DB_ERROR, str(exc))
-        return await self._with_query_timeout(_execute_inner())
+        return await exec_runtime.executescript_on_conn_async(
+            self,
+            conn,
+            script,
+            commit=commit,
+            logger=logger,
+        )
 
     async def aexecutescript(self, script: str) -> Result[bool]:
         """Execute a multi-statement SQL script (async)."""
@@ -1454,18 +1020,7 @@ class Sqlite:
         return await asyncio.wrap_future(fut)
 
     async def _vacuum_async(self) -> Result[bool]:
-        await self._ensure_initialized_async()
-        conn = await self._acquire_connection_async()
-        try:
-            await conn.execute("VACUUM")
-            await conn.commit()
-            logger.info("Database vacuumed successfully")
-            return Result.Ok(True)
-        except Exception as exc:
-            logger.error("Vacuum error: %s", exc)
-            return Result.Err(ErrorCode.DB_ERROR, str(exc))
-        finally:
-            await self._release_connection_async(conn)
+        return await exec_runtime.vacuum_async(self, logger=logger)
 
     async def avacuum(self) -> Result[bool]:
         """Run SQLite VACUUM (async)."""
@@ -1510,48 +1065,23 @@ class Sqlite:
         return tx_begin_stmt_for_mode(mode)
 
     async def _begin_tx_with_retry(self, conn: aiosqlite.Connection, begin_stmt: str) -> None:
-        for attempt in range(self._lock_retry_attempts + 1):
-            try:
-                await conn.execute(begin_stmt)
-                return
-            except sqlite3.OperationalError as exc:
-                if self._is_locked_error(exc) and attempt < self._lock_retry_attempts:
-                    await self._sleep_backoff(attempt)
-                    continue
-                raise
+        return await life_runtime.begin_tx_with_retry(self, conn, begin_stmt)
 
     def _register_tx_token(self, token: str, conn: aiosqlite.Connection, lock: asyncio.Lock | None) -> None:
-        tx_register_tx_token(self, token, conn, lock)
+        return tx_register_tx_token(self, token, conn, lock)
 
     async def _abort_begin_tx(
         self,
         conn: aiosqlite.Connection,
         lock: asyncio.Lock | None,
     ) -> None:
-        try:
-            await conn.rollback()
-        except Exception:
-            pass
-        await self._release_connection_async(conn)
-        if lock is not None:
-            try:
-                lock.release()
-            except Exception:
-                pass
+        return await life_runtime.abort_begin_tx(self, conn, lock)
 
     def _get_tx_state(self, token: str) -> tuple[aiosqlite.Connection | None, bool]:
         return tx_get_tx_state(self, token)
 
     async def _commit_with_retry(self, conn: aiosqlite.Connection) -> None:
-        for attempt in range(self._lock_retry_attempts + 1):
-            try:
-                await conn.commit()
-                return
-            except sqlite3.OperationalError as exc:
-                if self._is_locked_error(exc) and attempt < self._lock_retry_attempts:
-                    await self._sleep_backoff(attempt)
-                    continue
-                raise
+        return await life_runtime.commit_with_retry(self, conn)
 
     async def _cleanup_tx_state(
         self,
@@ -1560,281 +1090,48 @@ class Sqlite:
         had_write_lock: bool,
         lock: asyncio.Lock | None,
     ) -> None:
-        try:
-            with self._tx_state_lock:
-                self._tx_conns.pop(token, None)
-                if had_write_lock:
-                    self._tx_write_lock_tokens.discard(token)
-        except Exception:
-            pass
-        await self._release_connection_async(conn)
-        if lock is not None and had_write_lock:
-            try:
-                lock.release()
-            except Exception:
-                pass
+        return await life_runtime.cleanup_tx_state(self, token, conn, had_write_lock, lock)
 
     async def _begin_tx_async(self, mode: str) -> Result[str]:
-        await self._ensure_initialized_async()
-        lock = self._write_lock
-        if lock is not None:
-            await lock.acquire()
-        # Wrap connection acquisition inside the same try-except that calls
-        # _abort_begin_tx so the write lock is always released on any failure —
-        # including RuntimeError("Database is resetting…") from _acquire_connection_async.
-        # Without this guard, the lock is acquired above but never released if
-        # _acquire_connection_async raises before we enter the inner try block,
-        # permanently deadlocking all subsequent write operations.
-        conn: Any = None
-        try:
-            conn = await self._acquire_connection_async()
-            token = f"tx_{uuid.uuid4().hex}"
-            begin_stmt = self._begin_stmt_for_mode(mode)
-            try:
-                await self._begin_tx_with_retry(conn, begin_stmt)
-                self._register_tx_token(token, conn, lock)
-                return Result.Ok(token)
-            except Exception as exc:
-                await self._abort_begin_tx(conn, lock)
-                return Result.Err(ErrorCode.DB_ERROR, str(exc))
-        except Exception as exc:
-            # _acquire_connection_async failed — release the write lock and
-            # the partially-acquired connection (if any).
-            await self._abort_begin_tx(conn, lock)
-            return Result.Err(ErrorCode.DB_ERROR, str(exc))
+        return await life_runtime.begin_tx_async(self, mode)
 
     async def _commit_tx_async(self, token: str) -> Result[bool]:
-        lock = self._write_lock
-        conn, had_write_lock = self._get_tx_state(token)
-        if not conn:
-            return Result.Err(ErrorCode.DB_ERROR, "Transaction connection missing")
-        try:
-            await self._commit_with_retry(conn)
-            return Result.Ok(True)
-        except Exception as exc:
-            # Best-effort rollback to avoid returning a connection with an open transaction to the pool.
-            try:
-                await conn.rollback()
-            except Exception:
-                pass
-            return Result.Err(ErrorCode.DB_ERROR, str(exc))
-        finally:
-            await self._cleanup_tx_state(token, conn, had_write_lock, lock)
+        return await life_runtime.commit_tx_async(self, token)
 
     async def _rollback_tx_async(self, token: str) -> Result[bool]:
-        lock = self._write_lock
-        try:
-            with self._tx_state_lock:
-                conn = self._tx_conns.get(token)
-                had_write_lock = token in self._tx_write_lock_tokens
-        except Exception:
-            conn = None
-            had_write_lock = False
-        if not conn:
-            return Result.Err(ErrorCode.DB_ERROR, "Transaction connection missing")
-        try:
-            try:
-                await conn.rollback()
-            except Exception:
-                pass
-            return Result.Ok(True)
-        finally:
-            try:
-                with self._tx_state_lock:
-                    self._tx_conns.pop(token, None)
-                    if had_write_lock:
-                        self._tx_write_lock_tokens.discard(token)
-            except Exception:
-                pass
-            await self._release_connection_async(conn)
-            if lock is not None and had_write_lock:
-                try:
-                    lock.release()
-                except Exception:
-                    pass
+        return await life_runtime.rollback_tx_async(self, token)
 
     async def _close_all_async(self):
-        # 1. Close transaction connections first.
-        tokens = list(self._tx_conns.keys())
-        for token in tokens:
-            conn = self._tx_conns.pop(token, None)
-            if not conn:
-                continue
-            try:
-                await conn.close()
-            except Exception:
-                pass
-
-        # 2. Emptry the pool
-        while True:
-            try:
-                conn = self._pool.get_nowait()
-            except Empty:
-                break
-            try:
-                await conn.close()
-            except Exception:
-                pass
-
-        # 3. FORCE CLOSE any checked-out connections (critical for reset)
-        active_list = list(self._active_conns)
-        for conn in active_list:
-             try:
-                 await conn.close()
-             except Exception:
-                 pass
-        self._active_conns.clear()
-        self._active_conns_idle.set()
-
-        # Reset counters/semaphores as everything is closed
-        self._async_sem = None
+        return await life_runtime.close_all_async(self)
 
     async def aclose(self):
-        """Close connections and stop the DB loop thread (async)."""
-        if getattr(self, "_closing", False):
-            return
-        self._closing = True
-        fut = self._loop_thread.submit(self._close_all_async())
-        try:
-            await asyncio.wrap_future(fut)
-        finally:
-            self._stop_asset_lock_pruner()
-            self._loop_thread.stop()
-            self._closing = False
+        return await life_runtime.aclose_async(self)
 
     async def _drain_for_reset_async(self):
-        """Prepare for reset: lock new connections, wait for active ones, close all."""
-        self._resetting = True
-
-        # Best effort: force WAL checkpoint while connections are still alive.
-        # This reduces the chance of carrying stale WAL state into a reset on Windows.
-        try:
-            await self._checkpoint_wal_before_reset_async()
-        except Exception as exc:
-            logger.debug("DB Reset: WAL checkpoint pre-drain failed: %s", exc)
-
-        # Wait deterministically for in-flight checkouts to drain (max 5s), then force close.
-        drained = await asyncio.to_thread(self._active_conns_idle.wait, 5.0)
-        if not drained and self._active_conns:
-            logger.warning("DB Reset: Forced close with %d active connections", len(self._active_conns))
-
-        await self._close_all_async()
+        return await life_runtime.drain_for_reset_async(self)
 
     async def _checkpoint_wal_before_reset_async(self) -> None:
-        """
-        Best-effort checkpoint prior to hard reset.
-        Must be called on DB loop thread while connections are still valid.
-        """
-        await self._ensure_initialized_async()
-        conn = await self._acquire_connection_async()
-        try:
-            for attempt in range(self._lock_retry_attempts + 1):
-                try:
-                    cur = await conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-                    try:
-                        await cur.fetchall()
-                    finally:
-                        try:
-                            await cur.close()
-                        except Exception:
-                            pass
-                    break
-                except sqlite3.OperationalError as exc:
-                    if self._is_locked_error(exc) and attempt < self._lock_retry_attempts:
-                        await self._sleep_backoff(attempt)
-                        continue
-                    raise
-        finally:
-            await self._release_connection_async(conn)
+        return await life_runtime.checkpoint_wal_before_reset_async(self)
 
     @staticmethod
     def _schedule_delete_on_reboot(path: Path) -> bool:
-        return tx_schedule_delete_on_reboot(path)
+        return life_runtime.schedule_delete_on_reboot(path)
 
     def _has_async_runtime_state(self) -> bool:
-        """Return True when the instance has the async DB runtime needed for schema queries."""
-        return all(hasattr(self, attr) for attr in ("_loop_thread", "_pool", "_tx_conns"))
+        return life_runtime.has_async_runtime_state(self)
 
     async def areset(self) -> Result[bool]:
-        """
-        Aggressive reset:
-        1. Close all connections (drain)
-        2. Force GC to release file handles (Windows fix)
-        3. Delete DB files
-        4. Re-init
-        """
-        try:
-            deleted_files: list[str] = []
-            renamed_files: list[dict[str, str]] = []
-            await self._drain_for_reset()
-            delete_err = await self._delete_reset_files(deleted_files, renamed_files)
-            if delete_err is not None:
-                with self._lock:
-                    self._resetting = False
-                return delete_err
-
-            # 4. Reset initialization state
-            with self._lock:
-                self._initialized = False
-                # Keep reset lock active until async re-init + schema complete.
-                self._resetting = True
-
-            # 5. Re-initialize (async-safe; do not call sync _init_db from DB loop thread).
-            await self._ensure_initialized_async(allow_during_reset=True)
-            # Release reset guard before schema helpers, which execute through normal DB APIs.
-            with self._lock:
-                self._resetting = False
-
-            # 6. Re-apply schema
-            from .schema import (
-                ensure_columns_exist,
-                ensure_indexes_and_triggers,
-                ensure_tables_exist,
-            )
-            schema_res = await ensure_tables_exist(self)
-            if not schema_res.ok:
-                return schema_res
-
-            if self._has_async_runtime_state():
-                columns_res = await ensure_columns_exist(self)
-                if not columns_res.ok:
-                    return columns_res
-            else:
-                logger.debug("Skipping ensure_columns_exist during reset for partially constructed Sqlite instance")
-
-            indexes_res = await ensure_indexes_and_triggers(self)
-            if not indexes_res.ok:
-                return indexes_res
-
-            return Result.Ok(True, deleted_files=deleted_files, renamed_files=renamed_files)
-        except Exception as exc:
-            with self._lock:
-                self._resetting = False # Ensure unlock on error
-            logger.error(f"DB Reset failed: {exc}")
-            return Result.Err("RESET_FAILED", str(exc))
+        return await life_runtime.areset(self)
 
     async def _drain_for_reset(self) -> None:
-        # 1. Drain and close on loop thread.
-        fut = self._loop_thread.submit(self._drain_for_reset_async())
-        await asyncio.wrap_future(fut)
-        # 2. Wait a bit for OS to release file locks & force GC.
-        await asyncio.sleep(0.5)
-        gc.collect()
+        return await life_runtime.drain_for_reset(self)
 
     async def _delete_reset_files(
         self,
         deleted_files: list[str],
         renamed_files: list[dict[str, str]],
     ) -> Result[bool] | None:
-        base = str(self.db_path)
-        for ext in ["", "-wal", "-shm", "-journal"]:
-            path = Path(base + ext)
-            if not path.exists():
-                continue
-            err = await self._delete_or_recover_reset_file(path, deleted_files, renamed_files)
-            if err is not None:
-                return err
-        return None
+        return await life_runtime.delete_reset_files(self, deleted_files, renamed_files)
 
     async def _delete_or_recover_reset_file(
         self,
@@ -1842,224 +1139,38 @@ class Sqlite:
         deleted_files: list[str],
         renamed_files: list[dict[str, str]],
     ) -> Result[bool] | None:
-        deleted, last_error = await self._delete_reset_file_with_retries(path, deleted_files)
-        if deleted:
-            return None
-        logger.warning(f"Failed to delete {path} after retries: {last_error}")
-        recover = self._rename_or_schedule_delete(path, renamed_files, last_error)
-        return None if recover.ok else recover
+        return await life_runtime.delete_or_recover_reset_file(self, path, deleted_files, renamed_files)
 
     async def _delete_reset_file_with_retries(self, path: Path, deleted_files: list[str]) -> tuple[bool, Exception | None]:
-        last_error: Exception | None = None
-        forced_release_attempted = False
-        for attempt in range(5):
-            try:
-                path.unlink()
-                deleted_files.append(str(path))
-                return True, None
-            except Exception as exc:
-                last_error = exc
-                if not forced_release_attempted and self._is_windows_sharing_violation(exc):
-                    forced_release_attempted = True
-                    try:
-                        terminated = await asyncio.to_thread(self._terminate_locking_processes_windows, path)
-                        if terminated:
-                            logger.warning(
-                                "Terminated locking process(es) for %s: %s",
-                                path,
-                                ", ".join(str(pid) for pid in terminated),
-                            )
-                            await asyncio.sleep(0.6)
-                            gc.collect()
-                            continue
-                    except Exception as kill_exc:
-                        logger.debug("Failed to terminate locking process(es) for %s: %s", path, kill_exc)
-                await asyncio.sleep(0.5 + (attempt * 0.2))
-                gc.collect()
-        return False, last_error
+        return await life_runtime.delete_reset_file_with_retries(self, path, deleted_files)
 
     @staticmethod
     def _is_windows_sharing_violation(exc: Exception) -> bool:
-        if os.name != "nt":
-            return False
-        try:
-            winerror = int(getattr(exc, "winerror", 0) or 0)
-            if winerror in (32, 33):
-                return True
-        except Exception:
-            pass
-        msg = str(exc).lower()
-        return (
-            "winerror 32" in msg
-            or "winerror 33" in msg
-            or "used by another process" in msg
-            or "cannot access the file" in msg
-        )
+        return life_runtime.is_windows_sharing_violation(exc)
 
     @staticmethod
     def _lock_kill_enabled() -> bool:
-        raw = os.getenv("MJR_AM_DB_FORCE_KILL_LOCKERS", os.getenv("MAJOOR_DB_FORCE_KILL_LOCKERS", "1"))
-        return str(raw or "").strip().lower() in {"1", "true", "yes", "on"}
+        return life_runtime.lock_kill_enabled()
 
     @staticmethod
     def _build_rm_ctypes_types(wintypes: Any) -> tuple[Any, Any, Any]:
-        class FILETIME(ctypes.Structure):
-            _fields_ = [
-                ("dwLowDateTime", wintypes.DWORD),
-                ("dwHighDateTime", wintypes.DWORD),
-            ]
-
-        class RM_UNIQUE_PROCESS(ctypes.Structure):
-            _fields_ = [
-                ("dwProcessId", wintypes.DWORD),
-                ("ProcessStartTime", FILETIME),
-            ]
-
-        class RM_PROCESS_INFO(ctypes.Structure):
-            _fields_ = [
-                ("Process", RM_UNIQUE_PROCESS),
-                ("strAppName", wintypes.WCHAR * 256),
-                ("strServiceShortName", wintypes.WCHAR * 64),
-                ("ApplicationType", wintypes.DWORD),
-                ("AppStatus", wintypes.ULONG),
-                ("TSSessionId", wintypes.DWORD),
-                ("bRestartable", wintypes.BOOL),
-            ]
-
-        return FILETIME, RM_UNIQUE_PROCESS, RM_PROCESS_INFO
+        return life_runtime.build_rm_ctypes_types(wintypes)
 
     @staticmethod
     def _configure_rm_dll(rm: Any, wintypes: Any, RM_PROCESS_INFO: Any) -> None:
-        rm.RmStartSession.argtypes = [ctypes.POINTER(wintypes.DWORD), wintypes.DWORD, wintypes.LPWSTR]
-        rm.RmStartSession.restype = wintypes.DWORD
-        rm.RmRegisterResources.argtypes = [
-            wintypes.DWORD,
-            ctypes.c_uint,
-            ctypes.POINTER(wintypes.LPCWSTR),
-            ctypes.c_uint,
-            ctypes.c_void_p,
-            ctypes.c_uint,
-            ctypes.c_void_p,
-        ]
-        rm.RmRegisterResources.restype = wintypes.DWORD
-        rm.RmGetList.argtypes = [
-            wintypes.DWORD,
-            ctypes.POINTER(ctypes.c_uint),
-            ctypes.POINTER(ctypes.c_uint),
-            ctypes.POINTER(RM_PROCESS_INFO),
-            ctypes.POINTER(wintypes.DWORD),
-        ]
-        rm.RmGetList.restype = wintypes.DWORD
-        rm.RmEndSession.argtypes = [wintypes.DWORD]
-        rm.RmEndSession.restype = wintypes.DWORD
+        return life_runtime.configure_rm_dll(rm, wintypes, RM_PROCESS_INFO)
 
     @staticmethod
     def _rm_query_pids(rm: Any, session: Any, path: Path, wintypes: Any, RM_PROCESS_INFO: Any) -> list[int]:
-        ERROR_MORE_DATA = 234
-        files = (wintypes.LPCWSTR * 1)(str(path))
-        reg_res = rm.RmRegisterResources(session, 1, files, 0, None, 0, None)
-        if int(reg_res) != 0:
-            return []
-
-        needed = ctypes.c_uint(0)
-        count = ctypes.c_uint(0)
-        reasons = wintypes.DWORD(0)
-        get_res = rm.RmGetList(session, ctypes.byref(needed), ctypes.byref(count), None, ctypes.byref(reasons))
-        if int(get_res) not in (0, ERROR_MORE_DATA):
-            return []
-        if int(needed.value) <= 0:
-            return []
-
-        infos = (RM_PROCESS_INFO * int(needed.value))()
-        count = ctypes.c_uint(int(needed.value))
-        get_res = rm.RmGetList(
-            session,
-            ctypes.byref(needed),
-            ctypes.byref(count),
-            infos,
-            ctypes.byref(reasons),
-        )
-        if int(get_res) != 0:
-            return []
-
-        pids: list[int] = []
-        for i in range(int(count.value)):
-            pid = int(getattr(infos[i].Process, "dwProcessId", 0) or 0)
-            if pid > 0:
-                pids.append(pid)
-        seen: set[int] = set()
-        out: list[int] = []
-        for pid in pids:
-            if pid in seen:
-                continue
-            seen.add(pid)
-            out.append(pid)
-        return out
+        return life_runtime.rm_query_pids(rm, session, path, wintypes, RM_PROCESS_INFO)
 
     @classmethod
     def _find_locking_pids_windows(cls, path: Path) -> list[int]:
-        if os.name != "nt":
-            return []
-        try:
-            from ctypes import wintypes
-
-            CCH_RM_SESSION_KEY = 32
-            _FILETIME, _RM_UNIQUE_PROCESS, RM_PROCESS_INFO = cls._build_rm_ctypes_types(wintypes)
-
-            win_dll = getattr(ctypes, "WinDLL", None)
-            if win_dll is None:
-                return []
-            rm = win_dll("Rstrtmgr")
-            cls._configure_rm_dll(rm, wintypes, RM_PROCESS_INFO)
-
-            session = wintypes.DWORD(0)
-            session_key = ctypes.create_unicode_buffer(CCH_RM_SESSION_KEY + 1)
-            start_res = rm.RmStartSession(ctypes.byref(session), 0, session_key)
-            if int(start_res) != 0:
-                return []
-            try:
-                return cls._rm_query_pids(rm, session, path, wintypes, RM_PROCESS_INFO)
-            finally:
-                try:
-                    rm.RmEndSession(session)
-                except Exception:
-                    pass
-        except Exception:
-            return []
+        return life_runtime.find_locking_pids_windows(cls, path)
 
     @classmethod
     def _terminate_locking_processes_windows(cls, path: Path) -> list[int]:
-        if os.name != "nt" or not cls._lock_kill_enabled():
-            return []
-        pids = cls._find_locking_pids_windows(path)
-        if not pids:
-            return []
-
-        current_pid = int(os.getpid())
-        terminated: list[int] = []
-        for pid in pids:
-            if pid <= 0 or pid == current_pid:
-                continue
-            try:
-                proc = subprocess.run(
-                    ["taskkill", "/PID", str(pid), "/T", "/F"],
-                    capture_output=True,
-                    text=True,
-                    timeout=8,
-                )
-                if int(proc.returncode) == 0:
-                    terminated.append(pid)
-                else:
-                    logger.debug(
-                        "taskkill failed for PID %s (path=%s): rc=%s stderr=%s",
-                        pid,
-                        path,
-                        proc.returncode,
-                        (proc.stderr or "").strip(),
-                    )
-            except Exception as exc:
-                logger.debug("taskkill exception for PID %s (path=%s): %s", pid, path, exc)
-        return terminated
+        return life_runtime.terminate_locking_processes_windows(cls, path)
 
     def _rename_or_schedule_delete(
         self,
@@ -2067,51 +1178,18 @@ class Sqlite:
         renamed_files: list[dict[str, str]],
         last_error: Exception | None,
     ) -> Result[bool]:
-        return tx_rename_or_delete(path, renamed_files, last_error)
+        return life_runtime.rename_or_schedule_delete(path, renamed_files, last_error)
 
     async def _begin_tx_for_async(self, mode: str) -> Result[str]:
-        fut = self._loop_thread.submit(self._begin_tx_async(mode))
-        return await asyncio.wrap_future(fut)
+        return await life_runtime.begin_tx_for_async(self, mode)
 
     async def _commit_tx_for_async(self, token: str) -> Result[bool]:
-        fut = self._loop_thread.submit(self._commit_tx_async(token))
-        return await asyncio.wrap_future(fut)
+        return await life_runtime.commit_tx_for_async(self, token)
 
     async def _rollback_tx_for_async(self, token: str) -> Result[bool]:
-        fut = self._loop_thread.submit(self._rollback_tx_async(token))
-        return await asyncio.wrap_future(fut)
+        return await life_runtime.rollback_tx_for_async(self, token)
 
     @asynccontextmanager
     async def atransaction(self, mode: str = "immediate"):
-        """Async context manager for a DB transaction."""
-        current_token = self._tx_token()
-        if current_token:
-            # Reuse the ambient transaction when callers nest write helpers on the
-            # same task. The outer transaction still owns commit/rollback.
-            yield Result.Ok(True)
-            return
-
-        tx_state = Result.Ok(True)
-        begin_res = await self._begin_tx_for_async(mode)
-        if not begin_res.ok or not begin_res.data:
-            tx_state = Result.Err(ErrorCode.DB_ERROR, str(begin_res.error or "Failed to begin transaction"))
+        async with life_runtime.transaction_context(self, _TX_TOKEN, mode) as tx_state:
             yield tx_state
-            return
-
-        token = str(begin_res.data)
-        token_handle = _TX_TOKEN.set(token)
-        try:
-            yield tx_state
-            commit_res = await self._commit_tx_for_async(token)
-            if not commit_res.ok:
-                tx_state.ok = False
-                tx_state.code = str(getattr(commit_res, "code", None) or ErrorCode.DB_ERROR)
-                tx_state.error = str(commit_res.error or "Commit failed")
-        except Exception:
-            try:
-                await self._rollback_tx_for_async(token)
-            except Exception:
-                pass
-            raise
-        finally:
-            _TX_TOKEN.reset(token_handle)

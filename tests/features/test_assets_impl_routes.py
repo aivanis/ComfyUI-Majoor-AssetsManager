@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
+from mjr_am_backend.routes.handlers.asset_docs import register_asset_docs_routes
 from mjr_am_backend.routes.handlers import assets_impl as m
 from mjr_am_backend.shared import Result
 
@@ -13,6 +14,7 @@ def _app():
     app = web.Application()
     routes = web.RouteTableDef()
     m.register_asset_routes(routes)
+    register_asset_docs_routes(routes)
     app.add_routes(routes)
     return app
 

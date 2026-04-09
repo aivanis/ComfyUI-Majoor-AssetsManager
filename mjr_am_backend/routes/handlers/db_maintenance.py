@@ -23,6 +23,8 @@ from mjr_am_backend.custom_roots import resolve_custom_root
 from mjr_am_backend.runtime_activity import is_generation_busy
 from mjr_am_backend.shared import FileKind, Result, get_logger
 
+from ..db_maintenance import archive_runtime
+from ..db_maintenance import vector_runtime
 from ..core import (
     _csrf_error,
     _json_response,
@@ -422,60 +424,23 @@ def _vector_backfill_fail_job(backfill_id: str, exc: Exception) -> None:
 
 
 def _archive_root_resolved() -> Path:
-    try:
-        return _DB_ARCHIVE_DIR.resolve(strict=False)
-    except Exception:
-        return _DB_ARCHIVE_DIR
+    return archive_runtime.archive_root_resolved(_DB_ARCHIVE_DIR)
 
 
 def _resolve_archive_source(name: str) -> Path | None:
-    safe_name = str(name or "").strip()
-    if not safe_name:
-        return None
-    if "/" in safe_name or "\\" in safe_name or "\x00" in safe_name:
-        return None
-    try:
-        src = (_DB_ARCHIVE_DIR / safe_name).resolve(strict=False)
-    except Exception:
-        return None
-    try:
-        src.relative_to(_archive_root_resolved())
-    except Exception:
-        return None
-    return src
+    return archive_runtime.resolve_archive_source(name, _DB_ARCHIVE_DIR)
 
 
 def _basename_list(paths: list[str]) -> str:
-    names: list[str] = []
-    for p in paths or []:
-        try:
-            names.append(Path(str(p)).name)
-        except Exception:
-            continue
-    return ", ".join(names)
+    return archive_runtime.basename_list(paths)
 
 
 def _task_done_logger(label: str):
-    def _done(task: asyncio.Task) -> None:
-        try:
-            exc = task.exception()
-        except asyncio.CancelledError:
-            return
-        except Exception:
-            return
-        if exc is not None:
-            error_text = safe_error_message(exc, "task failed") if isinstance(exc, Exception) else "task failed"
-            logger.warning("Background task '%s' failed: %s", label, error_text)
-
-    return _done
+    return archive_runtime.task_done_logger(label)
 
 
 def _spawn_background_task(coro, *, label: str) -> None:
-    try:
-        task = asyncio.create_task(coro)
-        task.add_done_callback(_task_done_logger(label))
-    except Exception as exc:
-        logger.debug("Unable to start background task '%s': %s", label, exc)
+    return archive_runtime.spawn_background_task(coro, label=label)
 
 
 def is_db_maintenance_active() -> bool:
@@ -497,366 +462,83 @@ def _generation_busy_result() -> Result[dict[str, Any]]:
 
 
 async def _stop_watcher_if_running(svc: dict | None) -> bool:
-    watcher = svc.get("watcher") if isinstance(svc, dict) else None
-    try:
-        running = False
-        if watcher:
-            raw_running = getattr(watcher, "is_running", False)
-            running = bool(raw_running() if callable(raw_running) else raw_running)
-        if running and watcher is not None:
-            await watcher.stop()
-            return True
-    except Exception as exc:
-        logger.debug("Failed to stop watcher during DB maintenance: %s", exc)
-    return False
+    return await archive_runtime.stop_watcher_if_running(svc)
 
 
 async def _restart_watcher_if_needed(svc: dict | None, should_restart: bool) -> None:
-    if not should_restart or not isinstance(svc, dict):
-        return
-    watcher = svc.get("watcher")
-    if not watcher:
-        return
-    try:
-        from mjr_am_backend.features.index.watcher_scope import build_watch_paths
-        paths = _resolve_watcher_restart_paths(svc, build_watch_paths)
-        if paths:
-            import asyncio
-            await watcher.start(paths, asyncio.get_running_loop())
-    except Exception as exc:
-        logger.debug("Failed to restart watcher after DB maintenance: %s", exc)
-
-
-def _resolve_watcher_restart_paths(svc: dict[str, Any], build_watch_paths: Any) -> list[Path]:
-    scope_cfg = svc.get("watcher_scope") if isinstance(svc.get("watcher_scope"), dict) else {}
-    scope = str((scope_cfg or {}).get("scope") or "output")
-    custom_root_id = (scope_cfg or {}).get("custom_root_id")
-    active_user_id = str(svc.get("watcher_scope_active_user_id") or "").strip()
-    return build_watch_paths(scope, custom_root_id, user_id=active_user_id or None)
-
-
-def _backup_name(now: datetime.datetime | None = None) -> str:
-    ts = (now or datetime.datetime.now(datetime.timezone.utc)).strftime("%Y%m%d_%H%M%S_%f")[:-3]
-    return f"assets_{ts}.sqlite"
-
-
-def _next_backup_target() -> Path:
-    target = _DB_ARCHIVE_DIR / _backup_name()
-    if not target.exists():
-        return target
-    stem = target.stem
-    suffix = target.suffix or ".sqlite"
-    for index in range(2, 1000):
-        candidate = target.with_name(f"{stem}_{index}{suffix}")
-        if not candidate.exists():
-            return candidate
-    raise RuntimeError("Failed to reserve unique DB backup filename")
-
-
-def _list_backup_files() -> list[dict[str, str | int]]:
-    if not _DB_ARCHIVE_DIR.exists():
-        return []
-    rows: list[dict[str, str | int]] = []
-    for p in _DB_ARCHIVE_DIR.glob("*.sqlite"):
-        try:
-            st = p.stat()
-            rows.append(
-                {
-                    "name": p.name,
-                    "size_bytes": int(st.st_size),
-                    "mtime": int(st.st_mtime),
-                }
-            )
-        except Exception:
-            continue
-    rows.sort(key=lambda x: int(x.get("mtime") or 0), reverse=True)
-    return rows
-
-
-def _sqlite_backup_file(src: Path, dst: Path) -> None:
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(str(src)) as src_conn:
-        with sqlite3.connect(str(dst)) as dst_conn:
-            src_conn.backup(dst_conn)
-
-
-def _emit_restore_status(step: str, level: str = "info", message: str | None = None, **extra) -> None:
-    try:
-        from ..registry import PromptServer
-        payload = {"step": str(step or ""), "level": str(level or "info")}
-        if message:
-            payload["message"] = str(message)
-        if extra:
-            payload.update(extra)
-        _ps = getattr(PromptServer, "instance", None)
-        if _ps is not None:
-            _ps.send_sync("mjr-db-restore-status", payload)
-    except Exception:
-        pass
-
-
-async def _remove_with_retry(path: Path, attempts: int = 6) -> None:
-    if not path.exists():
-        return
-    last_exc = None
-    for attempt in range(max(1, int(attempts))):
-        try:
-            path.unlink()
-            return
-        except Exception as exc:
-            last_exc = exc
-            gc.collect()
-            await asyncio.sleep(0.2 * (attempt + 1))
-    if path.exists():
-        raise last_exc or RuntimeError(f"Failed to delete file: {path}")
-
-
-def _is_windows_sharing_violation(exc: Exception) -> bool:
-    if os.name != "nt":
-        return False
-    try:
-        winerror = int(getattr(exc, "winerror", 0) or 0)
-        if winerror in (32, 33):
-            return True
-    except Exception:
-        pass
-    msg = str(exc).lower()
-    return (
-        "winerror 32" in msg
-        or "winerror 33" in msg
-        or "used by another process" in msg
-        or "cannot access the file" in msg
+    return await archive_runtime.restart_watcher_if_needed(
+        svc,
+        should_restart,
+        resolve_watcher_restart_paths_fn=_resolve_watcher_restart_paths,
     )
 
 
+def _resolve_watcher_restart_paths(svc: dict[str, Any], build_watch_paths: Any) -> list[Path]:
+    return archive_runtime.resolve_watcher_restart_paths(svc, build_watch_paths)
+
+
+def _backup_name(now: datetime.datetime | None = None) -> str:
+    return archive_runtime.backup_name(now)
+
+
+def _next_backup_target() -> Path:
+    return archive_runtime.next_backup_target(_DB_ARCHIVE_DIR, backup_name_fn=_backup_name)
+
+
+def _list_backup_files() -> list[dict[str, str | int]]:
+    return archive_runtime.list_backup_files(_DB_ARCHIVE_DIR)
+
+
+def _sqlite_backup_file(src: Path, dst: Path) -> None:
+    return archive_runtime.sqlite_backup_file(src, dst)
+
+
+def _emit_restore_status(step: str, level: str = "info", message: str | None = None, **extra) -> None:
+    return archive_runtime.emit_restore_status(step, level, message, **extra)
+
+
+async def _remove_with_retry(path: Path, attempts: int = 6) -> None:
+    return await archive_runtime.remove_with_retry(path, attempts)
+
+
+def _is_windows_sharing_violation(exc: Exception) -> bool:
+    return archive_runtime.is_windows_sharing_violation(exc)
+
+
 async def _release_windows_db_lockers(path: Path, db: Any | None) -> list[int]:
-    if os.name != "nt" or db is None:
-        return []
-    terminator = getattr(db, "_terminate_locking_processes_windows", None)
-    if not callable(terminator):
-        return []
-    try:
-        killed = await asyncio.to_thread(terminator, path)
-    except Exception as exc:
-        logger.debug("Failed to terminate locking process(es) for %s: %s", path, exc)
-        return []
-    if not isinstance(killed, list):
-        return []
-    pids: list[int] = []
-    for pid in killed:
-        try:
-            n = int(pid)
-            if n > 0:
-                pids.append(n)
-        except Exception:
-            continue
-    return pids
+    return await archive_runtime.release_windows_db_lockers(path, db)
 
 
 async def _replace_db_from_backup(src: Path, dst: Path) -> None:
-    for suffix in ("", "-wal", "-shm", "-journal"):
-        await _remove_with_retry(Path(str(dst) + suffix))
-    await asyncio.to_thread(shutil.copy2, src, dst)
+    return await archive_runtime.replace_db_from_backup(
+        src,
+        dst,
+        remove_with_retry_fn=_remove_with_retry,
+    )
 
 
 def _normalize_asset_row_for_case_cleanup(row: dict) -> tuple[int, str]:
-    try:
-        asset_id = int(row.get("id") or 0)
-    except Exception:
-        return 0, ""
-    if asset_id <= 0:
-        return 0, ""
-    key = str(row.get("filepath") or "").strip().lower()
-    if not key:
-        return 0, ""
-    return asset_id, key
+    return vector_runtime.normalize_asset_row_for_case_cleanup(row)
 
 
 def _collect_case_duplicate_ids(rows: list[dict]) -> tuple[int, list[int], int]:
-    keep_ids: set[int] = set()
-    delete_ids: list[int] = []
-    groups = 0
-    current_key = None
-    seen_in_group = 0
-
-    for row in rows:
-        asset_id, key = _normalize_asset_row_for_case_cleanup(row)
-        if asset_id <= 0 or not key:
-            continue
-        if key != current_key:
-            if seen_in_group > 1:
-                groups += 1
-            current_key = key
-            seen_in_group = 1
-            keep_ids.add(asset_id)
-            continue
-        delete_ids.append(asset_id)
-        seen_in_group += 1
-
-    if seen_in_group > 1:
-        groups += 1
-    return groups, delete_ids, len(keep_ids)
+    return vector_runtime.collect_case_duplicate_ids(rows)
 
 
 async def _cleanup_assets_case_duplicates(db) -> Result[dict[str, int]]:
-    """
-    Remove duplicate assets that differ only by filepath casing.
-
-    Keeps the most recent row per normalized filepath (mtime DESC, id DESC),
-    then deletes other rows. Intended for Windows environments where paths are
-    case-insensitive.
-    """
-    try:
-        rows_res = await db.aquery(
-            """
-            SELECT id, filepath, mtime
-            FROM assets
-            WHERE filepath IS NOT NULL AND filepath != ''
-            ORDER BY lower(filepath), mtime DESC, id DESC
-            """
-        )
-        if not rows_res.ok:
-            return Result.Err("DB_ERROR", rows_res.error or "Failed to scan assets for duplicates")
-        rows = rows_res.data or []
-        if not rows:
-            return Result.Ok({"groups": 0, "deleted": 0, "kept": 0})
-
-        groups, delete_ids, kept_count = _collect_case_duplicate_ids(rows)
-
-        if not delete_ids:
-            return Result.Ok({"groups": 0, "deleted": 0, "kept": kept_count})
-
-        placeholders = ",".join("?" for _ in delete_ids)
-        del_res = await db.aexecute(f"DELETE FROM assets WHERE id IN ({placeholders})", tuple(delete_ids))
-        if not del_res.ok:
-            return Result.Err("DB_ERROR", del_res.error or "Failed to delete duplicate assets")
-
-        return Result.Ok({"groups": int(groups), "deleted": len(delete_ids), "kept": kept_count})
-    except Exception as exc:
-        return Result.Err("DB_ERROR", safe_error_message(exc, "Failed to cleanup case duplicates"))
+    return await vector_runtime.cleanup_assets_case_duplicates(db)
 
 
 def _extract_filename_prefix(filename: str) -> str:
-    """
-    Extract the base prefix of a filename for sibling grouping.
-    
-    Examples:
-      - "ltx-23_audio_00001.png" -> "ltx-23_audio_00001"
-      - "ltx-23_audio_00001-audio.mp4" -> "ltx-23_audio_00001"
-      - "ltx-23_audio_00001_audio.mp4" -> "ltx-23_audio_00001"
-      - "ComfyUI_00123.png" -> "comfyui_00123"
-    """
-    import re
-    name = str(filename or "").strip()
-    # Remove extension
-    stem = name.rsplit(".", 1)[0] if "." in name else name
-    # Remove common suffixes like -audio, _audio, -merged, _merged, -final, _final
-    stem_lower = stem.lower()
-    for suffix in ["-audio", "_audio", "-merged", "_merged", "-final", "_final", "-video", "_video"]:
-        if stem_lower.endswith(suffix):
-            stem_lower = stem_lower[:-len(suffix)]
-            break
-    return stem_lower
+    return vector_runtime.extract_filename_prefix(filename)
 
 
 async def _backfill_job_ids_by_prefix(db) -> Result[dict[str, int]]:
-    """
-    Backfill missing job_ids by propagating from sibling files with same prefix.
-    
-    Groups files by (subfolder, source, root_id, filename_prefix) and propagates
-    job_id from files that have one to files that don't.
-    """
-    try:
-        # Get all assets with their job_id status
-        rows_res = await db.aquery(
-            """
-            SELECT id, filename, subfolder, source, root_id, job_id
-            FROM assets
-            WHERE filename IS NOT NULL AND filename != ''
-            ORDER BY subfolder, source, root_id, filename
-            """
-        )
-        if not rows_res.ok:
-            return Result.Err("DB_ERROR", rows_res.error or "Failed to scan assets")
-        rows = rows_res.data or []
-        if not rows:
-            return Result.Ok({"groups": 0, "updated": 0, "skipped": 0})
-
-        # Group by (subfolder, source, root_id, prefix)
-        groups: dict[tuple[str, str, str, str], list[dict]] = {}
-        for row in rows:
-            prefix = _extract_filename_prefix(row.get("filename") or "")
-            if not prefix:
-                continue
-            key = (
-                str(row.get("subfolder") or "").strip().lower(),
-                str(row.get("source") or "output").strip().lower(),
-                str(row.get("root_id") or "").strip().lower(),
-                prefix,
-            )
-            groups.setdefault(key, []).append(row)
-
-        # For each group, find the job_id and propagate to others
-        updated_count = 0
-        skipped_count = 0
-        groups_with_updates = 0
-        
-        for key, group_rows in groups.items():
-            if len(group_rows) < 2:
-                continue  # Need at least 2 files to propagate
-                
-            # Find the job_id in this group (take first non-null)
-            group_job_id = None
-            for row in group_rows:
-                job = str(row.get("job_id") or "").strip()
-                if job:
-                    group_job_id = job
-                    break
-            
-            if not group_job_id:
-                skipped_count += len(group_rows)
-                continue  # No job_id in this group
-            
-            # Propagate to rows without job_id
-            group_updated = False
-            for row in group_rows:
-                if str(row.get("job_id") or "").strip():
-                    continue  # Already has job_id
-                asset_id = int(row.get("id") or 0)
-                if not asset_id:
-                    continue
-                update_res = await db.aexecute(
-                    "UPDATE assets SET job_id = ? WHERE id = ? AND (job_id IS NULL OR job_id = '')",
-                    (group_job_id, asset_id),
-                )
-                if update_res.ok:
-                    updated_count += 1
-                    group_updated = True
-            
-            if group_updated:
-                groups_with_updates += 1
-
-        return Result.Ok({
-            "groups": groups_with_updates,
-            "updated": updated_count,
-            "skipped": skipped_count,
-        })
-    except Exception as exc:
-        return Result.Err("DB_ERROR", safe_error_message(exc, "Failed to backfill job_ids"))
+    return await vector_runtime.backfill_job_ids_by_prefix(db)
 
 
 def _build_backfill_scope_clause(normalized_scope: str, normalized_custom_root: str) -> tuple[str, list[Any]]:
-    """Build the SQL WHERE fragment and params for backfill scope filtering."""
-    where: list[str] = []
-    params: list[Any] = []
-    if normalized_scope in {"output", "input", "custom"}:
-        where.append("LOWER(COALESCE(a.source, '')) = ?")
-        params.append(normalized_scope)
-    if normalized_scope == "custom":
-        where.append("a.root_id = ?")
-        params.append(normalized_custom_root)
-    scope_sql = (" AND " + " AND ".join(where)) if where else ""
-    return scope_sql, params
+    return vector_runtime.build_backfill_scope_clause(normalized_scope, normalized_custom_root)
 
 
 async def _process_backfill_row(
@@ -865,52 +547,25 @@ async def _process_backfill_row(
     row: dict[str, Any],
     index_asset_vector: Any,
 ) -> tuple[str, int]:
-    """Process one backfill row; returns (outcome, asset_id).
-
-    outcome is one of: 'skip_invalid', 'skipped_missing', 'indexed', 'skipped', 'error'.
-    """
-    await _vector_backfill_wait_for_priority_window()
-    asset_id = _parse_backfill_asset_id(row)
-    if asset_id <= 0:
-        return "skip_invalid", 0
-
-    filepath, kind = _parse_backfill_file_context(row)
-    if not filepath or not Path(filepath).is_file():
-        return "skipped_missing", asset_id
-
-    metadata_raw = _parse_backfill_metadata_raw(row)
-    result = await index_asset_vector(db, vector_service, asset_id, filepath, kind, metadata_raw=metadata_raw)
-    if result.ok and bool(result.data):
-        return "indexed", asset_id
-    if result.ok:
-        return "skipped", asset_id
-    return "error", asset_id
+    return await vector_runtime.process_backfill_row(
+        db,
+        vector_service,
+        row,
+        index_asset_vector,
+        wait_for_priority_window_fn=_vector_backfill_wait_for_priority_window,
+    )
 
 
 def _parse_backfill_asset_id(row: dict[str, Any]) -> int:
-    try:
-        return int(row.get("id") or 0)
-    except Exception:
-        return 0
+    return vector_runtime.parse_backfill_asset_id(row)
 
 
 def _parse_backfill_file_context(row: dict[str, Any]) -> tuple[str, FileKind]:
-    filepath = str(row.get("filepath") or "").strip()
-    kind: FileKind = "video" if str(row.get("kind") or "").strip().lower() == "video" else "image"
-    return filepath, kind
+    return vector_runtime.parse_backfill_file_context(row)
 
 
 def _parse_backfill_metadata_raw(row: dict[str, Any]) -> dict[str, Any] | None:
-    raw = row.get("metadata_raw")
-    if isinstance(raw, dict):
-        return raw
-    if isinstance(raw, str) and raw.strip():
-        try:
-            parsed = json.loads(raw)
-            return parsed if isinstance(parsed, dict) else None
-        except Exception:
-            return None
-    return None
+    return vector_runtime.parse_backfill_metadata_raw(row)
 
 
 async def _init_backfill_counters(
@@ -920,16 +575,13 @@ async def _init_backfill_counters(
     batch_size: int,
     on_progress: Any | None,
 ) -> Result[_BackfillCounters]:
-    """Initialize backfill counters from DB totals and emit initial progress."""
-    counters = _BackfillCounters(batch_size=batch_size)
-    totals_res = await _count_backfill_scope_totals(db=db, scope_sql=scope_sql, scope_params=scope_params)
-    if not totals_res.ok:
-        return Result.Err(totals_res.code, totals_res.error or "Failed to count backfill totals")
-    totals = totals_res.data or {}
-    counters.eligible_total = int(totals.get("eligible_total") or 0)
-    counters.candidate_total = int(totals.get("candidate_total") or 0)
-    _emit_backfill_progress(on_progress, counters)
-    return Result.Ok(counters)
+    return await vector_runtime.init_backfill_counters(
+        db,
+        scope_sql,
+        scope_params,
+        batch_size,
+        on_progress,
+    )
 
 
 async def _backfill_missing_asset_vectors(
@@ -941,53 +593,20 @@ async def _backfill_missing_asset_vectors(
     custom_root_id: str = "",
     on_progress: Any | None = None,
 ) -> Result[dict[str, int | str | None]]:
-    """
-    Generate embeddings for existing assets that currently have no vector.
-
-    Targets image and video assets.
-    """
-    try:
-        from ...features.index.vector_indexer import index_asset_vector
-    except Exception as exc:
-        return Result.Err("SERVICE_UNAVAILABLE", safe_error_message(exc, "Vector indexer unavailable"))
-
-    size = _normalize_backfill_batch_size(batch_size)
-    normalized_scope = _normalize_backfill_scope(scope)
-    if not normalized_scope:
-        return Result.Err("INVALID_INPUT", "Invalid scope. Must be one of: output, input, custom, all")
-    normalized_custom_root = _normalize_backfill_custom_root(normalized_scope, custom_root_id)
-    if normalized_scope == "custom" and not normalized_custom_root:
-        return Result.Err("INVALID_INPUT", "Missing custom_root_id for custom scope")
-
-    scope_sql, scope_params = _build_backfill_scope_clause(normalized_scope, normalized_custom_root)
-    counters_res = await _init_backfill_counters(db, scope_sql, scope_params, size, on_progress)
-    if not counters_res.ok:
-        return Result.Err(counters_res.code, counters_res.error or "Failed to initialize backfill counters")
-    counters = counters_res.data
-    if counters is None:
-        return Result.Err("DB_ERROR", "Failed to initialize backfill counters")
-    result = await _run_backfill_vector_query_loop(
-        db=db,
-        vector_service=vector_service,
-        index_asset_vector=index_asset_vector,
-        scope_sql=scope_sql,
-        scope_params=scope_params,
-        counters=counters,
+    return await vector_runtime.backfill_missing_asset_vectors(
+        db,
+        vector_service,
+        batch_size=batch_size,
+        scope=scope,
+        custom_root_id=custom_root_id,
         on_progress=on_progress,
-    )
-    if not result.ok:
-        return result
-    return Result.Ok(
-        {
-            **counters.as_payload(),
-            "scope": normalized_scope,
-            "custom_root_id": normalized_custom_root or None,
-        }
+        normalize_scope_fn=_normalize_backfill_scope,
+        wait_for_priority_window_fn=_vector_backfill_wait_for_priority_window,
     )
 
 
 def _normalize_backfill_batch_size(batch_size: int) -> int:
-    return max(1, min(200, int(batch_size or 64)))
+    return vector_runtime.normalize_backfill_batch_size(batch_size)
 
 
 _BACKFILL_SCOPE_TOTALS_SQL = """
@@ -1009,11 +628,7 @@ _BACKFILL_SCOPE_TOTALS_SQL = """
 
 
 def _safe_row_int(row: Any, key: str) -> int:
-    """Safely extract an integer value from a DB result row."""
-    try:
-        return int((row or {}).get(key) or 0)
-    except Exception:
-        return 0
+    return vector_runtime.safe_row_int(row, key)
 
 
 async def _count_backfill_scope_totals(
@@ -1022,58 +637,22 @@ async def _count_backfill_scope_totals(
     scope_sql: str,
     scope_params: list[Any],
 ) -> Result[dict[str, int]]:
-    count_res = await db.aquery(
-        _BACKFILL_SCOPE_TOTALS_SQL + scope_sql,
-        tuple(scope_params),
-    )
-    if not count_res.ok:
-        return Result.Err("DB_ERROR", count_res.error or "Failed to count eligible assets")
-    rows = count_res.data or []
-    row = rows[0] if rows else {}
-    return Result.Ok(
-        {
-            "eligible_total": max(0, _safe_row_int(row, "eligible_total")),
-            "candidate_total": max(0, _safe_row_int(row, "candidate_total")),
-        }
+    return await vector_runtime.count_backfill_scope_totals(
+        db=db,
+        scope_sql=scope_sql,
+        scope_params=scope_params,
     )
 
 
 def _normalize_backfill_custom_root(normalized_scope: str, custom_root_id: str) -> str:
-    return str(custom_root_id or "").strip() if normalized_scope == "custom" else ""
+    return vector_runtime.normalize_backfill_custom_root(normalized_scope, custom_root_id)
 
 
-class _BackfillCounters:
-    def __init__(self, *, batch_size: int) -> None:
-        self.eligible_total = 0
-        self.candidate_total = 0
-        self.candidates = 0
-        self.indexed = 0
-        self.skipped = 0
-        self.skipped_missing_files = 0
-        self.errors = 0
-        self.batch_size = int(batch_size)
-
-    def as_payload(self) -> dict[str, int]:
-        return {
-            "eligible_total": int(self.eligible_total),
-            "total_assets": int(self.eligible_total),
-            "candidate_total": int(self.candidate_total),
-            "candidates": int(self.candidates),
-            "indexed": int(self.indexed),
-            "skipped": int(self.skipped),
-            "skipped_missing_files": int(self.skipped_missing_files),
-            "errors": int(self.errors),
-            "batch_size": int(self.batch_size),
-        }
+_BackfillCounters = vector_runtime.BackfillCounters
 
 
 def _emit_backfill_progress(on_progress: Any | None, counters: _BackfillCounters) -> None:
-    if not callable(on_progress):
-        return
-    try:
-        on_progress(counters.as_payload())
-    except Exception:
-        return
+    return vector_runtime.emit_backfill_progress(on_progress, counters)
 
 
 async def _run_backfill_vector_query_loop(
@@ -1086,27 +665,16 @@ async def _run_backfill_vector_query_loop(
     counters: _BackfillCounters,
     on_progress: Any | None,
 ) -> Result[dict[str, int | str | None]]:
-    last_id = 0
-    while True:
-        await _vector_backfill_wait_for_priority_window()
-        rows_res = await _query_missing_vector_rows(
-            db=db,
-            last_id=last_id,
-            scope_sql=scope_sql,
-            scope_params=scope_params,
-            batch_size=counters.batch_size,
-        )
-        if not rows_res.ok:
-            return Result.Err(rows_res.code, rows_res.error or "Failed to query missing vector rows")
-        rows = rows_res.data or []
-        if not rows:
-            break
-        last_id = await _process_backfill_rows(rows, db, vector_service, index_asset_vector, counters, on_progress)
-        if len(rows) < counters.batch_size:
-            break
-        _emit_backfill_progress(on_progress, counters)
-    _emit_backfill_progress(on_progress, counters)
-    return Result.Ok({})
+    return await vector_runtime.run_backfill_vector_query_loop(
+        db=db,
+        vector_service=vector_service,
+        index_asset_vector=index_asset_vector,
+        scope_sql=scope_sql,
+        scope_params=scope_params,
+        counters=counters,
+        on_progress=on_progress,
+        wait_for_priority_window_fn=_vector_backfill_wait_for_priority_window,
+    )
 
 
 async def _query_missing_vector_rows(
@@ -1117,26 +685,13 @@ async def _query_missing_vector_rows(
     scope_params: list[Any],
     batch_size: int,
 ) -> Result[list[dict[str, Any]]]:
-    rows_res = await db.aquery(
-        """
-        SELECT a.id, a.filepath, a.kind, m.metadata_raw
-        FROM assets a
-        LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id
-        LEFT JOIN asset_metadata m ON m.asset_id = a.id
-        WHERE a.id > ?
-          AND a.kind IN ('image', 'video')
-          AND (ae.asset_id IS NULL OR ae.vector IS NULL OR length(ae.vector) = 0)
-        """
-        + scope_sql
-        + """
-        ORDER BY a.id ASC
-        LIMIT ?
-        """,
-        (int(last_id), *scope_params, int(batch_size)),
+    return await vector_runtime.query_missing_vector_rows(
+        db=db,
+        last_id=last_id,
+        scope_sql=scope_sql,
+        scope_params=scope_params,
+        batch_size=batch_size,
     )
-    if not rows_res.ok:
-        return Result.Err("DB_ERROR", rows_res.error or "Failed to query missing vectors")
-    return Result.Ok(rows_res.data or [])
 
 
 async def _process_backfill_rows(
@@ -1147,28 +702,19 @@ async def _process_backfill_rows(
     counters: _BackfillCounters,
     on_progress: Any | None,
 ) -> int:
-    last_id = 0
-    for row in rows:
-        outcome, row_asset_id = await _process_backfill_row(db, vector_service, row, index_asset_vector)
-        if outcome == "skip_invalid":
-            continue
-        last_id = row_asset_id
-        _accumulate_backfill_outcome(counters, outcome)
-        _emit_backfill_progress(on_progress, counters)
-    return last_id
+    return await vector_runtime.process_backfill_rows(
+        rows,
+        db,
+        vector_service,
+        index_asset_vector,
+        counters,
+        on_progress,
+        wait_for_priority_window_fn=_vector_backfill_wait_for_priority_window,
+    )
 
 
 def _accumulate_backfill_outcome(counters: _BackfillCounters, outcome: str) -> None:
-    counters.candidates += 1
-    if outcome == "indexed":
-        counters.indexed += 1
-    elif outcome == "skipped_missing":
-        counters.skipped += 1
-        counters.skipped_missing_files += 1
-    elif outcome == "skipped":
-        counters.skipped += 1
-    else:
-        counters.errors += 1
+    return vector_runtime.accumulate_backfill_outcome(counters, outcome)
 
 
 def register_db_maintenance_routes(routes: web.RouteTableDef) -> None:

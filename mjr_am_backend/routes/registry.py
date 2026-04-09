@@ -1,21 +1,14 @@
-"""
-Route registration system.
-Coordinates all route handlers and registers them with PromptServer or aiohttp app.
-"""
+"""Route registration system."""
 
 from __future__ import annotations
 
-import os
-import sqlite3
 from collections.abc import Awaitable, Callable
-from typing import Any, ClassVar, Protocol, cast
+from typing import Any
 
 from aiohttp import web
-from mjr_am_backend.config import INDEX_DB, SERVICES_PREWARM_ON_STARTUP
+from mjr_am_backend.config import SERVICES_PREWARM_ON_STARTUP
 from mjr_am_backend.observability import ensure_observability
 from mjr_am_backend.shared import Result, get_logger
-from mjr_am_backend.utils import parse_bool
-
 from .core import (
     _get_request_user_id,
     _json_response,
@@ -23,29 +16,29 @@ from .core import (
     _require_authenticated_user,
     _reset_request_user_context,
 )
-from .handlers import (
-    register_asset_routes,
-    register_audit_routes,
-    register_batch_zip_routes,
-    register_calendar_routes,
-    register_collections_routes,
-    register_custom_roots_routes,
-    register_db_maintenance_routes,
-    register_download_routes,
-    register_duplicates_routes,
-    register_health_routes,
-    register_hybrid_search_routes,
-    register_metadata_routes,
-    register_plugin_routes,
-    register_releases_routes,
-    register_scan_routes,
-    register_search_routes,
-    register_stacks_routes,
-    register_vector_search_routes,
-    register_vendor_routes,
-    register_version_routes,
-    register_viewer_routes,
+from .registry_app import (
+    _install_app_middlewares_best_effort as _install_app_middlewares_best_effort_impl,
+    _install_background_scan_cleanup as _install_background_scan_cleanup_impl,
+    _install_observability_on_prompt_server as _install_observability_on_prompt_server_impl,
+    _install_security_middlewares as _install_security_middlewares_impl,
+    _is_app_routes_registered as _is_app_routes_registered_impl,
+    _mark_routes_registered_best_effort as _mark_routes_registered_best_effort_impl,
+    _prepare_route_table as _prepare_route_table_impl,
+    _register_app_routes_best_effort as _register_app_routes_best_effort_impl,
+    _schedule_services_prewarm as _schedule_services_prewarm_impl,
+    _set_user_manager_best_effort as _set_user_manager_best_effort_impl,
 )
+from .registry_logging import (
+    _extract_app_paths,
+    _extract_table_paths,
+    _log_route_collisions,
+    _log_route_registration_summary,
+    _read_route_verbose_logs_env,
+    _read_route_verbose_logs_from_db,
+    _route_verbose_logs_enabled,
+)
+from .registry_prompt import PromptServer, _get_prompt_server
+from .route_catalog import CORE_ROUTE_REGISTRATIONS, OPTIONAL_ROUTE_REGISTRATIONS
 
 # --- CONFIGURATION ---
 API_PREFIX = "/mjr/am/"
@@ -58,176 +51,8 @@ _APP_KEY_OBSERVABILITY_INSTALLED: web.AppKey[bool] = web.AppKey("_mjr_observabil
 _APP_KEY_USER_MANAGER: web.AppKey[object] = web.AppKey("_mjr_user_manager", object)
 _APP_KEY_BG_SCAN_CLEANUP_INSTALLED: web.AppKey[bool] = web.AppKey("_mjr_bg_scan_cleanup_installed", bool)
 
-
-class _PromptServerInstance(Protocol):
-    routes: web.RouteTableDef
-    app: web.Application | None
-    def send_sync(self, event: str, data: object) -> None: ...
-
-
-class _PromptServer(Protocol):
-    instance: ClassVar[_PromptServerInstance]
-
-class _PromptServerInstanceStub:
-    routes: web.RouteTableDef = web.RouteTableDef()
-    app: web.Application | None = None
-    def send_sync(self, event: str, data: object) -> None:
-        return None
-
-
-class _PromptServerStub:
-    instance: ClassVar[_PromptServerInstanceStub] = _PromptServerInstanceStub()
-
-
-def _get_prompt_server() -> type[_PromptServer]:
-    # IMPORTANT (ComfyUI compatibility):
-    # Never `import server` here. Importing ComfyUI's `server.py` can trigger heavy
-    # initialization cascades in non-Comfy contexts.
-    import sys
-
-    try:
-        _server_mod = sys.modules.get("server")
-        if _server_mod is None or not hasattr(_server_mod, "PromptServer"):
-            raise ImportError("ComfyUI server not loaded")
-        return cast(type[_PromptServer], _server_mod.PromptServer)
-    except Exception:
-        return cast(type[_PromptServer], _PromptServerStub)
-
-
-class _PromptServerProxy:
-    @property
-    def instance(self) -> _PromptServerInstance:
-        return _get_prompt_server().instance
-
-
-# Public compatibility symbol used by several modules.
-PromptServer = _PromptServerProxy()
-
 logger = get_logger(__name__)
 _ROUTES_REGISTERED = False
-_ROUTE_VERBOSE_LOG_ENV_KEYS = (
-    "MAJOOR_ROUTE_VERBOSE_LOGS",
-    "MJR_AM_ROUTE_VERBOSE_LOGS",
-    "MAJOOR_VERBOSE_ROUTE_LOGS",
-    "MJR_AM_VERBOSE_ROUTE_LOGS",
-)
-_ROUTE_VERBOSE_LOGS_DB_KEY = "route_verbose_logs"
-
-
-def _route_verbose_logs_enabled() -> bool:
-    env_value = _read_route_verbose_logs_env()
-    if env_value is not None:
-        return env_value
-    return _read_route_verbose_logs_from_db()
-
-
-def _read_route_verbose_logs_env() -> bool | None:
-    for key in _ROUTE_VERBOSE_LOG_ENV_KEYS:
-        try:
-            raw = os.environ.get(key)
-        except Exception:
-            raw = None
-        if raw is None or str(raw).strip() == "":
-            continue
-        return parse_bool(raw, False)
-    return None
-
-
-def _read_route_verbose_logs_from_db() -> bool:
-    try:
-        with sqlite3.connect(str(INDEX_DB)) as conn:
-            row = conn.execute(
-                "SELECT value FROM metadata WHERE key = ?",
-                (_ROUTE_VERBOSE_LOGS_DB_KEY,),
-            ).fetchone()
-    except Exception:
-        return False
-    if not row:
-        return False
-    try:
-        return parse_bool(row[0], False)
-    except Exception:
-        return False
-
-
-def _log_route_registration_summary(verbose: bool) -> None:
-    if not verbose:
-        logger.info(
-            "Routes registered: summary mode. Enable verbose route registration logs in Majoor Settings to list each endpoint at startup."
-        )
-        return
-
-    logger.info("=" * 60)
-    logger.info("Routes registered:")
-    logger.info("  GET /mjr/am/health")
-    logger.info("  GET /mjr/am/health/counters")
-    logger.info("  GET /mjr/am/health/db")
-    logger.info("  GET /mjr/am/config")
-    logger.info("  GET /mjr/am/tools/status")
-    logger.info("  GET /mjr/am/metadata?type=<scope>&filename=<name>&subfolder=<sub>&root_id=<id>")
-    logger.info("  POST /mjr/am/scan")
-    logger.info("  POST /mjr/am/index-files")
-    logger.info("  POST /mjr/am/stage-to-input")
-    logger.info("  POST /mjr/am/open-in-folder")
-    logger.info("  GET /mjr/am/search?q=<query>")
-    logger.info("  GET /mjr/am/asset/{asset_id}")
-    logger.info("  POST /mjr/am/asset/rename")
-    logger.info("  POST /mjr/am/assets/delete")
-    logger.info("  POST /mjr/am/assets/rename")
-    logger.info("  GET /mjr/am/collections")
-    logger.info("  GET /mjr/am/date-histogram?month=YYYY-MM")
-    logger.info("  POST /mjr/am/batch-zip")
-    logger.info("  GET /mjr/am/batch-zip/{token}")
-    logger.info("  GET /mjr/am/viewer/info?asset_id=<id>")
-    logger.info("  POST /mjr/am/db/optimize")
-    logger.info("  POST /mjr/am/db/cleanup-case-duplicates")
-    logger.info("  POST /mjr/am/db/force-delete")
-    logger.info("  GET /mjr/am/download")
-    logger.info("  GET /mjr/am/releases")
-    logger.info("  GET /mjr/am/duplicates/alerts")
-    logger.info("=" * 60)
-
-
-def _extract_app_paths(app: web.Application) -> set[str]:
-    paths: set[str] = set()
-    try:
-        for route in app.router.routes():
-            try:
-                resource = getattr(route, "resource", None)
-                canonical = getattr(resource, "canonical", None)
-                if isinstance(canonical, str) and canonical:
-                    paths.add(canonical)
-            except Exception:
-                continue
-    except Exception:
-        pass
-    return paths
-
-
-def _extract_table_paths(routes: web.RouteTableDef) -> set[str]:
-    paths: set[str] = set()
-    try:
-        for item in routes:
-            path = getattr(item, "path", None)
-            if isinstance(path, str) and path:
-                paths.add(path)
-    except Exception:
-        pass
-    return paths
-
-
-def _log_route_collisions(app: web.Application, routes: web.RouteTableDef) -> None:
-    try:
-        app_paths = _extract_app_paths(app)
-        table_paths = _extract_table_paths(routes)
-        overlaps = sorted(app_paths.intersection(table_paths))
-        if overlaps:
-            logger.warning(
-                "Potential route path collisions detected before registration: %s",
-                ", ".join(overlaps[:20]),
-            )
-    except Exception:
-        pass
 
 
 @web.middleware
@@ -351,37 +176,22 @@ def _store_request_user_id(request: web.Request, user_id: Any) -> None:
 
 
 def _install_security_middlewares(app: web.Application) -> None:
-    try:
-        if app.get(_APP_KEY_SECURITY_MIDDLEWARES_INSTALLED):
-            return
-        app.middlewares.insert(0, auth_required_middleware)
-        app.middlewares.insert(0, security_headers_middleware)
-        app.middlewares.insert(0, api_versioning_middleware)
-        app[_APP_KEY_SECURITY_MIDDLEWARES_INSTALLED] = True
-    except Exception as exc:
-        logger.debug("Failed to install security middlewares: %s", exc)
+    _install_security_middlewares_impl(
+        app,
+        auth_required_middleware=auth_required_middleware,
+        security_headers_middleware=security_headers_middleware,
+        api_versioning_middleware=api_versioning_middleware,
+        installed_key=_APP_KEY_SECURITY_MIDDLEWARES_INSTALLED,
+        logger=logger,
+    )
 
 
 def _install_background_scan_cleanup(app: web.Application) -> None:
-    try:
-        if app.get(_APP_KEY_BG_SCAN_CLEANUP_INSTALLED):
-            return
-    except Exception:
-        pass
-
-    async def _on_cleanup(_app: web.Application) -> None:
-        try:
-            from .handlers.filesystem import stop_background_scan_worker
-
-            await stop_background_scan_worker(drain=True, timeout_s=2.0)
-        except Exception:
-            return
-
-    try:
-        app.on_cleanup.append(_on_cleanup)
-        app[_APP_KEY_BG_SCAN_CLEANUP_INSTALLED] = True
-    except Exception as exc:
-        logger.debug("Failed to install background scan cleanup hook: %s", exc)
+    _install_background_scan_cleanup_impl(
+        app,
+        installed_key=_APP_KEY_BG_SCAN_CLEANUP_INSTALLED,
+        logger=logger,
+    )
 
 
 def _try_register(
@@ -401,11 +211,6 @@ def _try_register(
         logger.error("Failed to register %s routes: %s", error_label, e)
 
 
-def _register_download_and_duplicates(routes: Any) -> None:
-    register_download_routes(routes)
-    register_duplicates_routes(routes)
-
-
 def register_all_routes() -> web.RouteTableDef:
     """
     Register all route handlers and return the RouteTableDef.
@@ -418,45 +223,17 @@ def register_all_routes() -> web.RouteTableDef:
         return routes
     verbose = _route_verbose_logs_enabled()
 
-    # Core handlers — always registered
-    register_health_routes(routes)
-    register_metadata_routes(routes)
-    register_custom_roots_routes(routes)
-    register_search_routes(routes)
-    register_scan_routes(routes)
-    register_asset_routes(routes)
-    register_collections_routes(routes)
-    register_batch_zip_routes(routes)
-    register_calendar_routes(routes)
-    register_viewer_routes(routes)
-    register_stacks_routes(routes)
-    register_vendor_routes(routes)
-    register_db_maintenance_routes(routes)
+    for route_group in CORE_ROUTE_REGISTRATIONS:
+        route_group.register_fn(routes)
 
-    # Optional handlers — failures are logged, not raised
-    _try_register(register_releases_routes, routes, "releases", verbose,
-                  "  GET /mjr/am/releases (Added)")
-    _try_register(register_version_routes, routes, "version", verbose,
-                  "  GET /mjr/am/version (Added)", "  GET /majoor/version (Legacy alias)")
-    _try_register(_register_download_and_duplicates, routes, "download+duplicates", verbose,
-                  "  GET /mjr/am/download (Added)")
-    _try_register(register_vector_search_routes, routes, "vector search", verbose,
-                  "  GET /mjr/am/vector/search (Added)",
-                  "  GET /mjr/am/vector/similar/{asset_id} (Added)",
-                  "  GET /mjr/am/vector/alignment/{asset_id} (Added)",
-                  "  GET /mjr/am/vector/auto-tags/{asset_id} (Added)",
-                  "  GET /mjr/am/vector/stats (Added)",
-                  "  POST /mjr/am/vector/index/{asset_id} (Added)",
-                  "  POST /mjr/am/vector/caption/{asset_id} (Added)",
-                  "  POST /mjr/am/vector/suggest-collections (Added)")
-    _try_register(register_plugin_routes, routes, "plugins", verbose,
-                  "  GET /mjr/am/plugins/list (Added)",
-                  "  POST /mjr/am/plugins/{name}/enable (Added)",
-                  "  POST /mjr/am/plugins/reload (Added)")
-    _try_register(register_hybrid_search_routes, routes, "hybrid search", verbose,
-                  "  GET /mjr/am/search/hybrid (Added)")
-    _try_register(register_audit_routes, routes, "audit", verbose,
-                  "  GET /mjr/am/audit (Added)")
+    for route_group in OPTIONAL_ROUTE_REGISTRATIONS:
+        _try_register(
+            route_group.register_fn,
+            routes,
+            route_group.label,
+            verbose,
+            *route_group.verbose_messages,
+        )
 
     _log_route_registration_summary(verbose)
     _ROUTES_REGISTERED = True
@@ -481,94 +258,69 @@ def register_routes(app: web.Application, user_manager=None) -> None:
 
 
 def _schedule_services_prewarm() -> None:
-    """Schedule build_services() as a fire-and-forget background task so the
-    first real API request doesn't incur the full DB + watcher init latency."""
-    if not SERVICES_PREWARM_ON_STARTUP:
-        return
-    import asyncio
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        return  # No running loop at import time; services will lazy-init on first request.
-    try:
-        from mjr_am_backend.routes.core.services import prewarm_services
-        loop.create_task(prewarm_services())
-        logger.debug("Services pre-warm task scheduled")
-    except Exception as exc:
-        logger.debug("Could not schedule services pre-warm: %s", exc)
+    _schedule_services_prewarm_impl(
+        services_prewarm_on_startup=SERVICES_PREWARM_ON_STARTUP,
+        logger=logger,
+    )
 
 
 def _prepare_route_table(app: web.Application, user_manager: object | None) -> bool:
-    try:
-        if user_manager is not None:
-            _set_user_manager_best_effort(app, user_manager)
-        register_all_routes()
-        return True
-    except Exception as exc:
-        logger.warning("Failed to prepare route table: %s", exc)
-        return False
+    return _prepare_route_table_impl(
+        app,
+        user_manager,
+        set_user_manager_fn=_set_user_manager_best_effort,
+        register_all_routes_fn=register_all_routes,
+        logger=logger,
+    )
 
 
 def _set_user_manager_best_effort(app: web.Application, user_manager: object) -> None:
-    try:
-        app[_APP_KEY_USER_MANAGER] = user_manager
-    except Exception:
-        return
+    _set_user_manager_best_effort_impl(
+        app,
+        user_manager,
+        user_manager_key=_APP_KEY_USER_MANAGER,
+    )
 
 
 def _install_app_middlewares_best_effort(app: web.Application) -> None:
-    try:
-        ensure_observability(app)
-    except Exception as exc:
-        logger.debug("Observability not installed on aiohttp app: %s", exc)
-    try:
-        _install_security_middlewares(app)
-    except Exception as exc:
-        logger.debug("Security middlewares not installed on aiohttp app: %s", exc)
-    try:
-        _install_background_scan_cleanup(app)
-    except Exception as exc:
-        logger.debug("Background scan cleanup hook not installed: %s", exc)
+    _install_app_middlewares_best_effort_impl(
+        app,
+        ensure_observability_fn=ensure_observability,
+        install_security_middlewares_fn=_install_security_middlewares,
+        install_background_scan_cleanup_fn=_install_background_scan_cleanup,
+        logger=logger,
+    )
 
 
 def _is_app_routes_registered(app: web.Application) -> bool:
-    try:
-        return bool(app[_APP_KEY_ROUTES_REGISTERED])
-    except KeyError:
-        return False
-    except Exception:
-        return False
+    return _is_app_routes_registered_impl(
+        app,
+        routes_registered_key=_APP_KEY_ROUTES_REGISTERED,
+    )
 
 
 def _register_app_routes_best_effort(app: web.Application) -> None:
-    try:
-        route_table = _get_prompt_server().instance.routes
-        _log_route_collisions(app, route_table)
-        app.add_routes(route_table)
-        _mark_routes_registered_best_effort(app)
-    except Exception as exc:
-        logger.warning("Failed to register routes on aiohttp app: %s", exc)
+    _register_app_routes_best_effort_impl(
+        app,
+        get_prompt_server_fn=_get_prompt_server,
+        log_route_collisions_fn=_log_route_collisions,
+        mark_routes_registered_fn=_mark_routes_registered_best_effort,
+        logger=logger,
+    )
 
 
 def _mark_routes_registered_best_effort(app: web.Application) -> None:
-    try:
-        app[_APP_KEY_ROUTES_REGISTERED] = True
-    except Exception:
-        return
+    _mark_routes_registered_best_effort_impl(
+        app,
+        routes_registered_key=_APP_KEY_ROUTES_REGISTERED,
+    )
 
 
 def _install_observability_on_prompt_server() -> None:
-    """
-    Best-effort installation of the middleware into ComfyUI's PromptServer app.
-    If PromptServer doesn't expose `app`, this safely no-ops.
-    """
-    try:
-        app = getattr(_get_prompt_server().instance, "app", None)
-        if app is not None:
-            if not app.get(_APP_KEY_OBSERVABILITY_INSTALLED):
-                ensure_observability(app)
-                app[_APP_KEY_OBSERVABILITY_INSTALLED] = True
-            _install_security_middlewares(app)
-    except Exception as exc:
-        logger.debug("Observability not installed on PromptServer app: %s", exc)
-        return
+    _install_observability_on_prompt_server_impl(
+        get_prompt_server_fn=_get_prompt_server,
+        ensure_observability_fn=ensure_observability,
+        observability_installed_key=_APP_KEY_OBSERVABILITY_INSTALLED,
+        install_security_middlewares_fn=_install_security_middlewares,
+        logger=logger,
+    )

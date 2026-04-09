@@ -9,6 +9,7 @@ from typing import Any
 
 from aiohttp import web
 
+from ..index.scan_batch_utils import normalize_filepath_str
 from ...shared import Result
 
 
@@ -95,6 +96,63 @@ def _parse_asset_ids(raw_ids: list[Any]) -> Result[list[int]]:
     if not asset_ids:
         return Result.Err("INVALID_INPUT", "No valid asset IDs provided")
     return Result.Ok(asset_ids)
+
+
+def filepath_db_keys(path_value: str | Path | None) -> tuple[str, ...]:
+    raw = str(path_value or "").strip()
+    if not raw:
+        return tuple()
+    keys: list[str] = []
+    for candidate in (raw, normalize_filepath_str(raw)):
+        value = str(candidate or "").strip()
+        if value and value not in keys:
+            keys.append(value)
+    return tuple(keys)
+
+
+def filepath_where_clause(
+    keys: tuple[str, ...],
+    column: str = "filepath",
+) -> tuple[str, tuple[Any, ...]]:
+    if not keys:
+        return f"{column} = ''", tuple()
+    placeholders = ",".join("?" * len(keys))
+    where = f"{column} IN ({placeholders})"
+    params: list[Any] = list(keys)
+    # Extra fallback for legacy rows whose casing differs from the normalized key.
+    where = f"{where} OR {column} = ? COLLATE NOCASE"
+    params.append(keys[0])
+    return where, tuple(params)
+
+
+async def find_asset_row_by_filepath(
+    db: Any,
+    filepath: str,
+    *,
+    select_sql: str,
+) -> dict[str, Any] | None:
+    keys = filepath_db_keys(filepath)
+    where_clause, where_params = filepath_where_clause(keys, column="filepath")
+    res = await db.aquery(
+        f"SELECT {select_sql} FROM assets WHERE {where_clause} ORDER BY id DESC LIMIT 1",
+        where_params,
+    )
+    if not res.ok or not res.data:
+        return None
+    row = res.data[0] or {}
+    return row if isinstance(row, dict) else None
+
+
+async def find_asset_id_row_by_filepath(db: Any, filepath: str) -> dict[str, Any] | None:
+    return await find_asset_row_by_filepath(db, filepath, select_sql="id")
+
+
+async def find_rename_row_by_filepath(db: Any, filepath: str) -> dict[str, Any] | None:
+    return await find_asset_row_by_filepath(
+        db,
+        filepath,
+        select_sql="id, filename, source, root_id",
+    )
 
 
 def _rename_lookup_details(
