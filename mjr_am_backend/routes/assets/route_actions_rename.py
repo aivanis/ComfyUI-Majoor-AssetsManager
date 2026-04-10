@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from aiohttp import web
-
 from mjr_am_backend.features.assets.rename_service import rename_asset_and_sync
+from mjr_am_backend.features.assets.request_context_service import PrepareAssetRenameContext
 from mjr_am_backend.shared import Result
 from mjr_am_backend.shared import sanitize_error_message as _safe_error_message
 
@@ -15,8 +16,8 @@ from mjr_am_backend.shared import sanitize_error_message as _safe_error_message
 async def handle_rename_asset(
     request: web.Request,
     *,
-    prepare_asset_rename_context: Callable[[web.Request], Awaitable[Result[Any]]],
-    validate_filename: Callable[[str], Result[str]],
+    prepare_asset_rename_context: PrepareAssetRenameContext,
+    validate_filename: Callable[[str], tuple[bool, str]],
     resolve_rename_target: Callable[..., Awaitable[Result[Any]]],
     load_asset_row_by_id: Callable[..., Awaitable[Result[dict[str, Any]]]],
     find_asset_row_by_filepath: Callable[..., Any],

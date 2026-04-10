@@ -7,8 +7,8 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from ..index.scan_batch_utils import normalize_filepath_str
 from ...shared import Result
+from ..index.scan_batch_utils import normalize_filepath_str
 
 try:
     import folder_paths  # type: ignore
@@ -149,6 +149,173 @@ def _match_custom_root_id_for_path(
     return None
 
 
+def _normalize_asset_source(file_type: str) -> str:
+    return str(file_type or "").strip().lower()
+
+
+def _resolve_standard_base_dir(
+    resolved: Path,
+    *,
+    source: str,
+    out_root: Path,
+    in_root: Path,
+    is_within_root: Callable[[Path, Path], bool],
+) -> tuple[str, Path | None]:
+    if source in ("output", "outputs", "") and is_within_root(resolved, out_root):
+        return "output", out_root
+    if source in ("input", "inputs", "") and is_within_root(resolved, in_root):
+        return "input", in_root
+    return source, None
+
+
+def _resolve_custom_root_by_membership(
+    resolved: Path,
+    *,
+    is_within_root: Callable[[Path, Path], bool],
+    list_custom_roots_fn: Callable[[], Result[Any]],
+    resolve_custom_root_fn: Callable[[str], Result[Any]],
+) -> tuple[Path | None, str | None]:
+    roots_res = list_custom_roots_fn()
+    if not roots_res.ok:
+        return None, None
+    for item in roots_res.data or []:
+        if not isinstance(item, dict):
+            continue
+        rid = str(item.get("id") or "")
+        if not rid:
+            continue
+        root_result = resolve_custom_root_fn(rid)
+        if not root_result.ok or not root_result.data:
+            continue
+        try:
+            root_path = Path(str(root_result.data)).resolve(strict=False)
+        except Exception:
+            continue
+        if is_within_root(resolved, root_path):
+            return root_path, rid or None
+    return None, None
+
+
+def _resolve_custom_root_by_id(
+    resolved: Path,
+    *,
+    root_id: str,
+    is_within_root: Callable[[Path, Path], bool],
+    resolve_custom_root_fn: Callable[[str], Result[Any]],
+) -> tuple[Path | None, str | None]:
+    if not root_id:
+        return None, None
+    root_result = resolve_custom_root_fn(str(root_id))
+    if not root_result.ok:
+        return None, None
+    try:
+        candidate_root = Path(str(root_result.data)).resolve(strict=False)
+    except Exception:
+        return None, None
+    if not is_within_root(resolved, candidate_root):
+        return None, None
+    return candidate_root, str(root_id)
+
+
+def _resolve_asset_root(
+    resolved: Path,
+    *,
+    source: str,
+    root_id: str,
+    is_within_root: Callable[[Path, Path], bool],
+    out_root: Path,
+    in_root: Path,
+    list_custom_roots_fn: Callable[[], Result[Any]],
+    resolve_custom_root_fn: Callable[[str], Result[Any]],
+) -> tuple[str, Path | None, str | None]:
+    resolved_source, base_dir = _resolve_standard_base_dir(
+        resolved,
+        source=source,
+        out_root=out_root,
+        in_root=in_root,
+        is_within_root=is_within_root,
+    )
+    if base_dir is not None:
+        return resolved_source, base_dir, None
+
+    custom_base_dir, resolved_root_id = _resolve_custom_root_by_membership(
+        resolved,
+        is_within_root=is_within_root,
+        list_custom_roots_fn=list_custom_roots_fn,
+        resolve_custom_root_fn=resolve_custom_root_fn,
+    )
+    if custom_base_dir is not None:
+        return "custom", custom_base_dir, resolved_root_id
+
+    custom_base_dir, resolved_root_id = _resolve_custom_root_by_id(
+        resolved,
+        root_id=root_id,
+        is_within_root=is_within_root,
+        resolve_custom_root_fn=resolve_custom_root_fn,
+    )
+    if custom_base_dir is not None:
+        return "custom", custom_base_dir, resolved_root_id
+
+    return resolved_source, None, None
+
+
+async def _index_asset_on_demand(
+    services: dict[str, Any],
+    *,
+    resolved: Path,
+    base_dir: Path,
+    source: str,
+    resolved_root_id: str | None,
+    filepath: str,
+    logger: Any,
+    to_thread_timeout_s: int | float,
+) -> None:
+    try:
+        await asyncio.wait_for(
+            services["index"].index_paths(
+                [Path(resolved)],
+                str(base_dir),
+                True,
+                source,
+                resolved_root_id,
+            ),
+            timeout=to_thread_timeout_s,
+        )
+    except asyncio.TimeoutError:
+        logger.debug("Index-on-demand timed out for %s", filepath)
+    except Exception as exc:
+        logger.debug("Index-on-demand skipped for %s: %s", filepath, exc)
+
+
+async def _lookup_asset_id_by_path(
+    services: dict[str, Any],
+    *,
+    resolved: Path,
+    safe_error_message: Callable[[Exception, str], str],
+    to_thread_timeout_s: int | float,
+) -> Result[int]:
+    try:
+        row = await asyncio.wait_for(
+            find_asset_row_by_filepath(
+                services["db"],
+                str(resolved),
+                select_sql="id",
+            ),
+            timeout=to_thread_timeout_s,
+        )
+    except asyncio.TimeoutError:
+        return Result.Err("TIMEOUT", "Asset lookup timed out")
+    except Exception as exc:
+        return Result.Err("DB_ERROR", safe_error_message(exc, "Failed to resolve asset id"))
+
+    if not row:
+        return Result.Err("NOT_FOUND", "Asset not indexed")
+    asset_id = row.get("id")
+    if asset_id is None:
+        return Result.Err("NOT_FOUND", "Asset id not available")
+    return Result.Ok(int(asset_id))
+
+
 async def resolve_or_create_asset_id(
     *,
     services: dict[str, Any],
@@ -178,97 +345,44 @@ async def resolve_or_create_asset_id(
     except Exception:
         return Result.Err("NOT_FOUND", "File does not exist")
 
-    source = str(file_type or "").strip().lower()
-    base_dir: Path | None = None
-    resolved_root_id: str | None = None
+    source = _normalize_asset_source(file_type)
 
     if get_input_directory is None:
         get_input_directory = folder_paths.get_input_directory
 
     out_root = Path(get_runtime_output_root_fn()).resolve(strict=False)
     in_root = Path(get_input_directory()).resolve(strict=False)
-
-    if source in ("output", "outputs", "") and is_within_root(resolved, out_root):
-        source = "output"
-        base_dir = out_root
-    elif source in ("input", "inputs", "") and is_within_root(resolved, in_root):
-        source = "input"
-        base_dir = in_root
-    else:
-        roots_res = list_custom_roots_fn()
-        if roots_res.ok:
-            for item in roots_res.data or []:
-                if not isinstance(item, dict):
-                    continue
-                rid = str(item.get("id") or "")
-                if not rid:
-                    continue
-                root_result = resolve_custom_root_fn(rid)
-                if not root_result.ok or not root_result.data:
-                    continue
-                try:
-                    root_path = Path(str(root_result.data)).resolve(strict=False)
-                except Exception:
-                    continue
-                if is_within_root(resolved, root_path):
-                    base_dir = root_path
-                    resolved_root_id = rid or None
-                    source = "custom"
-                    break
-
-        if root_id:
-            root_result = resolve_custom_root_fn(str(root_id))
-            if root_result.ok:
-                try:
-                    candidate_root = Path(str(root_result.data)).resolve(strict=False)
-                except Exception:
-                    candidate_root = None
-                if candidate_root and is_within_root(resolved, candidate_root):
-                    base_dir = candidate_root
-                    resolved_root_id = str(root_id)
-                    source = "custom"
+    source, base_dir, resolved_root_id = _resolve_asset_root(
+        resolved,
+        source=source,
+        root_id=root_id,
+        is_within_root=is_within_root,
+        out_root=out_root,
+        in_root=in_root,
+        list_custom_roots_fn=list_custom_roots_fn,
+        resolve_custom_root_fn=resolve_custom_root_fn,
+    )
 
     if not base_dir:
         return Result.Err("FORBIDDEN", "Path is not within allowed roots")
 
-    try:
-        await asyncio.wait_for(
-            services["index"].index_paths(
-                [Path(resolved)],
-                str(base_dir),
-                True,
-                source,
-                (resolved_root_id or None),
-            ),
-            timeout=to_thread_timeout_s,
-        )
-    except asyncio.TimeoutError:
-        logger.debug("Index-on-demand timed out for %s", filepath)
-    except Exception as exc:
-        logger.debug("Index-on-demand skipped for %s: %s", filepath, exc)
+    await _index_asset_on_demand(
+        services,
+        resolved=resolved,
+        base_dir=base_dir,
+        source=source,
+        resolved_root_id=resolved_root_id,
+        filepath=filepath,
+        logger=logger,
+        to_thread_timeout_s=to_thread_timeout_s,
+    )
 
-    try:
-        row = await asyncio.wait_for(
-            find_asset_row_by_filepath(
-                services["db"],
-                str(resolved),
-                select_sql="id",
-            ),
-            timeout=to_thread_timeout_s,
-        )
-        if not row:
-            return Result.Err("NOT_FOUND", "Asset not indexed")
-        asset_id = row.get("id")
-        if asset_id is None:
-            return Result.Err("NOT_FOUND", "Asset id not available")
-        return Result.Ok(int(asset_id))
-    except asyncio.TimeoutError:
-        return Result.Err("TIMEOUT", "Asset lookup timed out")
-    except Exception as exc:
-        return Result.Err(
-            "DB_ERROR",
-            safe_error_message(exc, "Failed to resolve asset id"),
-        )
+    return await _lookup_asset_id_by_path(
+        services,
+        resolved=resolved,
+        safe_error_message=safe_error_message,
+        to_thread_timeout_s=to_thread_timeout_s,
+    )
 
 
 async def infer_source_and_root_id_from_path(

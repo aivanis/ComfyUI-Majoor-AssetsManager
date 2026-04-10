@@ -13,9 +13,14 @@ function makeStorage() {
     };
 }
 
-vi.mock("vue", () => ({
-    nextTick: async () => {},
-}));
+vi.mock("vue", async () => {
+    const actual = await vi.importActual("vue");
+    return {
+        ...actual,
+        nextTick: async () => {},
+        reactive: (obj) => obj,
+    };
+});
 
 vi.mock("../api/client.js", () => ({
     get: vi.fn(),
@@ -76,6 +81,10 @@ describe("useGridLoader adaptive paging", () => {
         vi.resetModules();
         vi.clearAllMocks();
         globalThis.sessionStorage = makeStorage();
+        globalThis.window = {
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        };
     });
 
     it("increases page size when successive pages add no visible cards", async () => {

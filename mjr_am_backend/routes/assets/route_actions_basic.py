@@ -6,11 +6,12 @@ import os
 import shutil
 import subprocess
 import sys
+from collections.abc import Awaitable, Callable
 from pathlib import Path
-from typing import Any, Awaitable, Callable
+from typing import Any
 
 from aiohttp import web
-
+from mjr_am_backend.features.assets.request_context_service import PrepareAssetPathContext
 from mjr_am_backend.shared import Result
 from mjr_am_backend.shared import sanitize_error_message as _safe_error_message
 
@@ -127,7 +128,7 @@ async def handle_update_asset_tags(
 async def handle_open_in_folder(
     request: web.Request,
     *,
-    prepare_asset_path_context: Callable[[web.Request], Awaitable[Result[Any]]],
+    prepare_asset_path_context: PrepareAssetPathContext,
     resolve_body_filepath: Callable[[dict[str, Any] | None], Path | None],
     load_asset_filepath_by_id: Callable[[dict[str, Any], int], Awaitable[Result[str]]],
     is_resolved_path_allowed: Callable[[Path], bool],

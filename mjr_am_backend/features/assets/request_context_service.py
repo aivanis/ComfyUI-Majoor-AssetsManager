@@ -4,12 +4,71 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
 from aiohttp import web
 
 from ...shared import Result
 from .models import AssetIdsContext, AssetPathContext, AssetRenameContext, AssetRouteContext
+
+
+class PrepareAssetPathContext(Protocol):
+    async def __call__(
+        self,
+        request: web.Request,
+        *,
+        operation: str,
+        rate_limit_endpoint: str,
+        max_requests: int,
+        window_seconds: int,
+        require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
+        resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+        require_operation_enabled: Callable[..., Result[Any]],
+        require_write_access: Callable[[web.Request], Result[Any]],
+        check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
+        read_json: Callable[[web.Request], Awaitable[Result[dict[str, Any]]]],
+        csrf_error: Callable[[web.Request], str | None],
+        normalize_path: Callable[[str], Path | None],
+        resolve_body_filepath: Callable[[dict[str, Any] | None], Path | None],
+        load_asset_filepath: Callable[[dict[str, Any], int], Awaitable[Result[str]]],
+    ) -> Result[AssetPathContext]: ...
+
+
+class PrepareAssetRenameContext(Protocol):
+    async def __call__(
+        self,
+        request: web.Request,
+        *,
+        max_name_length: int,
+        validate_filename: Callable[[str], tuple[bool, str]],
+        require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
+        resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+        require_operation_enabled: Callable[..., Result[Any]],
+        require_write_access: Callable[[web.Request], Result[Any]],
+        check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
+        read_json: Callable[[web.Request], Awaitable[Result[dict[str, Any]]]],
+        csrf_error: Callable[[web.Request], str | None],
+    ) -> Result[AssetRenameContext]: ...
+
+
+class PrepareAssetIdsContext(Protocol):
+    async def __call__(
+        self,
+        request: web.Request,
+        *,
+        operation: str,
+        rate_limit_endpoint: str,
+        max_requests: int,
+        window_seconds: int,
+        require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
+        resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+        require_operation_enabled: Callable[..., Result[Any]],
+        require_write_access: Callable[[web.Request], Result[Any]],
+        check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
+        read_json: Callable[[web.Request], Awaitable[Result[dict[str, Any]]]],
+        csrf_error: Callable[[web.Request], str | None],
+        ids_key: str = "ids",
+    ) -> Result[AssetIdsContext]: ...
 
 
 def _result_error(result: Result[Any], default_code: str, default_error: str) -> Result[Any]:
@@ -341,6 +400,9 @@ async def prepare_asset_ids_context(
 
 
 __all__ = [
+    "PrepareAssetIdsContext",
+    "PrepareAssetPathContext",
+    "PrepareAssetRenameContext",
     "prepare_asset_ids_context",
     "prepare_asset_path_context",
     "prepare_asset_rename_context",
