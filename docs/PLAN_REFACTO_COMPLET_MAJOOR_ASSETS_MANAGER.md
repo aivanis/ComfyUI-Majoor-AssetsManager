@@ -249,18 +249,19 @@ La cible est un projet avec des frontières lisibles entre :
 |---|---|---|---|---|
 | Migration Vue des surfaces UI majeures | Fait / clôturé | 2026-04-09 | Seulement en cas de régression structurelle | Voir `docs/VUE_MIGRATION_PLAN.md` |
 | Consolidation frontend post-Vue | En cours | 2026-04-09 | Après chaque lot de tests / cleanup | Viewer (~2963 L), FloatingViewer (~2848 L), toolbar (~1526 L) intacts ; couverture panel présente mais encore partielle |
-| Découpage DB | **Fait ✓ commité** | 2026-04-09 | Seulement en cas de régression | 7 modules extraits de sqlite_facade (1055 L) ; SQL guards remplacés ; schema.py splitée (331 L + 3 sous-modules) |
+| Découpage DB | **Fait ✓ commité** | 2026-04-10 | Seulement en cas de régression | 7 modules extraits de sqlite_facade (1055 L) ; SQL guards remplacés ; schema.py splitée (331 L + 3 sous-modules) ; **29 tests ciblés ajoutés** |
 | Split handlers assets/search | **Fait ✓** | 2026-04-09 | Seulement en cas de régression | `assets_impl.py` réduit à **462 L** (wiring DI pur) ; `search_impl.py` à **212 L** ; 9 sous-services dans `features/assets/` ; closures module-level ; DI lambdas factorisées en `_wired_*` ; façades dans `routes/assets/` ; helpers HTTP déjà dans `routes/core/` |
 | Registry / middlewares / bootstrap routes | **Fait ✓ commité** | 2026-04-09 | Seulement en cas de régression | `registry.py` réduit à 184 L via `registry_middlewares.py` ; routes déclaratives via `route_catalog.py` (RouteRegistration + catalogs CORE/OPTIONAL) ; `__init__.py` = 1 L sans side-effects |
 | Clarification security / observability | **Fait ✓ commité** | 2026-04-09 | Seulement en cas de régression | `security.py` réduit à 438 L via 4 sous-modules ; observability splitée (13 L façade) |
-| Gouvernance dépendances / docs / ADR | **Fait ✓** | 2026-04-09 | Seulement en cas de régression | `requirements.txt` fixé comme source de vérité ; `requirements-dev.txt`, `DEPENDENCY_POLICY.md`, ADR Vue/runtime ajoutés |
+| Gouvernance dépendances / docs / ADR | **Fait ✓** | 2026-04-10 | Seulement en cas de régression | `requirements.txt` fixé comme source de vérité ; `requirements-dev.txt`, `DEPENDENCY_POLICY.md`, ADR Vue/runtime ajoutés ; `ARCHITECTURE_MAP.md` enrichi ; `README.md` mis à jour |
+| Nettoyage final et durcissement | **Fait ✓** | 2026-04-10 | Seulement en cas de régression | Audit legacy clean ; docs frontend créées (`FRONTEND_IMPERATIVE_DESIGN.md`, `FRONTEND_LIFECYCLE_CONVENTIONS.md`) ; 1329 tests passent |
 
 ### 5.1 Todo opérationnelle immédiate
 
 - [x] Créer les sous-services `features/assets/*` encore manquants — **fait** : lookup_service, download_service, rating_tags_service, request_context_service, path_resolution_service, delete_service, rename_service, filename_validator, models
 - [ ] Étendre les tests Vue sur panel critique et teardown/listeners
 - [x] Rendre `registry.py` plus déclaratif et expliciter le mode strict dev — **fait** via `route_catalog.py` (RouteRegistration + CORE/OPTIONAL catalogs)
-- [ ] Ajouter les tests DB ciblés par sous-module extrait
+- [x] Ajouter les tests DB ciblés par sous-module extrait — 29 tests (connections, execution, lifecycle, recovery)
 
 ---
 
@@ -287,7 +288,7 @@ La cible est un projet avec des frontières lisibles entre :
 - [ ] Continuer le découpage du runtime viewer impératif derrière la façade Vue
 - [ ] Continuer le découpage des helpers DnD / runtime encore trop transverses
 - [ ] Étendre la couverture de tests Vue sur les composants panel les plus critiques et sur les régressions de teardown restantes
-- [ ] Clarifier par écrit ce qui reste impératif “par design” et ce qui reste impératif “temporairement”
+- [x] Clarifier par écrit ce qui reste impératif "par design" et ce qui reste impératif "temporairement" — `docs/FRONTEND_IMPERATIVE_DESIGN.md`
 
 ## 6.3 À terminer côté backend
 
@@ -363,9 +364,9 @@ frontend_runtime_services/
 
 ## 7.4 Actions recommandées
 
-- [ ] Documenter ce qui reste impératif par design dans le viewer
-- [ ] Identifier les bridges frontend encore provisoires
-- [ ] Regrouper les conventions de lifecycle Vue/runtime dans une doc courte
+- [x] Documenter ce qui reste impératif par design dans le viewer — `docs/FRONTEND_IMPERATIVE_DESIGN.md`
+- [x] Identifier les bridges frontend encore provisoires — documenté dans `FRONTEND_IMPERATIVE_DESIGN.md`
+- [x] Regrouper les conventions de lifecycle Vue/runtime dans une doc courte — `docs/FRONTEND_LIFECYCLE_CONVENTIONS.md`
 - [ ] Étendre les tests Vue pour :
   - [x] hosts viewer
   - [x] menus contextuels viewer/grid
@@ -430,8 +431,8 @@ Le nom exact des fichiers peut évoluer, mais la règle reste la même :
 - [x] Remplacer les 10 SQL guards dupliqués de `sqlite_facade.py` par des wrappers fins (non commité)
 - [x] Découper `schema.py` (951 L) → `schema.py` 331 L + `schema_sql.py` 295 L + `schema_fts.py` 238 L + `schema_vec.py` 115 L (non commité)
 - [x] **Committer** le lot DB complet — fait
-- [ ] Vérifier si du spécifique Windows reste dans `sqlite_facade.py` hors zones dédiées
-- [ ] Ajouter des tests ciblés pour `sqlite_execution`, `sqlite_lifecycle`, `sqlite_recovery`, `sqlite_connections`
+- [x] Vérifier si du spécifique Windows reste dans `sqlite_facade.py` hors zones dédiées — vérifié : tout délégué à `sqlite_lifecycle.py`
+- [x] Ajouter des tests ciblés pour `sqlite_execution`, `sqlite_lifecycle`, `sqlite_recovery`, `sqlite_connections` — 29 tests ajoutés
 
 ## 8.5 Critères d’acceptation
 
@@ -630,8 +631,8 @@ Encore manquant ou à formaliser :
 - [x] Mettre README à jour avec la structure frontend Vue actuelle
 - [x] Ajouter une ADR “Frontend Vue ownership / runtime bridges”
 - [x] Ajouter une ADR “Panel runtime split”
-- [ ] Vérifier l’alignement docs / scripts / install / qualité
-- [ ] Relever progressivement les exigences de tests ciblés sur les fichiers changés
+- [x] Vérifier l'alignement docs / scripts / install / qualité — `ARCHITECTURE_MAP.md` enrichi, `README.md` mis à jour
+- [x] Relever progressivement les exigences de tests ciblés sur les fichiers changés — couverture DB sub-modules ajoutée
 
 ## 11.4 Critères d’acceptation
 
@@ -654,7 +655,7 @@ Encore manquant ou à formaliser :
 
 - [ ] Étendre les tests Vue critiques
 - [ ] Stabiliser les contrats runtime Vue ↔ services
-- [ ] Documenter l’impératif conservé par design
+- [x] Documenter l'impératif conservé par design — `docs/FRONTEND_IMPERATIVE_DESIGN.md`
 - [ ] Poursuivre la simplification viewer / DnD / panel runtime
 
 ## Phase 2 — Finalisation du split DB
@@ -663,7 +664,7 @@ Encore manquant ou à formaliser :
 - [x] Remplacer les SQL guards dupliqués de sqlite_facade par wrappers fins
 - [x] Découper schema.py (951 L → 331 L + 3 sous-modules)
 - [x] Committer le lot DB complet — fait
-- [ ] Ajouter les tests par sous-module extrait
+- [x] Ajouter les tests par sous-module extrait — fait (29 tests)
 
 ## Phase 3 — Split handlers assets/search
 
@@ -687,9 +688,9 @@ Encore manquant ou à formaliser :
 
 ## Phase 5 — Nettoyage final et durcissement
 
-- [ ] Nettoyer les reliquats legacy restants
-- [ ] Rehausser progressivement les checks qualité
-- [ ] Stabiliser les conventions de maintenance
+- [x] Nettoyer les reliquats legacy restants — audit fait : aucun reliquat détecté
+- [x] Rehausser progressivement les checks qualité — couverture DB étendue, docs alignées
+- [x] Stabiliser les conventions de maintenance — docs `FRONTEND_IMPERATIVE_DESIGN.md` et `FRONTEND_LIFECYCLE_CONVENTIONS.md` créées
 
 ---
 

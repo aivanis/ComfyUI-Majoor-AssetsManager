@@ -767,17 +767,21 @@ Dependency roles and update rules are defined in [`docs/DEPENDENCY_POLICY.md`](d
 ```
 ComfyUI-Majoor-AssetsManager/
 ├── __init__.py                 # Extension entry point
-├── js/                         # Frontend (Vue.js, vanilla JS)
+├── js/                         # Frontend (Vue 3 + Pinia, vanilla JS)
 │   ├── entry.js               # Main entry
 │   ├── app/                   # App initialization, settings
 │   ├── components/            # UI components
 │   ├── features/              # Feature modules
+│   ├── stores/                # Pinia stores
 │   ├── api/                   # API client
 │   └── vue/                   # Vue.js source modules
 ├── mjr_am_backend/            # Backend (Python)
-│   ├── routes/                # API routes
-│   ├── features/              # Backend features
-│   ├── adapters/              # Database adapters
+│   ├── routes/                # API routes, route_catalog.py (declarative)
+│   ├── routes/core/           # Shared HTTP helpers (security, path, JSON)
+│   ├── routes/assets/         # Thin compat facades → features/assets/
+│   ├── features/assets/       # Asset domain: 9 sub-services
+│   ├── features/              # Other backend features
+│   ├── adapters/db/           # SQLite: facade + split sub-modules
 │   └── shared.py              # Shared backend helpers
 ├── mjr_am_shared/             # Shared code (frontend/backend)
 ├── tests/                     # Test suites
@@ -789,6 +793,8 @@ ComfyUI-Majoor-AssetsManager/
 ├── docs/                      # Documentation
 └── scripts/                   # Utility scripts
 ```
+
+> For detailed architecture and module responsibilities, see [docs/ARCHITECTURE_MAP.md](docs/ARCHITECTURE_MAP.md).
 
 ### Running Tests
 
