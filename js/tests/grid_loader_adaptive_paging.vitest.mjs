@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { ensureWindowStub, mockPartialVue } from "./helpers/vitestEnvironment.mjs";
+
 const fetchGridPageMock = vi.hoisted(() => vi.fn());
 const appendAssetsMock = vi.hoisted(() => vi.fn());
 
@@ -13,13 +15,9 @@ function makeStorage() {
     };
 }
 
-vi.mock("vue", async () => {
-    const actual = await vi.importActual("vue");
-    return {
-        ...actual,
-        nextTick: async () => {},
-        reactive: (obj) => obj,
-    };
+mockPartialVue({
+    nextTick: async () => {},
+    reactive: (obj) => obj,
 });
 
 vi.mock("../api/client.js", () => ({
@@ -81,10 +79,7 @@ describe("useGridLoader adaptive paging", () => {
         vi.resetModules();
         vi.clearAllMocks();
         globalThis.sessionStorage = makeStorage();
-        globalThis.window = {
-            addEventListener: vi.fn(),
-            removeEventListener: vi.fn(),
-        };
+        ensureWindowStub();
     });
 
     it("increases page size when successive pages add no visible cards", async () => {

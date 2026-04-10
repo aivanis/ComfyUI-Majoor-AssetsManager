@@ -6,7 +6,7 @@ import os
 import shutil
 import subprocess
 import sys
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -135,7 +135,7 @@ async def handle_open_in_folder(
     normalize_path: Callable[[str], Path | None],
     read_json: Callable[[web.Request], Awaitable[Any]],
     require_services: Callable[[], Awaitable[tuple[dict[str, Any], Result[Any] | None]]],
-    resolve_security_prefs: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
+    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
     require_operation_enabled: Callable[..., Result[Any]],
     require_write_access: Callable[[web.Request], Result[Any]],
     check_rate_limit: Callable[..., tuple[bool, int | None]],
@@ -207,7 +207,7 @@ async def handle_open_in_folder(
     for cmd in commands:
         try:
             _execute_command(cmd)
-            payload = {"opened": True, "selected": selected}
+            payload: dict[str, Any] = {"opened": True, "selected": selected}
             if cmd[0] == "xdg-open":
                 payload["fallback"] = "xdg-open"
             return json_response(Result.Ok(payload))

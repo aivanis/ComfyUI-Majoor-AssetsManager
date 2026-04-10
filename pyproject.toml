@@ -56,6 +56,7 @@ dev = [
   "pytest-asyncio>=0.22.0,<2.0.0",
   "pytest-cov>=6.0.0,<8.0.0",
   "pytest-timeout>=2.3.0,<3.0.0",
+  "pre-commit>=4.3.0,<5.0.0",
   "radon>=6.0.1,<7.0.0",
   "xenon>=0.9.3,<1.0.0",
   "ruff>=0.12.0,<1.0.0",
@@ -80,7 +81,7 @@ exclude = ["js*", "vendor*", "plugins*", "ressources*"]
 PublisherId = "majoor-waldi"
 DisplayName = "ComfyUI-Majoor-AssetsManager"
 Icon = "https://raw.githubusercontent.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/main/ressources/icon.png"
-includes = [] 
+includes = []
 "requires-comfyui" = ">=0.13.0"
 
 [tool.black]
@@ -111,4 +112,3 @@ ignore = ["E501", "S101", "S105", "S110", "S112", "S311", "S603", "S607", "S608"
 [tool.ruff.lint.per-file-ignores]
 "scripts/junit_to_html.py" = ["S314"]
 "tests/**/*.py" = ["S108", "S605"]
-

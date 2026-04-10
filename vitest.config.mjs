@@ -5,6 +5,7 @@ export default defineConfig({
   plugins: [vue()],
   test: {
     environment: "node",
+    setupFiles: ["js/tests/vitest.setup.mjs"],
     transformMode: {
       web: [/\.vue$/],
     },

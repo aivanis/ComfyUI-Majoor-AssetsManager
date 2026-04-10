@@ -1,6 +1,6 @@
 # Testing
 
-**Version**: 2.4.4  
+**Version**: 2.4.4
 **Last Updated**: April 5, 2026
 
 This project uses **pytest** (backend) and **Vitest** (frontend) for comprehensive test coverage. On Windows, batch runners are provided for convenience and generate both:
@@ -11,6 +11,7 @@ Before running the quality gate or local tests, install contributor tooling:
 
 ```bash
 pip install -r requirements-dev.txt
+python scripts/install_local_hooks.py
 ```
 
 Runtime dependencies stay in `requirements.txt`; optional AI/vector dependencies stay in `requirements-vector.txt`. See `docs/DEPENDENCY_POLICY.md` for the canonical dependency policy.
@@ -94,7 +95,27 @@ The canonical gate runs encoding/BOM checks, `ruff`, `mypy`, `bandit`, `pip-audi
 
 The Python coverage gate currently enforces a minimum combined backend/shared coverage threshold of `60%`, which gives the CI pipeline a regression floor without making legacy cleanup block unrelated work.
 
-During the migration to stricter quality thresholds, `ruff` is enforced on changed Python files while repository-wide hygiene, security, and complexity checks continue to run across the repo. This keeps the gate hard for new work without turning legacy cleanup into a single big-bang change.
+During the migration to stricter quality thresholds, `ruff` is enforced with autofix on commit for changed Python files, while `mypy` and the changed-file complexity gate run on pre-push. The changed-file complexity threshold is aligned locally with the CI limit of `25`, and repository-wide hygiene, security, and complexity checks continue to run across the repo.
+
+## Local Hooks
+
+This repository ships local Git hooks via `pre-commit`:
+
+```bash
+python scripts/install_local_hooks.py
+```
+
+Installed behavior:
+- `pre-commit`: BOM/encoding hygiene, `ruff --fix`, `eslint --fix`, `prettier --write`
+- `pre-push`: mandatory `mypy` plus `scripts/run_changed_quality_gate.py`
+
+The changed-file quality gate is also runnable manually:
+
+```bash
+python scripts/run_changed_quality_gate.py
+```
+
+For frontend tests in the Node Vitest environment, prefer the shared helpers in `js/tests/helpers/vitestEnvironment.mjs`. Team rule: use partial Vue mocks by default, based on the real `vue` module, instead of full replacement mocks.
 
 ## Batch runners (Windows)
 
@@ -136,4 +157,3 @@ If you don't want to commit large samples, you can point the test to an external
 $env:MJR_TEST_PARSER_DIR = "C:\path\to\parser"
 python -m pytest tests/metadata/test_parser_folder_scan.py -q
 ```
-

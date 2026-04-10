@@ -10,6 +10,10 @@ from aiohttp import web
 from mjr_am_backend.shared import Result
 
 
+def _propagate_all_scope_error(result: Result[Any], default_code: str, default_error: str) -> Result[dict[str, Any]]:
+    return Result.Err(result.code or default_code, str(result.error or default_error))
+
+
 def _build_all_scope_payload(
     *,
     assets: list[dict[str, Any]],
@@ -310,7 +314,7 @@ async def _merge_all_scope_page(
 
     err = await _fill_output_buffer(state, svc=svc, query=query, sort_key=sort_key, filters=filters, output_root=output_root)
     if err:
-        return err
+        return _propagate_all_scope_error(err, "SEARCH_FAILED", "Failed to fill output buffer")
     err = await _fill_input_buffer(
         state,
         input_root=input_root,
@@ -320,7 +324,7 @@ async def _merge_all_scope_page(
         list_filesystem_assets=list_filesystem_assets,
     )
     if err:
-        return err
+        return _propagate_all_scope_error(err, "SEARCH_FAILED", "Failed to fill input buffer")
 
     total = int(state["out_total"] or 0) + int(state["in_total"] or 0)
     target = offset + limit
@@ -338,7 +342,7 @@ async def _merge_all_scope_page(
                 output_root=output_root,
             )
             if err:
-                return err
+                return _propagate_all_scope_error(err, "SEARCH_FAILED", "Failed to refill output buffer")
         if state["in_i"] >= len(state["in_buf"]) and (state["in_total"] is None or state["in_offset"] < state["in_total"]):
             err = await _fill_input_buffer(
                 state,
@@ -349,7 +353,7 @@ async def _merge_all_scope_page(
                 list_filesystem_assets=list_filesystem_assets,
             )
             if err:
-                return err
+                return _propagate_all_scope_error(err, "SEARCH_FAILED", "Failed to refill input buffer")
 
         out_has = state["out_i"] < len(state["out_buf"])
         in_has = state["in_i"] < len(state["in_buf"])

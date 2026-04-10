@@ -835,15 +835,21 @@ Test reports: `tests/__reports__/index.html`
 
 ### Code Quality
 ```bash
+# Install local git hooks once
+python scripts/install_local_hooks.py
+
 # Canonical repo quality gate
 python scripts/run_quality_gate.py
 
 # Fast Python-only gate
 python scripts/run_quality_gate.py --python-only --skip-tests
 
+# Fast local pre-push equivalent on changed files
+python scripts/run_changed_quality_gate.py
+
 # Individual checks
 mypy --config-file mypy.ini
-python -m ruff check mjr_am_backend mjr_am_shared tests scripts __init__.py
+python -m ruff check --fix mjr_am_backend mjr_am_shared tests scripts __init__.py
 bandit -r mjr_am_backend -ll -ii -x tests
 pip-audit -r requirements.txt
 python scripts/check_cc_changed.py
@@ -853,9 +859,10 @@ python scripts/check_cc_changed.py
 1. Fork the repository
 2. Create a feature branch
 3. Install contributor dependencies: `pip install -r requirements-dev.txt`
-4. Make your changes
-5. Run tests: `run_tests.bat`
-6. Submit a pull request
+4. Install local hooks: `python scripts/install_local_hooks.py`
+5. Make your changes
+6. Run tests: `run_tests.bat`
+7. Submit a pull request
 
 See [`docs/TESTING.md`](docs/TESTING.md), [`tests/README.md`](tests/README.md), and [`docs/DEPENDENCY_POLICY.md`](docs/DEPENDENCY_POLICY.md) for detailed contributor guidance.
 

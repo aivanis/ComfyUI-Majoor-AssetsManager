@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +26,7 @@ async def handle_rename_asset(
     audit_asset_write: Callable[..., Awaitable[None]],
     json_response: Callable[[Any], web.Response],
     require_services: Callable[[], Awaitable[tuple[dict[str, Any], Result[Any] | None]]],
-    resolve_security_prefs: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
+    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
     require_operation_enabled: Callable[..., Result[Any]],
     require_write_access: Callable[[web.Request], Result[Any]],
     check_rate_limit: Callable[..., tuple[bool, int | None]],

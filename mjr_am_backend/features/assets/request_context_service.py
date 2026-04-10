@@ -11,6 +11,8 @@ from aiohttp import web
 from ...shared import Result
 from .models import AssetIdsContext, AssetPathContext, AssetRenameContext, AssetRouteContext
 
+ResolveSecurityPrefs = Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]]
+
 
 class PrepareAssetPathContext(Protocol):
     async def __call__(
@@ -22,7 +24,7 @@ class PrepareAssetPathContext(Protocol):
         max_requests: int,
         window_seconds: int,
         require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
-        resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+        resolve_security_prefs: ResolveSecurityPrefs,
         require_operation_enabled: Callable[..., Result[Any]],
         require_write_access: Callable[[web.Request], Result[Any]],
         check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
@@ -42,7 +44,7 @@ class PrepareAssetRenameContext(Protocol):
         max_name_length: int,
         validate_filename: Callable[[str], tuple[bool, str]],
         require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
-        resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+        resolve_security_prefs: ResolveSecurityPrefs,
         require_operation_enabled: Callable[..., Result[Any]],
         require_write_access: Callable[[web.Request], Result[Any]],
         check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
@@ -61,7 +63,7 @@ class PrepareAssetIdsContext(Protocol):
         max_requests: int,
         window_seconds: int,
         require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
-        resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+        resolve_security_prefs: ResolveSecurityPrefs,
         require_operation_enabled: Callable[..., Result[Any]],
         require_write_access: Callable[[web.Request], Result[Any]],
         check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
@@ -103,7 +105,7 @@ async def _check_operation_auth(
     *,
     operation: str,
     services: dict[str, Any],
-    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+    resolve_security_prefs: ResolveSecurityPrefs,
     require_operation_enabled: Callable[..., Result[Any]],
     require_write_access: Callable[[web.Request], Result[Any]],
 ) -> Result[None]:
@@ -218,7 +220,7 @@ async def prepare_asset_path_context(
     max_requests: int,
     window_seconds: int,
     require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
-    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+    resolve_security_prefs: ResolveSecurityPrefs,
     require_operation_enabled: Callable[..., Result[Any]],
     require_write_access: Callable[[web.Request], Result[Any]],
     check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
@@ -306,7 +308,7 @@ async def prepare_asset_rename_context(
     max_name_length: int,
     validate_filename: Callable[[str], tuple[bool, str]],
     require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
-    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+    resolve_security_prefs: ResolveSecurityPrefs,
     require_operation_enabled: Callable[..., Result[Any]],
     require_write_access: Callable[[web.Request], Result[Any]],
     check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],
@@ -360,7 +362,7 @@ async def prepare_asset_ids_context(
     max_requests: int,
     window_seconds: int,
     require_services: Callable[[], Awaitable[tuple[dict[str, Any] | None, Result[Any] | None]]],
-    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
+    resolve_security_prefs: ResolveSecurityPrefs,
     require_operation_enabled: Callable[..., Result[Any]],
     require_write_access: Callable[[web.Request], Result[Any]],
     check_rate_limit: Callable[[web.Request, str, int, int], tuple[bool, int | None]],

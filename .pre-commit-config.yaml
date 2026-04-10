@@ -1,3 +1,5 @@
+default_install_hook_types: [pre-commit, pre-push]
+
 minimum_pre_commit_version: "3.6.0"
 
 repos:
@@ -20,21 +22,34 @@ repos:
         language: system
         pass_filenames: false
 
-      - id: ruff
-        name: Ruff
-        entry: python -m ruff check
+      - id: ruff-fix
+        name: Ruff autofix
+        entry: python -m ruff check --fix --exit-non-zero-on-fix
         language: system
+        types: [python]
+
+      - id: eslint-fix
+        name: ESLint autofix
+        entry: npm exec eslint --fix
+        language: system
+        files: ^js/.*\.(js|mjs|vue)$
+
+      - id: prettier-write
+        name: Prettier write
+        entry: npm exec prettier --write
+        language: system
+        files: ^js/.*\.(js|mjs|vue)$
 
       - id: mypy
-        name: Mypy (manual / pre-push)
+        name: Mypy (pre-push / manual)
         entry: python -m mypy --config-file mypy.ini
         language: system
         pass_filenames: false
-        stages: [commit, pre-push, manual]
+        stages: [pre-push, manual]
 
       - id: quality-gate
-        name: Quality gate (manual / pre-push)
-        entry: python scripts/run_quality_gate.py --python-only --skip-tests
+        name: Changed-file quality gate (pre-push / manual)
+        entry: python scripts/run_changed_quality_gate.py
         language: system
         pass_filenames: false
         stages: [pre-push, manual]

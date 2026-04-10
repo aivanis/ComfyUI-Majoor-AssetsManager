@@ -11,6 +11,10 @@ from ...shared import Result
 from .models import AssetRenameTarget
 
 
+def _propagate_rename_error(result: Result[Any], default_code: str, default_error: str) -> Result[dict[str, Any]]:
+    return Result.Err(result.code or default_code, str(result.error or default_error))
+
+
 def _compute_rename_path(current_resolved: Path, new_name: str) -> Path:
     return current_resolved.parent / new_name
 
@@ -214,11 +218,11 @@ async def rename_asset_and_sync(
     new_path = _compute_rename_path(current_resolved, new_name)
     conflict_res = _check_rename_conflict(current_resolved, new_path, new_name)
     if not conflict_res.ok:
-        return conflict_res
+        return _propagate_rename_error(conflict_res, "CONFLICT", "File rename conflict")
 
     rename_res = _rename_file(current_resolved, new_path, safe_error_message=safe_error_message)
     if not rename_res.ok:
-        return rename_res
+        return _propagate_rename_error(rename_res, "RENAME_FAILED", "Failed to rename file")
 
     stat_res = await _stat_renamed_file(
         current_resolved,
@@ -228,7 +232,7 @@ async def rename_asset_and_sync(
         logger=logger,
     )
     if not stat_res.ok:
-        return stat_res
+        return _propagate_rename_error(stat_res, "FS_ERROR", "Failed to stat renamed file")
     mtime = int(stat_res.data or 0)
 
     update_res = await _update_rename_records(

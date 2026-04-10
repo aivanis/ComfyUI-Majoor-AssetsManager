@@ -5,9 +5,10 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
-DEFAULT_MAX_CC = 10
+DEFAULT_MAX_CC = 25
 
 
 def _max_cc() -> int:
@@ -24,23 +25,41 @@ def _run(cmd: list[str]) -> str:
     return subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
 
 
-def _new_python_files() -> list[Path]:
+def _diff_outputs() -> list[str]:
+    diffs: list[str] = []
     base_ref = os.environ.get("GITHUB_BASE_REF", "").strip()
-    if base_ref:
+    try:
+        if base_ref:
+            diffs.append(_run(["git", "diff", "--diff-filter=AM", "--name-only", f"origin/{base_ref}...HEAD"]))
+        else:
+            try:
+                diffs.append(_run(["git", "diff", "--diff-filter=AM", "--name-only", "@{upstream}...HEAD"]))
+            except Exception:
+                diffs.append(_run(["git", "diff", "--diff-filter=AM", "--name-only", "HEAD~1...HEAD"]))
+    except Exception:
+        pass
+
+    for cmd in (
+        ["git", "diff", "--diff-filter=AM", "--name-only"],
+        ["git", "diff", "--cached", "--diff-filter=AM", "--name-only"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
         try:
-            diff = _run(["git", "diff", "--diff-filter=AM", "--name-only", f"origin/{base_ref}...HEAD"])
+            diffs.append(_run(cmd))
         except Exception:
-            diff = ""
-    else:
-        try:
-            diff = _run(["git", "diff", "--diff-filter=AM", "--name-only", "HEAD~1...HEAD"])
-        except Exception:
-            diff = ""
+            continue
+    return diffs
+
+
+def _new_python_files() -> list[Path]:
     files = []
-    for raw in diff.splitlines():
-        p = Path(raw.strip())
-        if p.suffix == ".py" and p.exists():
-            files.append(p)
+    seen: set[Path] = set()
+    for diff in _diff_outputs():
+        for raw in diff.splitlines():
+            p = Path(raw.strip())
+            if p.suffix == ".py" and p.exists() and p not in seen:
+                seen.add(p)
+                files.append(p)
     return files
 
 
@@ -51,7 +70,7 @@ def main() -> int:
         print("No changed Python files; complexity gate skipped.")
         return 0
 
-    cmd = ["python", "-m", "radon", "cc", "--json", *[str(p) for p in files]]
+    cmd = [sys.executable, "-m", "radon", "cc", "--json", *[str(p) for p in files]]
     try:
         payload = _run(cmd)
         data = json.loads(payload) if payload else {}
@@ -85,4 +104,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

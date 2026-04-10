@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +14,17 @@ from mjr_am_backend.shared import sanitize_error_message as _safe_error_message
 
 def _delete_audit_target(asset_ids: list[int]) -> str:
     return f"assets:{','.join(str(value) for value in asset_ids[:25])}"
+
+
+def _result_err(result: Result[Any], default_code: str, default_error: str) -> Result[Any]:
+    return Result.Err(result.code or default_code, str(result.error or default_error))
+
+
+def _coerce_asset_id(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 async def _load_found_assets(
@@ -93,7 +104,7 @@ def _validate_assets_for_deletion(
             is_resolved_path_allowed=is_resolved_path_allowed,
         )
         if not asset_res.ok:
-            return asset_res
+            return _result_err(asset_res, "INVALID_INPUT", "Failed to validate asset for deletion")
         validated_assets.append(asset_res.data or {})
     validated_assets.sort(key=lambda item: item["id"])
     return Result.Ok(validated_assets)
@@ -221,14 +232,18 @@ def _partial_delete_result(
     attempted: int,
 ) -> Result[dict[str, Any]]:
     failed_ids = [
-        int(item.get("asset_id"))
+        asset_id
         for item in file_deletion_errors
-        if isinstance(item, dict) and item.get("asset_id") is not None
+        if isinstance(item, dict)
+        for asset_id in [_coerce_asset_id(item.get("asset_id"))]
+        if asset_id is not None
     ]
     failed_ids += [
-        int(item.get("asset_id"))
+        asset_id
         for item in db_errors
-        if isinstance(item, dict) and item.get("asset_id") is not None
+        if isinstance(item, dict)
+        for asset_id in [_coerce_asset_id(item.get("asset_id"))]
+        if asset_id is not None
     ]
     unique_failed_ids = sorted(set(failed_ids))
     return Result.Ok(
@@ -283,7 +298,7 @@ async def handle_delete_assets(
     audit_asset_write: Callable[..., Awaitable[None]],
     json_response: Callable[[Any], web.Response],
     require_services: Callable[[], Awaitable[tuple[dict[str, Any], Result[Any] | None]]],
-    resolve_security_prefs: Callable[[dict[str, Any]], Awaitable[dict[str, Any]]],
+    resolve_security_prefs: Callable[[Mapping[str, Any] | None], Awaitable[Mapping[str, Any] | None]],
     require_operation_enabled: Callable[..., Result[Any]],
     require_write_access: Callable[[web.Request], Result[Any]],
     check_rate_limit: Callable[..., tuple[bool, int | None]],
