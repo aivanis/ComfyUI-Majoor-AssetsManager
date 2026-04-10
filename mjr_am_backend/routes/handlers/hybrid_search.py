@@ -30,7 +30,7 @@ from .vector_search import (
     _filter_text_search_hits,
     _hits_to_asset_ids,
     _hydrate_vector_results,
-    _require_vector_services,
+    _require_vector_services_async,
     _rows_to_allowed_set,
 )
 
@@ -369,7 +369,7 @@ def register_hybrid_search_routes(routes: web.RouteTableDef) -> None:
             # Lazy-init vector services like /vector/search does.
             # If unavailable/disabled, keep hybrid route operational in FTS-only mode.
             try:
-                searcher, _verr = _require_vector_services(services_dict)
+                searcher, _verr = await _require_vector_services_async(services_dict)
                 if _verr is not None:
                     searcher = None
             except Exception:

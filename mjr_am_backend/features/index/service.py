@@ -292,7 +292,7 @@ class IndexService:
         Returns:
             Result with indexing statistics
         """
-        self._ensure_vector_services()
+        await self._ensure_vector_services_async()
         res = await self._scanner.index_paths(
             paths=paths,
             base_dir=base_dir,
