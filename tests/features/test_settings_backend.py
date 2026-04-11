@@ -8,10 +8,10 @@ from mjr_am_backend.settings import (
     _AI_VERBOSE_LOGS_KEY,
     _METADATA_FALLBACK_IMAGE_KEY,
     _METADATA_FALLBACK_MEDIA_KEY,
-    _SECURITY_API_TOKEN_KEY,
     _OUTPUT_DIRECTORY_KEY,
     _PROBE_BACKEND_KEY,
     _SECURITY_API_TOKEN_HASH_KEY,
+    _SECURITY_API_TOKEN_KEY,
     _SETTINGS_VERSION_KEY,
     AppSettings,
 )
@@ -235,13 +235,26 @@ async def test_probe_backend_get_set_paths(monkeypatch):
 def test_cached_probe_backend_helper_paths():
     s = AppSettings(_DB())
     cache_key = _PROBE_BACKEND_KEY
-    s._cache[cache_key] = "auto"
-    s._cache_at[cache_key] = 0.0
-    s._cache_version[cache_key] = 1
+    # Seed with an expired entry (TTL already passed → monotonic timestamp 0)
+    s._cache._data[cache_key] = ("auto", 0.0, 1)
     assert s._cached_probe_backend(cache_key, 1) == ""
 
-    s._cache_at[cache_key] = 10**9
+    # Seed with fresh timestamp but wrong version → should also miss
+    s._cache.put(cache_key, "auto", version=1)
     assert s._cached_probe_backend(cache_key, 2) == ""
+
+
+def test_versioned_ttl_cache_evicts_oldest_entry():
+    s = AppSettings(_DB())
+
+    s._cache = s._cache.__class__(ttl_s=s._cache_ttl_s, maxsize=2)
+    s._cache.put("first", "1", version=0)
+    s._cache.put("second", "2", version=0)
+    s._cache.put("third", "3", version=0)
+
+    assert s._cache.get("first", version=0) is None
+    assert s._cache.get("second", version=0) == "2"
+    assert s._cache.get("third", version=0) == "3"
 
 
 @pytest.mark.asyncio
@@ -326,8 +339,8 @@ def test_metadata_helpers_direct():
     assert payload[_METADATA_FALLBACK_IMAGE_KEY] is False
     assert payload[_METADATA_FALLBACK_MEDIA_KEY] is True
 
-    s._cache[_METADATA_FALLBACK_IMAGE_KEY] = "1"
-    s._cache[_METADATA_FALLBACK_MEDIA_KEY] = "0"
+    s._cache.put(_METADATA_FALLBACK_IMAGE_KEY, "1", version=0)
+    s._cache.put(_METADATA_FALLBACK_MEDIA_KEY, "0", version=0)
     cur = s._current_metadata_fallback_prefs_from_cache()
     assert cur == {"image": True, "media": False}
 

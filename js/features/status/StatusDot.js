@@ -19,7 +19,10 @@ import { APP_CONFIG } from "../../app/config.js";
 import { comfyConfirm } from "../../app/dialogs.js";
 import { comfyToast, recordToastHistory } from "../../app/toast.js";
 import { t } from "../../app/i18n.js";
-import { getEnrichmentState, setEnrichmentState } from "../../app/runtimeState.js";
+import {
+    getRuntimeEnrichmentState,
+    setRuntimeEnrichmentState,
+} from "../../stores/runtimeEnrichmentState.js";
 import { loadMajoorSettings } from "../../app/settings.js";
 import { EVENTS } from "../../app/events.js";
 
@@ -1723,9 +1726,9 @@ export async function updateStatus(
             0,
             Number(counters?.enrichment_queue_length || 0) || 0,
         );
-        const runtimeEnrichment = getEnrichmentState();
+        const runtimeEnrichment = getRuntimeEnrichmentState();
         const enrichmentActive = runtimeEnrichment.active || enrichmentQueueLength > 0;
-        setEnrichmentState(enrichmentActive, enrichmentQueueLength);
+        setRuntimeEnrichmentState(enrichmentActive, enrichmentQueueLength);
         const hasIndexedAssets = Number(totalAssets) > 0;
         const hasIndexTimestamp = Boolean(counters?.last_index_end || counters?.last_scan_end);
         const indexHealthy = hasIndexedAssets && hasIndexTimestamp;
@@ -2010,7 +2013,7 @@ function _statusHasActiveWork(counters) {
     if (!counters || typeof counters !== "object") return false;
     if (_maintenanceActive) return true;
     try {
-        if (getEnrichmentState()?.active) return true;
+        if (getRuntimeEnrichmentState()?.active) return true;
     } catch (e) {
         console.debug?.(e);
     }

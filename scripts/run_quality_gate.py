@@ -44,7 +44,8 @@ DEFAULT_PYTEST_ARGS = [
     "-q",
     "--cov=mjr_am_backend",
     "--cov=mjr_am_shared",
-    "--cov-fail-under=60",
+    "--cov-branch",
+    "--cov-fail-under=68",
     "--cov-report=xml",
     "--cov-report=term-missing:skip-covered",
 ]

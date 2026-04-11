@@ -1,14 +1,22 @@
 /**
  * Global state key registry for Majoor Assets Manager.
  *
- * All `window`-level keys used by this extension are listed here to avoid
- * accidental collisions with other extensions or user scripts.
+ * This module is now a **thin shim** over the Pinia store
+ * `useRuntimeStore` (js/stores/useRuntimeStore.js).
  *
- * | Key / Symbol                                              | File            | Purpose                          |
- * |-----------------------------------------------------------|-----------------|----------------------------------|
- * | Symbol.for("majoor.assets_manager.runtime_state")         | runtimeState.js | Extension runtime state object   |
- * | window["__MJR_VIDEO_THUMBS__"]                            | Card.js         | Video thumbnail manager singleton|
+ * When Pinia is active (Vue mounted), reads and writes are forwarded to the
+ * reactive store.  Before Pinia is ready (early bootstrap), the legacy
+ * Symbol-keyed globalThis fallback is used so the extension never crashes.
+ *
+ * Consumers do NOT need to change their imports — this file keeps the same
+ * public API: getRuntimeState, setRuntimeStatePatch, setEnrichmentState,
+ * getEnrichmentState.
  */
+
+export {
+    getRuntimeEnrichmentState as getEnrichmentState,
+    setRuntimeEnrichmentState as setEnrichmentState,
+} from "../stores/runtimeEnrichmentState.js";
 
 const RUNTIME_STATE_KEY = Symbol.for("majoor.assets_manager.runtime_state");
 
@@ -57,18 +65,4 @@ export function setRuntimeStatePatch(patch = {}) {
         console.debug?.(e);
     }
     return state;
-}
-
-export function setEnrichmentState(active, queueLength) {
-    const state = getRuntimeState();
-    state.enrichmentActive = !!active;
-    state.enrichmentQueueLength = Math.max(0, Number(queueLength || 0) || 0);
-}
-
-export function getEnrichmentState() {
-    const state = getRuntimeState();
-    return {
-        active: !!state.enrichmentActive,
-        queueLength: Math.max(0, Number(state.enrichmentQueueLength || 0) || 0),
-    };
 }

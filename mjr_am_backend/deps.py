@@ -136,7 +136,7 @@ def _build_services_dict(
     return services
 
 
-async def _load_watcher_scope_or_default(db: Sqlite) -> dict:
+async def _load_watcher_scope_or_default(db: Sqlite) -> dict[str, str]:
     try:
         return await load_watcher_scope(db)
     except Exception as exc:
@@ -251,7 +251,12 @@ async def build_services(db_path: str | None = None) -> Result[dict]:
 async def _create_watcher(index_service: IndexService) -> OutputWatcher:
     """Create and start the file watcher for output directories."""
 
-    async def index_callback(filepaths: list, base_dir: str, source: str | None = None, root_id: str | None = None):
+    async def index_callback(
+        filepaths: list,
+        base_dir: str,
+        source: str | None = None,
+        root_id: str | None = None,
+    ) -> None:
         """Called by watcher when files are ready to index."""
         if not filepaths:
             return
@@ -276,7 +281,12 @@ async def _create_watcher(index_service: IndexService) -> OutputWatcher:
                 root_id=root_id,
             )
 
-    async def remove_callback(filepaths: list, _base_dir: str, _source: str | None = None, _root_id: str | None = None):
+    async def remove_callback(
+        filepaths: list,
+        _base_dir: str,
+        _source: str | None = None,
+        _root_id: str | None = None,
+    ) -> None:
         if not filepaths:
             return
         for fp in filepaths:
@@ -286,7 +296,12 @@ async def _create_watcher(index_service: IndexService) -> OutputWatcher:
                 logger.debug("Watcher remove callback failed for %s: %s", fp, exc)
                 continue
 
-    async def move_callback(moves: list, _base_dir: str, _source: str | None = None, _root_id: str | None = None):
+    async def move_callback(
+        moves: list,
+        _base_dir: str,
+        _source: str | None = None,
+        _root_id: str | None = None,
+    ) -> None:
         if not moves:
             return
         for move in moves:

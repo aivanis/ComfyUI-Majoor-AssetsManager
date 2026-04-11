@@ -181,7 +181,10 @@ def has_exiftool() -> bool:
             _TOOL_CACHE["exiftool"] = available
 
             if available:
-                assert result is not None
+                if result is None:
+                    logger.warning("ExifTool probe returned available=True but no result object")
+                    _TOOL_CACHE["exiftool"] = False
+                    return False
                 version = result.stdout.strip()
                 _TOOL_VERSIONS["exiftool"] = version
                 if not _enforce_min_version("ExifTool", version, EXIFTOOL_MIN_VERSION):
@@ -213,7 +216,10 @@ def has_ffprobe() -> bool:
             _TOOL_CACHE["ffprobe"] = available
 
             if available:
-                assert result is not None
+                if result is None:
+                    logger.warning("FFprobe probe returned available=True but no result object")
+                    _TOOL_CACHE["ffprobe"] = False
+                    return False
                 version_line = result.stdout.split("\n")[0] if result.stdout else ""
                 version = version_line.strip()
                 _TOOL_VERSIONS["ffprobe"] = version
@@ -257,7 +263,7 @@ def get_tool_status() -> dict[str, Any]:
     }
 
 
-def reset_tool_cache():
+def reset_tool_cache() -> None:
     """Reset tool detection cache (for testing or manual refresh)."""
     global _TOOL_CACHE, _TOOL_VERSIONS
     with _TOOL_CACHE_LOCK:

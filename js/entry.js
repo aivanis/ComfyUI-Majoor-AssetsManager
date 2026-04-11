@@ -46,7 +46,7 @@ import { ENDPOINTS } from "./api/endpoints.js";
 import { comfyToast } from "./app/toast.js";
 import { t } from "./app/i18n.js";
 import { APP_CONFIG } from "./app/config.js";
-import { getEnrichmentState, setEnrichmentState } from "./app/runtimeState.js";
+import { getRuntimeEnrichmentState, setRuntimeEnrichmentState } from "./stores/runtimeEnrichmentState.js";
 import { reportError } from "./utils/logging.js";
 import { app } from "../../scripts/app.js";
 import { registerRealtimeListeners } from "./features/runtime/registerRealtimeListeners.js";
@@ -248,8 +248,8 @@ async function setupApiListeners(runtimeApp, executionRuntime) {
         pushGeneratedAsset,
         upsertAsset,
         removeAssetsFromGrid,
-        getEnrichmentState,
-        setEnrichmentState,
+        getEnrichmentState: getRuntimeEnrichmentState,
+        setEnrichmentState: setRuntimeEnrichmentState,
         comfyToast,
         t,
         reportError,

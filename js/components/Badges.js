@@ -2,7 +2,7 @@
  * Badges Component - File type, rating, tags badges
  */
 import { resolveAssetStatusDotColor } from "../features/status/AssetStatusDotTheme.js";
-import { getEnrichmentState } from "../app/runtimeState.js";
+import { getRuntimeEnrichmentState } from "../stores/runtimeEnrichmentState.js";
 import { detectKind } from "../features/grid/AssetCardRenderer.js";
 
 /**
@@ -237,7 +237,7 @@ export function createWorkflowDot(asset) {
 
     const hasWorkflow = toBoolish(asset?.has_workflow ?? asset?.hasWorkflow);
     const hasGen = toBoolish(asset?.has_generation_data ?? asset?.hasGenerationData);
-    const enrichment = getEnrichmentState();
+    const enrichment = getRuntimeEnrichmentState();
     const enrichmentQueue = enrichment.queueLength;
     const enrichmentActive = enrichment.active || enrichmentQueue > 0;
 

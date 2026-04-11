@@ -1,5 +1,14 @@
 """
 Application settings persisted in the local metadata store.
+
+Cache strategy
+--------------
+Settings reads are cached in a bounded ``_VersionedTTLCache`` (maxsize=256,
+TTL=10 s).  Each entry is tagged with a per-scope *settings version* counter
+so that writes on any node/process invalidate stale reads within the TTL
+window.  The version counter itself is cached for 1 s to avoid hitting the
+DB on every read.  Expired and over-capacity entries are evicted lazily on
+the next ``get`` or ``put`` call — no background thread is required.
 """
 from __future__ import annotations
 
@@ -13,9 +22,9 @@ from collections.abc import Mapping
 from typing import Any
 
 from .config import (
+    _OUTPUT_DIR_OVERRIDE_FILE_PATH,
     MEDIA_PROBE_BACKEND,
     OUTPUT_ROOT,
-    _OUTPUT_DIR_OVERRIDE_FILE_PATH,
     is_execution_grouping_enabled,
     is_vector_search_enabled,
 )
@@ -81,17 +90,60 @@ _USER_SCOPED_SETTING_KEYS = frozenset(
 )
 
 
+class _VersionedTTLCache:
+    """Bounded TTL + version-aware cache.
+
+    Entries expire after *ttl_s* seconds **or** when the stored version no
+    longer matches the current version supplied at read time.  The cache
+    automatically evicts stale entries and never grows beyond *maxsize*.
+    """
+
+    __slots__ = ("_data", "_maxsize", "_ttl_s")
+
+    def __init__(self, *, ttl_s: float, maxsize: int = 256) -> None:
+        self._data: dict[str, tuple[str, float, int]] = {}
+        self._maxsize = max(1, maxsize)
+        self._ttl_s = max(0.0, ttl_s)
+
+    def get(self, key: str, *, version: int | None = None) -> str | None:
+        entry = self._data.get(key)
+        if entry is None:
+            return None
+        value, ts, ver = entry
+        if version is not None and ver != version:
+            self._data.pop(key, None)
+            return None
+        if (time.monotonic() - ts) >= self._ttl_s:
+            self._data.pop(key, None)
+            return None
+        return value
+
+    def put(self, key: str, value: str, *, version: int) -> None:
+        if len(self._data) >= self._maxsize and key not in self._data:
+            self._evict_oldest()
+        self._data[key] = (value, time.monotonic(), version)
+
+    def _evict_oldest(self) -> None:
+        now = time.monotonic()
+        # First pass: remove expired entries.
+        expired = [k for k, (_, ts, _) in self._data.items() if (now - ts) >= self._ttl_s]
+        for k in expired:
+            self._data.pop(k, None)
+        # Still full? Remove the oldest entry.
+        if len(self._data) >= self._maxsize and self._data:
+            oldest_key = min(self._data, key=lambda k: self._data[k][1])
+            self._data.pop(oldest_key, None)
+
+
 class AppSettings:
     """
     Simple settings manager backed by the metadata table.
     """
 
-    def __init__(self, db):
+    def __init__(self, db) -> None:
         self._db = db
         self._lock = asyncio.Lock()
-        self._cache: dict[str, str] = {}
-        self._cache_at: dict[str, float] = {}
-        self._cache_version: dict[str, int] = {}
+        self._cache = _VersionedTTLCache(ttl_s=_SETTINGS_CACHE_TTL_S, maxsize=256)
         self._cache_ttl_s = _SETTINGS_CACHE_TTL_S
         self._version_cache_ttl_s = _VERSION_CACHE_TTL_S
         self._version_cached: dict[str, int] = {}
@@ -667,24 +719,11 @@ class AppSettings:
             return mode
 
     def _cached_probe_backend(self, cache_key: str, current_version: int) -> str:
-        cached = str(self._cache.get(cache_key) or "")
-        if not cached:
-            return ""
-        try:
-            ts = float(self._cache_at.get(cache_key) or 0.0)
-        except Exception:
-            ts = 0.0
-        cached_ver = int(self._cache_version.get(cache_key) or 0)
-        if cached_ver != int(current_version or 0):
-            return ""
-        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
-            return ""
-        return cached
+        cached = self._cache.get(cache_key, version=current_version)
+        return cached or ""
 
     def _store_probe_backend_cache(self, cache_key: str, mode: str, current_version: int) -> None:
-        self._cache[cache_key] = mode
-        self._cache_at[cache_key] = time.monotonic()
-        self._cache_version[cache_key] = int(current_version or 0)
+        self._cache.put(cache_key, mode, version=current_version)
 
     async def set_probe_backend(self, mode: str) -> Result[str]:
         """Persist the media probe backend mode and bump the settings version."""
@@ -704,11 +743,9 @@ class AppSettings:
                         logger.warning("Failed to bump settings version: %s", bump.error)
                     except Exception:
                         pass
-                self._cache[cache_key] = normalized
-                self._cache_at[cache_key] = time.monotonic()
-                self._cache_version[cache_key] = int(
+                self._cache.put(cache_key, normalized, version=int(
                     bump.data or await self._get_settings_version(user_scoped=True, user_id=user_id) or 0
-                )
+                ))
                 logger.info("Media probe backend set to %s", normalized)
                 return Result.Ok(normalized)
             return Result.Err("DB_ERROR", result.error or "Failed to persist probe backend")
@@ -762,17 +799,8 @@ class AppSettings:
         default: bool,
         current_version: int,
     ) -> bool | None:
-        cached = self._cache.get(storage_key)
+        cached = self._cache.get(storage_key, version=current_version)
         if cached is None:
-            return None
-        try:
-            ts = float(self._cache_at.get(storage_key) or 0.0)
-        except Exception:
-            ts = 0.0
-        cached_ver = int(self._cache_version.get(storage_key) or 0)
-        if cached_ver != int(current_version or 0):
-            return None
-        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
             return None
         return parse_bool(cached, default)
 
@@ -787,9 +815,7 @@ class AppSettings:
     ) -> bool:
         raw = await self._read_setting(storage_key, user_scoped=True, user_id=user_id)
         parsed = parse_bool(raw, default) if raw is not None else default
-        self._cache[cache_key] = "1" if parsed else "0"
-        self._cache_at[cache_key] = time.monotonic()
-        self._cache_version[cache_key] = int(current_version or 0)
+        self._cache.put(cache_key, "1" if parsed else "0", version=current_version)
         return parsed
 
     async def set_metadata_fallback_prefs(
@@ -821,9 +847,7 @@ class AppSettings:
             current_version = int(bump.data or await self._get_settings_version(user_scoped=True, user_id=user_id) or 0)
             for key, value in to_write.items():
                 cache_key = self._storage_key(key, user_scoped=True, user_id=user_id)
-                self._cache[cache_key] = "1" if value else "0"
-                self._cache_at[cache_key] = time.monotonic()
-                self._cache_version[cache_key] = current_version
+                self._cache.put(cache_key, "1" if value else "0", version=current_version)
 
             return Result.Ok(self._current_metadata_fallback_prefs_from_cache(user_id=user_id))
 
@@ -836,38 +860,18 @@ class AppSettings:
                 return cached
             raw = await self._read_setting(_VECTOR_SEARCH_ENABLED_KEY)
             enabled = parse_bool(raw, self._default_vector_search_enabled) if raw is not None else self._default_vector_search_enabled
-            self._cache[_VECTOR_SEARCH_ENABLED_KEY] = "1" if enabled else "0"
-            self._cache_at[_VECTOR_SEARCH_ENABLED_KEY] = time.monotonic()
-            self._cache_version[_VECTOR_SEARCH_ENABLED_KEY] = int(current_version or 0)
+            self._cache.put(_VECTOR_SEARCH_ENABLED_KEY, "1" if enabled else "0", version=current_version)
             return enabled
 
     def _cached_vector_search_pref(self, current_version: int) -> bool | None:
-        cached = self._cache.get(_VECTOR_SEARCH_ENABLED_KEY)
+        cached = self._cache.get(_VECTOR_SEARCH_ENABLED_KEY, version=current_version)
         if cached is None:
-            return None
-        try:
-            ts = float(self._cache_at.get(_VECTOR_SEARCH_ENABLED_KEY) or 0.0)
-        except Exception:
-            ts = 0.0
-        cached_ver = int(self._cache_version.get(_VECTOR_SEARCH_ENABLED_KEY) or 0)
-        if cached_ver != int(current_version or 0):
-            return None
-        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
             return None
         return parse_bool(cached, self._default_vector_search_enabled)
 
     def _cached_execution_grouping_pref(self, current_version: int) -> bool | None:
-        cached = self._cache.get(_EXECUTION_GROUPING_ENABLED_KEY)
+        cached = self._cache.get(_EXECUTION_GROUPING_ENABLED_KEY, version=current_version)
         if cached is None:
-            return None
-        try:
-            ts = float(self._cache_at.get(_EXECUTION_GROUPING_ENABLED_KEY) or 0.0)
-        except Exception:
-            ts = 0.0
-        cached_ver = int(self._cache_version.get(_EXECUTION_GROUPING_ENABLED_KEY) or 0)
-        if cached_ver != int(current_version or 0):
-            return None
-        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
             return None
         return parse_bool(cached, self._default_execution_grouping_enabled)
 
@@ -886,9 +890,7 @@ class AppSettings:
                 except Exception:
                     pass
             current_version = int(bump.data or await self._get_settings_version() or 0)
-            self._cache[_VECTOR_SEARCH_ENABLED_KEY] = "1" if normalized else "0"
-            self._cache_at[_VECTOR_SEARCH_ENABLED_KEY] = time.monotonic()
-            self._cache_version[_VECTOR_SEARCH_ENABLED_KEY] = current_version
+            self._cache.put(_VECTOR_SEARCH_ENABLED_KEY, "1" if normalized else "0", version=current_version)
             return Result.Ok(normalized)
 
     async def get_execution_grouping_enabled(self) -> bool:
@@ -904,9 +906,7 @@ class AppSettings:
                 if raw is not None
                 else self._default_execution_grouping_enabled
             )
-            self._cache[_EXECUTION_GROUPING_ENABLED_KEY] = "1" if enabled else "0"
-            self._cache_at[_EXECUTION_GROUPING_ENABLED_KEY] = time.monotonic()
-            self._cache_version[_EXECUTION_GROUPING_ENABLED_KEY] = int(current_version or 0)
+            self._cache.put(_EXECUTION_GROUPING_ENABLED_KEY, "1" if enabled else "0", version=current_version)
             return enabled
 
     @staticmethod
@@ -937,9 +937,7 @@ class AppSettings:
                 except Exception:
                     pass
             current_version = int(bump.data or await self._get_settings_version() or 0)
-            self._cache[_EXECUTION_GROUPING_ENABLED_KEY] = "1" if normalized else "0"
-            self._cache_at[_EXECUTION_GROUPING_ENABLED_KEY] = time.monotonic()
-            self._cache_version[_EXECUTION_GROUPING_ENABLED_KEY] = current_version
+            self._cache.put(_EXECUTION_GROUPING_ENABLED_KEY, "1" if normalized else "0", version=current_version)
             return Result.Ok(normalized)
 
     async def get_huggingface_token_info(self) -> dict[str, Any]:
@@ -1011,23 +1009,12 @@ class AppSettings:
                 return cached
             raw = await self._read_setting(_AI_VERBOSE_LOGS_KEY)
             enabled = parse_bool(raw, self._default_ai_verbose_logs) if raw is not None else self._default_ai_verbose_logs
-            self._cache[_AI_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
-            self._cache_at[_AI_VERBOSE_LOGS_KEY] = time.monotonic()
-            self._cache_version[_AI_VERBOSE_LOGS_KEY] = int(current_version or 0)
+            self._cache.put(_AI_VERBOSE_LOGS_KEY, "1" if enabled else "0", version=current_version)
             return enabled
 
     def _cached_ai_verbose_logs_pref(self, current_version: int) -> bool | None:
-        cached = self._cache.get(_AI_VERBOSE_LOGS_KEY)
+        cached = self._cache.get(_AI_VERBOSE_LOGS_KEY, version=current_version)
         if cached is None:
-            return None
-        try:
-            ts = float(self._cache_at.get(_AI_VERBOSE_LOGS_KEY) or 0.0)
-        except Exception:
-            ts = 0.0
-        cached_ver = int(self._cache_version.get(_AI_VERBOSE_LOGS_KEY) or 0)
-        if cached_ver != int(current_version or 0):
-            return None
-        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
             return None
         return parse_bool(cached, self._default_ai_verbose_logs)
 
@@ -1046,9 +1033,7 @@ class AppSettings:
                 except Exception:
                     pass
             current_version = int(bump.data or await self._get_settings_version() or 0)
-            self._cache[_AI_VERBOSE_LOGS_KEY] = "1" if normalized else "0"
-            self._cache_at[_AI_VERBOSE_LOGS_KEY] = time.monotonic()
-            self._cache_version[_AI_VERBOSE_LOGS_KEY] = current_version
+            self._cache.put(_AI_VERBOSE_LOGS_KEY, "1" if normalized else "0", version=current_version)
             return Result.Ok(normalized)
 
     async def get_route_verbose_logs_enabled(self) -> bool:
@@ -1064,23 +1049,12 @@ class AppSettings:
                 if raw is not None
                 else self._default_route_verbose_logs
             )
-            self._cache[_ROUTE_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
-            self._cache_at[_ROUTE_VERBOSE_LOGS_KEY] = time.monotonic()
-            self._cache_version[_ROUTE_VERBOSE_LOGS_KEY] = int(current_version or 0)
+            self._cache.put(_ROUTE_VERBOSE_LOGS_KEY, "1" if enabled else "0", version=current_version)
             return enabled
 
     def _cached_route_verbose_logs_pref(self, current_version: int) -> bool | None:
-        cached = self._cache.get(_ROUTE_VERBOSE_LOGS_KEY)
+        cached = self._cache.get(_ROUTE_VERBOSE_LOGS_KEY, version=current_version)
         if cached is None:
-            return None
-        try:
-            ts = float(self._cache_at.get(_ROUTE_VERBOSE_LOGS_KEY) or 0.0)
-        except Exception:
-            ts = 0.0
-        cached_ver = int(self._cache_version.get(_ROUTE_VERBOSE_LOGS_KEY) or 0)
-        if cached_ver != int(current_version or 0):
-            return None
-        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
             return None
         return parse_bool(cached, self._default_route_verbose_logs)
 
@@ -1099,9 +1073,7 @@ class AppSettings:
                 except Exception:
                     pass
             current_version = int(bump.data or await self._get_settings_version() or 0)
-            self._cache[_ROUTE_VERBOSE_LOGS_KEY] = "1" if normalized else "0"
-            self._cache_at[_ROUTE_VERBOSE_LOGS_KEY] = time.monotonic()
-            self._cache_version[_ROUTE_VERBOSE_LOGS_KEY] = current_version
+            self._cache.put(_ROUTE_VERBOSE_LOGS_KEY, "1" if normalized else "0", version=current_version)
             return Result.Ok(normalized)
 
     async def get_startup_verbose_logs_enabled(self) -> bool:
@@ -1117,23 +1089,12 @@ class AppSettings:
                 if raw is not None
                 else self._default_startup_verbose_logs
             )
-            self._cache[_STARTUP_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
-            self._cache_at[_STARTUP_VERBOSE_LOGS_KEY] = time.monotonic()
-            self._cache_version[_STARTUP_VERBOSE_LOGS_KEY] = int(current_version or 0)
+            self._cache.put(_STARTUP_VERBOSE_LOGS_KEY, "1" if enabled else "0", version=current_version)
             return enabled
 
     def _cached_startup_verbose_logs_pref(self, current_version: int) -> bool | None:
-        cached = self._cache.get(_STARTUP_VERBOSE_LOGS_KEY)
+        cached = self._cache.get(_STARTUP_VERBOSE_LOGS_KEY, version=current_version)
         if cached is None:
-            return None
-        try:
-            ts = float(self._cache_at.get(_STARTUP_VERBOSE_LOGS_KEY) or 0.0)
-        except Exception:
-            ts = 0.0
-        cached_ver = int(self._cache_version.get(_STARTUP_VERBOSE_LOGS_KEY) or 0)
-        if cached_ver != int(current_version or 0):
-            return None
-        if not ts or (time.monotonic() - ts) >= self._cache_ttl_s:
             return None
         return parse_bool(cached, self._default_startup_verbose_logs)
 
@@ -1152,9 +1113,7 @@ class AppSettings:
                 except Exception:
                     pass
             current_version = int(bump.data or await self._get_settings_version() or 0)
-            self._cache[_STARTUP_VERBOSE_LOGS_KEY] = "1" if normalized else "0"
-            self._cache_at[_STARTUP_VERBOSE_LOGS_KEY] = time.monotonic()
-            self._cache_version[_STARTUP_VERBOSE_LOGS_KEY] = current_version
+            self._cache.put(_STARTUP_VERBOSE_LOGS_KEY, "1" if normalized else "0", version=current_version)
             return Result.Ok(normalized)
 
     def _set_vector_search_env_vars(self, enabled: bool) -> None:
@@ -1395,9 +1354,7 @@ class AppSettings:
                 raw = await self._read_setting(_VECTOR_SEARCH_ENABLED_KEY)
                 enabled = parse_bool(raw, self._default_vector_search_enabled) if raw is not None else self._default_vector_search_enabled
                 self._set_vector_search_env_vars(enabled)
-                self._cache[_VECTOR_SEARCH_ENABLED_KEY] = "1" if enabled else "0"
-                self._cache_at[_VECTOR_SEARCH_ENABLED_KEY] = time.monotonic()
-                self._cache_version[_VECTOR_SEARCH_ENABLED_KEY] = int(await self._get_settings_version() or 0)
+                self._cache.put(_VECTOR_SEARCH_ENABLED_KEY, "1" if enabled else "0", version=int(await self._get_settings_version() or 0))
                 startup_log_info(
                     logger,
                     "Restored vector search setting on startup: %s",
@@ -1417,11 +1374,9 @@ class AppSettings:
                     else self._default_execution_grouping_enabled
                 )
                 self._set_execution_grouping_env_vars(enabled)
-                self._cache[_EXECUTION_GROUPING_ENABLED_KEY] = "1" if enabled else "0"
-                self._cache_at[_EXECUTION_GROUPING_ENABLED_KEY] = time.monotonic()
-                self._cache_version[_EXECUTION_GROUPING_ENABLED_KEY] = int(
+                self._cache.put(_EXECUTION_GROUPING_ENABLED_KEY, "1" if enabled else "0", version=int(
                     await self._get_settings_version() or 0
-                )
+                ))
                 startup_log_info(
                     "Restored execution grouping setting on startup: %s",
                     "enabled" if enabled else "disabled",
@@ -1452,9 +1407,7 @@ class AppSettings:
                 raw = await self._read_setting(_AI_VERBOSE_LOGS_KEY)
                 enabled = parse_bool(raw, self._default_ai_verbose_logs) if raw is not None else self._default_ai_verbose_logs
                 self._set_ai_verbose_logs_env_vars(enabled)
-                self._cache[_AI_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
-                self._cache_at[_AI_VERBOSE_LOGS_KEY] = time.monotonic()
-                self._cache_version[_AI_VERBOSE_LOGS_KEY] = int(await self._get_settings_version() or 0)
+                self._cache.put(_AI_VERBOSE_LOGS_KEY, "1" if enabled else "0", version=int(await self._get_settings_version() or 0))
                 startup_log_info(
                     logger,
                     "Restored AI verbose logs setting on startup: %s",
@@ -1474,11 +1427,9 @@ class AppSettings:
                     else self._default_route_verbose_logs
                 )
                 self._set_route_verbose_logs_env_vars(enabled)
-                self._cache[_ROUTE_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
-                self._cache_at[_ROUTE_VERBOSE_LOGS_KEY] = time.monotonic()
-                self._cache_version[_ROUTE_VERBOSE_LOGS_KEY] = int(
+                self._cache.put(_ROUTE_VERBOSE_LOGS_KEY, "1" if enabled else "0", version=int(
                     await self._get_settings_version() or 0
-                )
+                ))
                 startup_log_info(
                     logger,
                     "Restored verbose route registration logs setting on startup: %s",
@@ -1498,11 +1449,9 @@ class AppSettings:
                     else self._default_startup_verbose_logs
                 )
                 self._set_startup_verbose_logs_env_vars(enabled)
-                self._cache[_STARTUP_VERBOSE_LOGS_KEY] = "1" if enabled else "0"
-                self._cache_at[_STARTUP_VERBOSE_LOGS_KEY] = time.monotonic()
-                self._cache_version[_STARTUP_VERBOSE_LOGS_KEY] = int(
+                self._cache.put(_STARTUP_VERBOSE_LOGS_KEY, "1" if enabled else "0", version=int(
                     await self._get_settings_version() or 0
-                )
+                ))
                 startup_log_info(
                     logger,
                     "Restored verbose startup logs setting on startup: %s",

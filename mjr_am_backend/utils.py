@@ -7,8 +7,11 @@ import math
 import os
 from typing import Any
 
+from .shared import get_logger
+
 BOOL_TRUE_VALUES = frozenset({"1", "true", "yes", "on", "enabled"})
 BOOL_FALSE_VALUES = frozenset({"0", "false", "no", "off", "disabled"})
+logger = get_logger(__name__)
 
 
 def parse_bool(value: Any, default: bool = False) -> bool:
@@ -24,7 +27,8 @@ def parse_bool(value: Any, default: bool = False) -> bool:
             return False
         try:
             return bool(float(normalized))
-        except Exception:
+        except (ValueError, TypeError, OverflowError):
+            logger.debug("parse_bool could not coerce %r via float fallback", value)
             pass
     return default
 

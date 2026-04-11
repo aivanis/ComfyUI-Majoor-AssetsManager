@@ -1,5 +1,27 @@
 """
 Configuration for Majoor Assets Manager.
+
+Output directory resolution order
+=================================
+The output root is resolved at import time by ``_resolve_output_root()``.
+The **first** strategy that returns a valid directory wins:
+
+1. **Environment variable** – ``MJR_AM_OUTPUT_DIRECTORY`` or
+   ``MAJOOR_OUTPUT_DIRECTORY``, or the ``.mjr_output_directory_override``
+   file next to this package.
+2. **ComfyUI CLI argument** – ``--output-directory`` parsed from
+   ``comfy.cli_args`` (loaded lazily).
+3. **folder_paths module** – ``folder_paths.get_output_directory()`` from
+   the already-loaded ``sys.modules`` dict, then a fresh import.
+4. **sys.argv fallback** – ``--output-directory`` parsed from raw argv.
+5. **Filesystem heuristic** – walk parent directories looking for a ComfyUI
+   root (contains ``main.py`` + ``folder_paths.py``), then ``<root>/output``.
+6. **cwd fallback** – ``Path.cwd() / "output"`` (last resort).
+
+A log line at startup (level INFO) reports which strategy was selected.
+
+Input/index directory resolution follows a similar pattern; see
+``_resolve_index_dir()``.
 """
 import contextlib
 import logging
@@ -24,7 +46,7 @@ def _env_raw(*names: str, default: str | None = None) -> str | None:
             continue
         try:
             val = os.getenv(name)
-        except Exception:
+        except Exception:  # OK: os.getenv can raise on broken env (embedded runtimes)
             val = None
         if val is not None and str(val).strip() != "":
             return str(val).strip()
@@ -74,7 +96,7 @@ def _env_bool(default: bool, *names: str) -> bool:
         try:
             if name in os.environ:
                 return env_bool(name, default)
-        except Exception:
+        except Exception:  # OK: env access guard (embedded/restricted runtimes)
             continue
     return default
 
@@ -85,20 +107,25 @@ def _read_output_dir_override_from_file() -> str | None:
             return None
         raw = _OUTPUT_DIR_OVERRIDE_FILE_PATH.read_text(encoding="utf-8").strip()
         return raw or None
-    except Exception:
+    except Exception:  # OK: file may be missing/locked/corrupt — graceful fallback
         return None
 
 def _resolve_output_root() -> Path:
     resolved = _resolve_output_root_from_env()
     if resolved is not None:
+        logger.info("Selected output directory strategy=env path=%s", resolved)
         return resolved
     resolved = _resolve_output_root_from_comfy_cli()
     if resolved is not None:
+        logger.info("Selected output directory strategy=comfy_cli path=%s", resolved)
         return resolved
     resolved = _resolve_output_root_from_folder_paths()
     if resolved is not None:
+        logger.info("Selected output directory strategy=folder_paths path=%s", resolved)
         return resolved
-    return _resolve_output_root_fallback()
+    resolved = _resolve_output_root_fallback()
+    logger.info("Selected output directory strategy=fallback path=%s", resolved)
+    return resolved
 
 
 def _resolve_output_root_from_env() -> Path | None:
@@ -121,7 +148,7 @@ def _resolve_output_root_from_comfy_cli() -> Path | None:
         cli_out = getattr(comfy_args, "output_directory", None)
         if cli_out:
             return Path(str(cli_out)).expanduser().resolve()
-    except Exception:
+    except Exception:  # OK: comfy module may not be loaded yet or at all
         return None
     return None
 
@@ -171,10 +198,10 @@ def get_registered_model_paths() -> dict[str, list[str]]:
                 values = getter(category)
                 if values:
                     result[category] = [str(Path(v).resolve(strict=False)) for v in values]
-            except Exception:
+            except Exception:  # OK: individual category may be unregistered
                 continue
         return result
-    except Exception:
+    except Exception:  # OK: folder_paths module may be absent or broken
         return {}
 
 
@@ -183,7 +210,7 @@ def _folder_paths_output_dir_from_loaded_module() -> Path | None:
         fp_mod = sys.modules.get("folder_paths")
         if fp_mod and hasattr(fp_mod, "get_output_directory"):
             return Path(fp_mod.get_output_directory()).resolve()
-    except Exception:
+    except Exception:  # OK: folder_paths may not be loaded or may lack the method
         return None
     return None
 
@@ -248,11 +275,11 @@ def get_runtime_output_root() -> str:
     if env_path:
         try:
             return str(Path(env_path).expanduser().resolve())
-        except Exception:
+        except Exception:  # OK: path may be invalid — fall through to static output
             pass
     try:
         return str(Path(OUTPUT_ROOT).expanduser().resolve())
-    except Exception:
+    except Exception:  # OK: OUTPUT_ROOT already resolved at startup; str fallback is safe
         return str(OUTPUT_ROOT)
 
 
@@ -269,7 +296,7 @@ def _read_index_dir_override_from_file() -> str | None:
             return None
         raw = _INDEX_DIR_OVERRIDE_FILE_PATH.read_text(encoding="utf-8").strip()
         return raw or None
-    except Exception:
+    except Exception:  # OK: file may be missing/locked/corrupt — graceful fallback
         return None
 
 
@@ -279,16 +306,20 @@ def _resolve_index_dir() -> Path:
         raw = str(_read_index_dir_override_from_file() or "").strip()
     if raw:
         try:
-            return _normalize_index_dir_candidate(raw, OUTPUT_ROOT_PATH)
+            resolved = _normalize_index_dir_candidate(raw, OUTPUT_ROOT_PATH)
+            logger.info("Selected index directory strategy=override path=%s", resolved)
+            return resolved
         except Exception:
             logger.warning("Invalid index directory override: %s", raw)
-    return (OUTPUT_ROOT_PATH / "_mjr_index").resolve(strict=False)
+    resolved = (OUTPUT_ROOT_PATH / "_mjr_index").resolve(strict=False)
+    logger.info("Selected index directory strategy=default path=%s", resolved)
+    return resolved
 
 
 def get_runtime_index_dir() -> str:
     try:
         return str(_resolve_index_dir())
-    except Exception:
+    except Exception:  # OK: fallback to startup-resolved INDEX_DIR
         return str(INDEX_DIR)
 
 
@@ -300,7 +331,7 @@ def set_index_directory_override(path: str) -> str:
         try:
             if _INDEX_DIR_OVERRIDE_FILE_PATH.exists():
                 _INDEX_DIR_OVERRIDE_FILE_PATH.unlink()
-        except Exception:
+        except Exception:  # OK: best-effort cleanup of override file
             pass
         return ""
 
@@ -317,7 +348,7 @@ def _write_index_override_file_atomic(resolved: str) -> None:
     try:
         tmp.write_text(resolved + "\n", encoding="utf-8")
         tmp.replace(_INDEX_DIR_OVERRIDE_FILE_PATH)
-    except Exception:
+    except Exception:  # OK: atomic write failed — clean up temp file silently
         with contextlib.suppress(Exception):
             tmp.unlink(missing_ok=True)
 
@@ -349,15 +380,15 @@ def initialize_directories() -> None:
         _DIRS_INITIALIZED = True
 
 # External tool overrides (portable vs. system-wide)
-EXIFTOOL_BIN = _env_raw("MJR_AM_EXIFTOOL_PATH", "MAJOOR_EXIFTOOL_PATH", "MAJOOR_EXIFTOOL_BIN", default="exiftool")
-FFPROBE_BIN = _env_raw("MJR_AM_FFPROBE_PATH", "MAJOOR_FFPROBE_PATH", "MAJOOR_FFPROBE_BIN", default="ffprobe")
+EXIFTOOL_BIN: str = _env_raw("MJR_AM_EXIFTOOL_PATH", "MAJOOR_EXIFTOOL_PATH", "MAJOOR_EXIFTOOL_BIN", default="exiftool") or "exiftool"
+FFPROBE_BIN: str = _env_raw("MJR_AM_FFPROBE_PATH", "MAJOOR_FFPROBE_PATH", "MAJOOR_FFPROBE_BIN", default="ffprobe") or "ffprobe"
 
-TOOL_LOCATIONS = {
+TOOL_LOCATIONS: dict[str, str] = {
     "exiftool": EXIFTOOL_BIN,
     "ffprobe": FFPROBE_BIN,
 }
 
-def get_tool_paths():
+def get_tool_paths() -> dict[str, str]:
     """Return the resolved external tool executable paths."""
     return TOOL_LOCATIONS.copy()
 
