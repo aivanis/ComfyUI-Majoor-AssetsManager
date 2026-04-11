@@ -59,6 +59,7 @@ import {
     mountGlobalRuntime,
     registerAssetsSidebar,
     registerNativeCommands,
+    teardownTopBarMfvButton,
     teardownGeneratedFeed,
     teardownAssetsSidebar,
     teardownGlobalRuntime,
@@ -315,6 +316,7 @@ app.registerExtension({
             teardownGeneratedFeed,
             teardownAssetsSidebar,
             teardownGlobalRuntime,
+            teardownTopBarMfvButton,
             reportError,
         });
 

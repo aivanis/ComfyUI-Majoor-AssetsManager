@@ -32,6 +32,7 @@ import { mountKeepAlive, unmountKeepAlive } from "../../vue/createVueApp.js";
 import GlobalRuntimeApp from "../../vue/GlobalRuntime.vue";
 import AssetsManagerApp from "../../vue/App.vue";
 import GeneratedFeedApp from "../../vue/GeneratedFeedApp.vue";
+import { mountTopBarMfvButton, teardownTopBarMfvButton } from "./topBarMfvButton.js";
 
 // ── keep-alive mount keys ─────────────────────────────────────────────────────
 const GLOBAL_RUNTIME_ROOT_ID = "mjr-global-runtime-root";
@@ -61,15 +62,15 @@ function startEarlyFetch() {
     }
     const now = Date.now();
     const key = "output:*:mtime_desc"; // Default browse context
-    
+
     // Skip if we already have a valid prefetch
     if (_earlyFetchPromise && _earlyFetchKey === key && (now - _earlyFetchTimestamp) < EARLY_FETCH_TTL_MS) {
         return _earlyFetchPromise;
     }
-    
+
     _earlyFetchKey = key;
     _earlyFetchTimestamp = now;
-    
+
     try {
         const url = buildListURL({
             query: "*",
@@ -82,7 +83,7 @@ function startEarlyFetch() {
     } catch {
         _earlyFetchPromise = null;
     }
-    
+
     return _earlyFetchPromise;
 }
 
@@ -126,7 +127,9 @@ export function mountGlobalRuntime() {
     try {
         const root = ensureGlobalRuntimeRoot();
         if (!root) return false;
-        return mountKeepAlive(root, GlobalRuntimeApp, GLOBAL_RUNTIME_MOUNT_KEY);
+        const mounted = mountKeepAlive(root, GlobalRuntimeApp, GLOBAL_RUNTIME_MOUNT_KEY);
+        mountTopBarMfvButton();
+        return mounted;
     } catch {
         return false;
     }
@@ -142,6 +145,8 @@ export function teardownGlobalRuntime() {
         /* ignore */
     }
 }
+
+export { teardownTopBarMfvButton };
 
 // ── sidebar helpers ───────────────────────────────────────────────────────────
 
