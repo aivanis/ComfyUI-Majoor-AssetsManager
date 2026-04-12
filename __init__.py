@@ -13,9 +13,23 @@ import sys
 from pathlib import Path
 from typing import Any
 
-# ComfyUI extension metadata
+# ComfyUI extension metadata – populated from nodes.py below.
 NODE_CLASS_MAPPINGS: dict[str, Any] = {}
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {}
+
+try:
+    from .nodes import (
+        NODE_CLASS_MAPPINGS as _ncm,
+    )
+    from .nodes import (
+        NODE_DISPLAY_NAME_MAPPINGS as _ndnm,
+    )
+    NODE_CLASS_MAPPINGS.update(_ncm)
+    NODE_DISPLAY_NAME_MAPPINGS.update(_ndnm)
+except Exception:
+    logging.getLogger("majoor_assets_manager").debug(
+        "failed to import custom nodes", exc_info=True,
+    )
 # Resolved below after `root` is known; keep None as sentinel so imports
 # executed before root assignment don't accidentally use a relative path.
 WEB_DIRECTORY = None

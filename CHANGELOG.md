@@ -11,6 +11,12 @@ All notable changes to this project are documented in this file.
 - **Expandable Text Areas**: Collapse/expand long text inputs with a toggle button
 - **Sidebar Position Setting**: Choose right, left, or bottom placement for the Node Parameters sidebar via Settings; applies immediately without reload
 - **Toolbar Layout**: Run and Node Parameters buttons placed at far right for ergonomic access
+- **Topbar MFV Button**: New Viewer toggle button in the ComfyUI top action bar — open or close the Floating Viewer without opening the sidebar; highlights when the viewer is active
+
+### 🎉 New Features — Custom Nodes
+- **Majoor Save Image 💾**: Drop-in replacement for the built-in SaveImage node that persists `generation_time_ms` in PNG text chunks alongside prompt and workflow metadata; supports auto-detection of generation time from the prompt lifecycle
+- **Majoor Save Video 🎬**: Save IMAGE batches or VIDEO inputs as MP4 (h264 via PyAV), GIF, or WebP; embeds `generation_time_ms`, prompt, and workflow directly in the MP4 container metadata; optional PNG sidecar for first frame; supports audio muxing and configurable CRF quality
+- **Generation Time Extraction**: The metadata extraction pipeline now reads `generation_time_ms` from PNG text chunks and MP4 container format tags, so the value survives index resets and re-indexing
 
 ---
 

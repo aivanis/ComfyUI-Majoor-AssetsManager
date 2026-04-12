@@ -44,6 +44,7 @@ Welcome to the documentation hub for **Majoor Assets Manager** for ComfyUI.
 | **[RATINGS_TAGS_COLLECTIONS.md](RATINGS_TAGS_COLLECTIONS.md)** | Ratings, tags, and collections |
 | **[DRAG_DROP.md](DRAG_DROP.md)** | Drag and drop behavior |
 | **[AI_FEATURES.md](AI_FEATURES.md)** | Semantic search, auto-tags, and enrichment |
+| **[CUSTOM_NODES.md](CUSTOM_NODES.md)** | MajoorSaveImage & MajoorSaveVideo node reference |
 
 ### Plugin System
 | Document | Description |

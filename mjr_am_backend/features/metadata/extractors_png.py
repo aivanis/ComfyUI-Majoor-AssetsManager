@@ -21,7 +21,7 @@ def read_png_text_chunks(file_path: str) -> dict[str, Any]:
         return {}
 
     out: dict[str, Any] = {}
-    for key in ("prompt", "workflow", "parameters"):
+    for key in ("prompt", "workflow", "parameters", "generation_time_ms"):
         value = info.get(key)
         if isinstance(value, str) and value.strip():
             out[f"PNG:{key.capitalize()}"] = value

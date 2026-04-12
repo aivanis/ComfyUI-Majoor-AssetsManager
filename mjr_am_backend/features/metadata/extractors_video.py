@@ -16,6 +16,17 @@ def apply_video_ffprobe_fields(metadata: dict[str, Any], ffprobe_data: dict[str,
     metadata["fps"] = video_stream.get("r_frame_rate")
     metadata["duration"] = format_info.get("duration")
 
+    tags = format_info.get("tags") if isinstance(format_info, dict) else None
+    if isinstance(tags, dict):
+        gen_ms_raw = tags.get("generation_time_ms")
+        if gen_ms_raw is not None:
+            try:
+                ms = int(gen_ms_raw)
+                if 0 < ms < 86_400_000:
+                    metadata["generation_time_ms"] = ms
+            except (TypeError, ValueError):
+                pass
+
 
 def scan_video_workflow_prompt_from_sources(
     exif_data: dict[str, Any],

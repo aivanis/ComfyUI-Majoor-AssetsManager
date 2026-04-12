@@ -52,6 +52,7 @@ Useful links:
 - [ComfyUI Desktop Second-Screen Popup](#comfyui-desktop-second-screen-popup)
 - [Basic Usage](#basic-usage)
 - [Majoor Floating Viewer (MFV)](#majoor-floating-viewer-mfv)
+- [Custom Nodes](#custom-nodes)
 - [Hotkeys & Shortcuts](#hotkeys--shortcuts)
 - [Advanced Features](#advanced-features)
 - [AI Features (How to Use)](#ai-features-how-to-use)
@@ -297,6 +298,61 @@ Notes:
 - This host-side patch is only needed for Desktop builds that still block `about:blank` popups.
 - Browser-based ComfyUI does not require this Electron host patch.
 - If your Desktop build already allows these popup URLs, no extra host change is required.
+
+---
+
+## Custom Nodes
+
+Majoor Assets Manager ships two ComfyUI nodes that persist **generation timing metadata** directly inside the saved files. This allows the asset manager to index `generation_time_ms` alongside prompt/workflow data for every asset.
+
+Full reference: [`docs/CUSTOM_NODES.md`](docs/CUSTOM_NODES.md)
+
+### Majoor Save Image 💾
+
+Drop-in replacement for the built-in **SaveImage** node. Saves PNG files with `generation_time_ms` embedded in the PNG text chunks.
+
+| Input | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `images` | IMAGE | ✅ | — | The image batch to save |
+| `filename_prefix` | STRING | ✅ | `Majoor` | Filename prefix (supports ComfyUI `%date%` placeholders) |
+| `generation_time_ms` | INT | ❌ | `-1` (auto) | Generation time in ms. `-1` = auto-detect from prompt lifecycle |
+
+**Metadata written to each PNG:**
+- `prompt` — full ComfyUI prompt graph (JSON)
+- `workflow` — full workflow (JSON)
+- `generation_time_ms` — elapsed time since prompt start (ms)
+- `CreationTime` — ISO timestamp
+
+### Majoor Save Video 🎬
+
+Saves a **VIDEO** input or a batch of **IMAGE** frames as a video file. Supports MP4 (h264 via PyAV), GIF, and WebP.
+
+| Input | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `filename_prefix` | STRING | ✅ | `MajoorVideo` | Filename prefix |
+| `format` | COMBO | ✅ | `mp4 (h264)` | Output format: `mp4 (h264)`, `gif`, `webp` |
+| `images` | IMAGE | ❌ | — | Batch of frames (alternative to `video`) |
+| `video` | VIDEO | ❌ | — | A VIDEO input from LoadVideo/CreateVideo |
+| `frame_rate` | FLOAT | ❌ | `24.0` | FPS (ignored when VIDEO input carries its own rate) |
+| `loop_count` | INT | ❌ | `0` | Loop count for GIF/WebP (0 = infinite) |
+| `generation_time_ms` | INT | ❌ | `-1` (auto) | Generation time in ms. `-1` = auto-detect |
+| `audio` | AUDIO | ❌ | — | Audio track to mux into MP4 |
+| `crf` | INT | ❌ | `19` | Constant Rate Factor (0-63, lower = higher quality) |
+| `save_first_frame` | BOOLEAN | ❌ | `true` | Save a PNG sidecar of the first frame with full metadata |
+
+**MP4 container metadata:**
+- `prompt`, `workflow`, `generation_time_ms`, `CreationTime` — written via PyAV with `movflags=use_metadata_tags`
+
+**Notes:**
+- At least one of `images` or `video` must be connected
+- When a `video` input is connected, its native frame rate and audio are used automatically
+- GIF/WebP outputs rely on the PNG sidecar for metadata persistence
+
+### Auto-Detection of `generation_time_ms`
+
+When `generation_time_ms` is left at `-1` (default), the node reads the prompt start time from Majoor's `runtime_activity` module, which hooks into the ComfyUI prompt lifecycle. This gives an accurate wall-clock measurement of generation time without any manual wiring.
+
+If the Majoor nodes are **not** used, the asset manager falls back to its standard metadata extraction (EXIF dates, prompt graph analysis, etc.).
 
 ---
 

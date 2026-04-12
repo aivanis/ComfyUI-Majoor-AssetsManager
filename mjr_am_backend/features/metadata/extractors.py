@@ -1142,9 +1142,30 @@ def _apply_rating_tags_and_generation_time(metadata: dict[str, Any], exif_data: 
     if tags:
         metadata["tags"] = tags
 
+    gen_ms = _extract_generation_time_ms_from_exif(exif_data)
+    if gen_ms is not None:
+        metadata["generation_time_ms"] = gen_ms
+
     date_created = _extract_date_created(exif_data)
     if date_created:
         metadata["generation_time"] = date_created
+
+
+def _extract_generation_time_ms_from_exif(exif_data: dict[str, Any] | None) -> int | None:
+    """Extract generation_time_ms written by MajoorSaveImage/MajoorSaveVideo."""
+    if not exif_data:
+        return None
+    for key in ("PNG:Generation_time_ms", "generation_time_ms", "Generation_time_ms"):
+        value = exif_data.get(key)
+        if value is None:
+            continue
+        try:
+            ms = int(value)
+            if 0 < ms < 86_400_000:
+                return ms
+        except (TypeError, ValueError):
+            pass
+    return None
 
 
 def _apply_common_exif_fields(
