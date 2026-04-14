@@ -573,7 +573,8 @@ function _buildGrid(host, externalGridWrapper = null) {
         scrollElement: wrapper,
         virtualize: false,
         applyDefaultSettingsClasses: false,
-        emitWindowSelectionEvents: false,
+        // MFV listens on window selection events; feed selection changes must be forwarded too.
+        emitWindowSelectionEvents: true,
         onCardRendered: (card, asset) => {
             try {
                 _decorateFeedCard(host, card, asset);

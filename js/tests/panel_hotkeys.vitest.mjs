@@ -6,6 +6,14 @@ import {
 } from "../features/panel/controllers/panelHotkeysController.js";
 import { setHotkeysScope } from "../features/panel/controllers/hotkeysState.js";
 
+const panelRuntimeState = vi.hoisted(() => ({
+    activeGrid: null,
+}));
+
+vi.mock("../features/panel/panelRuntimeRefs.js", () => ({
+    getActiveGridContainer: vi.fn(() => panelRuntimeState.activeGrid),
+}));
+
 function createWindowStub() {
     const listeners = new Map();
     return {
@@ -29,6 +37,7 @@ function createWindowStub() {
 function createBoundElement() {
     const listeners = new Map();
     return {
+        _containsSet: new Set(),
         addEventListener(type, handler) {
             if (!listeners.has(type)) listeners.set(type, new Set());
             listeners.get(type).add(handler);
@@ -41,6 +50,9 @@ function createBoundElement() {
             for (const handler of handlers) {
                 handler(event);
             }
+        },
+        contains(target) {
+            return this._containsSet.has(target);
         },
     };
 }
@@ -65,6 +77,7 @@ beforeEach(() => {
         body: { nodeName: "BODY" },
         activeElement: null,
     };
+    panelRuntimeState.activeGrid = null;
     setHotkeysSuspended(false);
     setHotkeysScope(null);
 });
@@ -135,5 +148,27 @@ describe("panelHotkeysController", () => {
 
         expect(onToggleFloatingViewer).not.toHaveBeenCalled();
         expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it("lets grid navigation keys pass through when the active context is an asset grid", () => {
+        const controller = createPanelHotkeysController();
+        const boundEl = createBoundElement();
+        const activeGrid = {
+            contains: vi.fn((target) => target === document.body),
+        };
+        panelRuntimeState.activeGrid = activeGrid;
+        boundEl.isConnected = true;
+
+        controller.bind(boundEl);
+        document.activeElement = document.body;
+
+        const event = createKeyEvent("ArrowRight", {
+            closest: vi.fn(() => activeGrid),
+        });
+        window.dispatchEvent({ type: "keydown", ...event });
+
+        expect(event.preventDefault).not.toHaveBeenCalled();
+        expect(event.stopPropagation).not.toHaveBeenCalled();
+        expect(event.stopImmediatePropagation).not.toHaveBeenCalled();
     });
 });

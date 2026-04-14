@@ -26,6 +26,7 @@ import { requestViewerOpen } from "../viewer/viewerOpenRequest.js";
 import { showAddToCollectionMenu } from "../collections/contextmenu/addToCollectionMenu.js";
 import { normalizeRenameFilename, validateFilename } from "../../utils/filenames.js";
 import { getHotkeysState, isHotkeysSuspended } from "../panel/controllers/hotkeysState.js";
+import { getActiveGridContainer, setActiveGridContainer } from "../panel/panelRuntimeRefs.js";
 
 /**
  * Keyboard shortcut definitions
@@ -188,9 +189,23 @@ export function installGridKeyboard({
     if (!gridContainer) return { bind: () => {}, unbind: () => {}, dispose: () => {} };
 
     let keydownHandler = null;
+    let activateGridHandler = null;
     let bound = false;
     const openInViewer = ({ assets = [], index = 0, mode = "" } = {}) => {
         requestViewerOpen({ assets, index, mode });
+    };
+
+    const markGridActive = () => {
+        try {
+            setActiveGridContainer(gridContainer);
+        } catch (e) {
+            console.debug?.(e);
+        }
+        try {
+            window.__MJR_LAST_SELECTION_GRID__ = gridContainer;
+        } catch (e) {
+            console.debug?.(e);
+        }
     };
 
     const getSelection = () => {
@@ -356,6 +371,8 @@ export function installGridKeyboard({
         const nextId = String(assets[nextIndex]?.id || "");
         if (!nextId) return false;
 
+        markGridActive();
+
         if (e.shiftKey) {
             let anchorId = String(gridContainer?._mjrSelectionAnchorId || "");
             if (!anchorId) anchorId = currentId || nextId;
@@ -403,7 +420,7 @@ export function installGridKeyboard({
         // Allow if focus is:
         // 1. Inside grid (contains active)
         // 2. On grid parent wrapper (active contains grid)
-        // 3. On body (no specific focus)
+        // 3. On body, but only for the active grid
         // 4. On a card (explicit check though covered by 1 usually)
         if (document.activeElement !== document.body) {
             const active = document.activeElement;
@@ -412,6 +429,11 @@ export function installGridKeyboard({
             const isCard = active?.closest?.(".mjr-asset-card");
 
             if (!inGrid && !wrapsGrid && !isCard) {
+                return;
+            }
+        } else {
+            const activeGrid = getActiveGridContainer();
+            if (activeGrid && activeGrid !== gridContainer) {
                 return;
             }
         }
@@ -903,14 +925,22 @@ export function installGridKeyboard({
     const bind = () => {
         if (bound) return;
         keydownHandler = handleKeydown;
+        activateGridHandler = () => markGridActive();
         document.addEventListener("keydown", keydownHandler, true);
+        gridContainer.addEventListener("pointerdown", activateGridHandler, true);
+        gridContainer.addEventListener("focusin", activateGridHandler, true);
         bound = true;
     };
 
     const unbind = () => {
         if (!bound || !keydownHandler) return;
         document.removeEventListener("keydown", keydownHandler, true);
+        if (activateGridHandler) {
+            gridContainer.removeEventListener("pointerdown", activateGridHandler, true);
+            gridContainer.removeEventListener("focusin", activateGridHandler, true);
+        }
         keydownHandler = null;
+        activateGridHandler = null;
         bound = false;
         for (const t of _ratingDebounceTimers.values()) {
             try {

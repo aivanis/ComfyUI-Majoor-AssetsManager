@@ -88,6 +88,15 @@ import {
 } from "./floatingViewerLoader.js";
 import { disposeFloatingViewerProgressBar } from "./floatingViewerProgress.js";
 
+function _hasSimplePlayerControls(mediaEl) {
+    try {
+        return !!mediaEl?.classList?.contains("mjr-mfv-simple-player");
+    } catch (e) {
+        console.debug?.(e);
+        return false;
+    }
+}
+
 export { MFV_MODES } from "./floatingViewerConstants.js";
 
 let _mfvInstanceSeq = 0;
@@ -425,6 +434,7 @@ export class FloatingViewer {
             "wheel",
             (e) => {
                 if (e.target?.closest?.("audio")) return;
+                if (e.target?.closest?.(".mjr-mfv-simple-player-controls")) return;
                 if (isModel3DInteractionTarget(e.target)) return;
                 const scrollableAncestor = _findScrollableAncestor(e.target, contentEl);
                 if (
@@ -460,6 +470,7 @@ export class FloatingViewer {
                 // Let native video controls and the AB divider handle their own events.
                 if (e.target?.closest?.("video")) return;
                 if (e.target?.closest?.("audio")) return;
+                if (e.target?.closest?.(".mjr-mfv-simple-player-controls")) return;
                 if (e.target?.closest?.(".mjr-mfv-ab-divider")) return;
                 if (isModel3DInteractionTarget(e.target)) return;
                 e.preventDefault();
@@ -510,6 +521,7 @@ export class FloatingViewer {
             (e) => {
                 if (e.target?.closest?.("video")) return;
                 if (e.target?.closest?.("audio")) return;
+                if (e.target?.closest?.(".mjr-mfv-simple-player-controls")) return;
                 if (isModel3DInteractionTarget(e.target)) return;
                 const isNearFit = Math.abs(this._zoom - 1) < 0.05;
                 this._setMfvZoom(isNearFit ? Math.min(4, this._zoom * 4) : 1, e.clientX, e.clientY);
@@ -608,6 +620,9 @@ export class FloatingViewer {
             if (infoFrag) {
                 const ol = document.createElement("div");
                 ol.className = "mjr-mfv-geninfo";
+                if (_hasSimplePlayerControls(mediaEl)) {
+                    ol.classList.add("mjr-mfv-geninfo--above-player");
+                }
                 ol.appendChild(infoFrag);
                 wrap.appendChild(ol);
             }
@@ -664,6 +679,9 @@ export class FloatingViewer {
         if (fragA) {
             genInfoAEl = document.createElement("div");
             genInfoAEl.className = "mjr-mfv-geninfo-a";
+            if (_hasSimplePlayerControls(elA)) {
+                genInfoAEl.classList.add("mjr-mfv-geninfo--above-player");
+            }
             genInfoAEl.appendChild(fragA);
             // Limit right edge to divider so it doesn't bleed into B side.
             genInfoAEl.style.right = `calc(${100 - pct}% + 8px)`;
@@ -673,6 +691,9 @@ export class FloatingViewer {
         if (fragB) {
             genInfoBEl = document.createElement("div");
             genInfoBEl.className = "mjr-mfv-geninfo-b";
+            if (_hasSimplePlayerControls(elB)) {
+                genInfoBEl.classList.add("mjr-mfv-geninfo--above-player");
+            }
             genInfoBEl.appendChild(fragB);
             // Start at the divider — overrides CSS left:8px so it is never
             // clipped by layerB's clip-path.
@@ -748,9 +769,13 @@ export class FloatingViewer {
         if (fragSideA) {
             const oa = document.createElement("div");
             oa.className = "mjr-mfv-geninfo-a";
+            if (_hasSimplePlayerControls(elA)) {
+                oa.classList.add("mjr-mfv-geninfo--above-player");
+            }
             oa.appendChild(fragSideA);
             sideA.appendChild(oa);
         }
+
 
         const sideB = document.createElement("div");
         sideB.className = "mjr-mfv-side-panel";
@@ -763,9 +788,13 @@ export class FloatingViewer {
         if (fragSideB) {
             const ob = document.createElement("div");
             ob.className = "mjr-mfv-geninfo-b";
+            if (_hasSimplePlayerControls(elB)) {
+                ob.classList.add("mjr-mfv-geninfo--above-player");
+            }
             ob.appendChild(fragSideB);
             sideB.appendChild(ob);
         }
+
 
         container.appendChild(sideA);
         container.appendChild(sideB);
@@ -804,6 +833,9 @@ export class FloatingViewer {
                     if (frag) {
                         const overlay = document.createElement("div");
                         overlay.className = `mjr-mfv-geninfo-${label.toLowerCase()}`;
+                        if (_hasSimplePlayerControls(el)) {
+                            overlay.classList.add("mjr-mfv-geninfo--above-player");
+                        }
                         overlay.appendChild(frag);
                         cell.appendChild(overlay);
                     }

@@ -4,6 +4,7 @@ import {
     setHotkeysScope,
     setHotkeysSuspendedFlag,
 } from "./hotkeysState.js";
+import { getActiveGridContainer } from "../panelRuntimeRefs.js";
 
 export function setHotkeysSuspended(suspended) {
     setHotkeysSuspendedFlag(suspended);
@@ -53,6 +54,24 @@ export function createPanelHotkeysController({
         }
         try {
             return Boolean(boundEl?.isConnected) && document.activeElement === document.body;
+        } catch (e) {
+            console.debug?.(e);
+            return false;
+        }
+    };
+
+    const isGridHotkeyContext = (event) => {
+        try {
+            const targetGrid = event?.target?.closest?.(".mjr-grid");
+            if (targetGrid) return true;
+        } catch (e) {
+            console.debug?.(e);
+        }
+        try {
+            const activeGrid = getActiveGridContainer();
+            if (!activeGrid) return false;
+            if (document.activeElement === document.body) return true;
+            return activeGrid.contains?.(document.activeElement) || false;
         } catch (e) {
             console.debug?.(e);
             return false;
@@ -167,6 +186,7 @@ export function createPanelHotkeysController({
             // Never intercept while typing in inputs (e.g. tags editor in the sidebar).
             if (allowed.has(event.key) && isPanelHotkeyContext(event)) {
                 if (isTypingTarget) return;
+                if (isGridHotkeyContext(event)) return;
                 event.preventDefault();
                 event.stopPropagation();
                 event.stopImmediatePropagation?.();

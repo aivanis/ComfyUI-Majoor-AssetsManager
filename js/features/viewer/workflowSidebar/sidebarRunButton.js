@@ -13,10 +13,13 @@ const STATE = Object.freeze({ IDLE: "idle", RUNNING: "running", ERROR: "error" }
 const MFV_PREVIEW_METHODS = new Set(["default", "auto", "latent2rgb", "taesd", "none"]);
 
 /**
- * Create a Run button element.
- * @returns {{ el: HTMLButtonElement, dispose: () => void }}
+ * Create Run/Pause/Stop controls for MFV.
+ * @returns {{ el: HTMLDivElement, dispose: () => void }}
  */
 export function createRunButton() {
+    const wrap = document.createElement("div");
+    wrap.className = "mjr-mfv-run-controls";
+
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "mjr-icon-btn mjr-mfv-run-btn";
@@ -28,6 +31,17 @@ export function createRunButton() {
     icon.className = "pi pi-play";
     icon.setAttribute("aria-hidden", "true");
     btn.appendChild(icon);
+
+    const stopBtn = document.createElement("button");
+    stopBtn.type = "button";
+    stopBtn.className = "mjr-icon-btn mjr-mfv-stop-btn";
+    const stopIcon = document.createElement("i");
+    stopIcon.className = "pi pi-stop";
+    stopIcon.setAttribute("aria-hidden", "true");
+    stopBtn.appendChild(stopIcon);
+
+    wrap.appendChild(btn);
+    wrap.appendChild(stopBtn);
 
     let state = STATE.IDLE;
 
@@ -41,6 +55,25 @@ export function createRunButton() {
         } else {
             icon.className = "pi pi-play";
         }
+    }
+
+    function setStopLabel() {
+        const stopLabel = t("tooltip.queueStop", "Stop Generation");
+        stopBtn.title = stopLabel;
+        stopBtn.setAttribute("aria-label", stopLabel);
+    }
+
+    async function stopCurrentGeneration() {
+        const app = getComfyApp();
+        const api = getComfyApi(app);
+
+        if (api && typeof api.interrupt === "function") {
+            await api.interrupt();
+            return;
+        }
+
+        const resp = await fetch("/interrupt", { method: "POST" });
+        if (!resp.ok) throw new Error(`POST /interrupt failed (${resp.status})`);
     }
 
     async function handleClick() {
@@ -58,11 +91,29 @@ export function createRunButton() {
         }
     }
 
+    async function handleStopClick() {
+        if (state === STATE.RUNNING) return;
+        stopBtn.disabled = true;
+        try {
+            await stopCurrentGeneration();
+        } catch (e) {
+            console.error?.("[MFV Stop]", e);
+        } finally {
+            stopBtn.disabled = false;
+        }
+    }
+
+    setStopLabel();
+
     btn.addEventListener("click", handleClick);
+    stopBtn.addEventListener("click", handleStopClick);
 
     return {
-        el: btn,
-        dispose() { btn.removeEventListener("click", handleClick); },
+        el: wrap,
+        dispose() {
+            btn.removeEventListener("click", handleClick);
+            stopBtn.removeEventListener("click", handleStopClick);
+        },
     };
 }
 

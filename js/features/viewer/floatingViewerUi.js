@@ -48,6 +48,7 @@ export function renderFloatingViewer(viewer) {
         hostEl: el,
         onClose: () => viewer._updateSettingsBtnState(false),
     });
+
     viewer._contentWrapper.appendChild(viewer._sidebar.el);
 
     el.appendChild(viewer._contentWrapper);
@@ -478,6 +479,28 @@ export function buildFloatingViewerGenDropdown(viewer) {
     return d;
 }
 
+function formatFloatingViewerGenTime(totalSeconds) {
+    const seconds = Number(totalSeconds);
+    if (!Number.isFinite(seconds) || seconds <= 0) return "";
+    if (seconds >= 60) return `${(seconds / 60).toFixed(1)}m`;
+    return `${seconds.toFixed(1)}s`;
+}
+
+function parseFloatingViewerGenTimeSeconds(value) {
+    const text = String(value || "").trim().toLowerCase();
+    if (!text) return 0;
+    if (text.endsWith("m")) {
+        const mins = Number.parseFloat(text.slice(0, -1));
+        return Number.isFinite(mins) ? mins * 60 : 0;
+    }
+    if (text.endsWith("s")) {
+        const secs = Number.parseFloat(text.slice(0, -1));
+        return Number.isFinite(secs) ? secs : 0;
+    }
+    const fallback = Number.parseFloat(text);
+    return Number.isFinite(fallback) ? fallback : 0;
+}
+
 export function getFloatingViewerGenFields(_viewer, fileData) {
     if (!fileData) return {};
     try {
@@ -531,7 +554,7 @@ export function getFloatingViewerGenFields(_viewer, fileData) {
                 genTimeMs > 0 &&
                 genTimeMs < 86400000
             ) {
-                out.genTime = (Number(genTimeMs) / 1000).toFixed(1) + "s";
+                out.genTime = formatFloatingViewerGenTime(Number(genTimeMs) / 1000);
             }
             return out;
         }
@@ -568,7 +591,7 @@ export function getFloatingViewerGenFields(_viewer, fileData) {
         genTimeMsFallback > 0 &&
         genTimeMsFallback < 86400000
     ) {
-        out.genTime = (Number(genTimeMsFallback) / 1000).toFixed(1) + "s";
+        out.genTime = formatFloatingViewerGenTime(Number(genTimeMsFallback) / 1000);
     }
     return out;
 }
@@ -604,7 +627,7 @@ export function buildFloatingViewerGenInfoDOM(viewer, fileData) {
         if (k === "prompt") {
             div.appendChild(document.createTextNode(v));
         } else if (k === "genTime") {
-            const secs = parseFloat(v);
+            const secs = parseFloatingViewerGenTimeSeconds(v);
             let gtColor = "#4CAF50";
             if (secs >= 60) gtColor = "#FF9800";
             else if (secs >= 30) gtColor = "#FFC107";

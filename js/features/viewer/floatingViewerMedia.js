@@ -4,6 +4,7 @@ import {
     createModel3DMediaElement,
     MODEL3D_EXTS,
 } from "./model3dRenderer.js";
+import { mountFloatingViewerSimplePlayer } from "./floatingViewerSimplePlayer.js";
 
 const VIDEO_EXTS = new Set([".mp4", ".webm", ".mov", ".avi", ".mkv"]);
 const AUDIO_EXTS = new Set([".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac", ".opus", ".wma"]);
@@ -122,50 +123,41 @@ export function buildFloatingViewerMediaElement(fileData, { fill = false } = {})
     if (!url) return null;
     const kind = getFloatingViewerMediaKind(fileData);
     const mediaClass = `mjr-mfv-media mjr-mfv-media--fit-height${fill ? " mjr-mfv-media--fill" : ""}`;
+    const ext = getFloatingViewerMediaExt(fileData?.filename || "");
+    const isAnimatedWebp =
+        ext === ".webp" &&
+        Number(fileData?.duration ?? fileData?.metadata_raw?.duration ?? 0) > 0;
 
     if (kind === "audio") {
-        const wrap = document.createElement("div");
-        wrap.className = `mjr-mfv-audio-card${fill ? " mjr-mfv-audio-card--fill" : ""}`;
-
-        const head = document.createElement("div");
-        head.className = "mjr-mfv-audio-head";
-        const icon = document.createElement("i");
-        icon.className = "pi pi-volume-up mjr-mfv-audio-icon";
-        icon.setAttribute("aria-hidden", "true");
-        const title = document.createElement("div");
-        title.className = "mjr-mfv-audio-title";
-        title.textContent = String(fileData?.filename || "Audio");
-        head.appendChild(icon);
-        head.appendChild(title);
-
         const audio = document.createElement("audio");
-        audio.className = "mjr-mfv-audio-player";
+        audio.className = mediaClass;
         audio.src = url;
-        audio.controls = true;
+        audio.controls = false;
         audio.autoplay = true;
         audio.preload = "metadata";
+        audio.loop = true;
+        audio.muted = true;
         try {
             audio.addEventListener("loadedmetadata", () => attemptFloatingViewerAutoplay(audio), { once: true });
         } catch (e) {
             console.debug?.(e);
         }
         attemptFloatingViewerAutoplay(audio);
-
-        wrap.appendChild(head);
-        wrap.appendChild(audio);
-        return wrap;
+        const playerRoot = mountFloatingViewerSimplePlayer(audio, fileData, { kind: "audio" });
+        return playerRoot || audio;
     }
 
     if (kind === "video") {
         const v = document.createElement("video");
         v.className = mediaClass;
         v.src = url;
-        v.controls = true;
+        v.controls = false;
         v.loop = true;
         v.muted = true;
         v.autoplay = true;
         v.playsInline = true;
-        return v;
+        const playerRoot = mountFloatingViewerSimplePlayer(v, fileData, { kind: "video" });
+        return playerRoot || v;
     }
 
     if (kind === "model3d") {
@@ -183,6 +175,12 @@ export function buildFloatingViewerMediaElement(fileData, { fill = false } = {})
     img.src = url;
     img.alt = String(fileData?.filename || "");
     img.draggable = false;
+    if (kind === "gif" || isAnimatedWebp) {
+        const playerRoot = mountFloatingViewerSimplePlayer(img, fileData, {
+            kind: kind === "gif" ? "gif" : "animated-image",
+        });
+        return playerRoot || img;
+    }
     return img;
 }
 
