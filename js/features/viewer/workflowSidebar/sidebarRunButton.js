@@ -8,9 +8,19 @@
 import { getComfyApp, getComfyApi } from "../../../app/comfyApiBridge.js";
 import { APP_CONFIG } from "../../../app/config.js";
 import { t } from "../../../app/i18n.js";
+import {
+    ensureFloatingViewerProgressTracking,
+    floatingViewerProgressService,
+} from "../floatingViewerProgress.js";
 
-const STATE = Object.freeze({ IDLE: "idle", RUNNING: "running", ERROR: "error" });
+const STATE = Object.freeze({
+    IDLE: "idle",
+    RUNNING: "running",
+    STOPPING: "stopping",
+    ERROR: "error",
+});
 const MFV_PREVIEW_METHODS = new Set(["default", "auto", "latent2rgb", "taesd", "none"]);
+const PROGRESS_UPDATE_EVENT = "progress-update";
 
 /**
  * Create Run/Pause/Stop controls for MFV.
@@ -44,13 +54,26 @@ export function createRunButton() {
     wrap.appendChild(stopBtn);
 
     let state = STATE.IDLE;
+    let queuePending = false;
+    let stopPending = false;
+    let errorResetTimer = null;
 
-    function setState(newState) {
+    function clearErrorResetTimer() {
+        if (errorResetTimer == null) return;
+        clearTimeout(errorResetTimer);
+        errorResetTimer = null;
+    }
+
+    function setState(newState, { canStop = false } = {}) {
         state = newState;
         btn.classList.toggle("running", state === STATE.RUNNING);
+        btn.classList.toggle("stopping", state === STATE.STOPPING);
         btn.classList.toggle("error", state === STATE.ERROR);
-        btn.disabled = state === STATE.RUNNING;
-        if (state === STATE.RUNNING) {
+        btn.disabled = state === STATE.RUNNING || state === STATE.STOPPING;
+        stopBtn.disabled = !canStop || state === STATE.STOPPING;
+        stopBtn.classList.toggle("active", canStop && state !== STATE.STOPPING);
+        stopBtn.classList.toggle("stopping", state === STATE.STOPPING);
+        if (state === STATE.RUNNING || state === STATE.STOPPING) {
             icon.className = "pi pi-spin pi-spinner";
         } else {
             icon.className = "pi pi-play";
@@ -63,56 +86,148 @@ export function createRunButton() {
         stopBtn.setAttribute("aria-label", stopLabel);
     }
 
+    function syncFromProgress(
+        snapshot = floatingViewerProgressService.getSnapshot(),
+        { authoritative = false } = {},
+    ) {
+        const queue = Math.max(0, Number(snapshot?.queue) || 0);
+        const prompt = snapshot?.prompt || null;
+        const hasExecution = Boolean(prompt?.currentlyExecuting);
+        const hasQueuedPrompt = queue > 0 || Boolean(prompt && !prompt?.errorDetails);
+        const isError = Boolean(prompt?.errorDetails);
+
+        if (authoritative && queue === 0 && !prompt) {
+            queuePending = false;
+            stopPending = false;
+        }
+
+        const canStop = queuePending || stopPending || hasExecution || queue > 0;
+
+        if (hasExecution || hasQueuedPrompt || queue > 0) {
+            queuePending = false;
+        }
+
+        if (isError) {
+            stopPending = false;
+            clearErrorResetTimer();
+            setState(STATE.ERROR, { canStop: false });
+            return;
+        }
+
+        if (stopPending) {
+            if (!canStop) {
+                stopPending = false;
+                syncFromProgress(snapshot);
+                return;
+            }
+            setState(STATE.STOPPING, { canStop: false });
+            return;
+        }
+
+        if (queuePending || hasExecution || hasQueuedPrompt || queue > 0) {
+            clearErrorResetTimer();
+            setState(STATE.RUNNING, { canStop: true });
+            return;
+        }
+
+        clearErrorResetTimer();
+        setState(STATE.IDLE, { canStop: false });
+    }
+
+    function enterTransientErrorState() {
+        queuePending = false;
+        stopPending = false;
+        clearErrorResetTimer();
+        setState(STATE.ERROR, { canStop: false });
+        errorResetTimer = setTimeout(() => {
+            errorResetTimer = null;
+            syncFromProgress();
+        }, 1500);
+    }
+
     async function stopCurrentGeneration() {
         const app = getComfyApp();
         const api = getComfyApi(app);
 
         if (api && typeof api.interrupt === "function") {
             await api.interrupt();
-            return;
+            return { tracked: true };
+        }
+
+        if (api && typeof api.fetchApi === "function") {
+            const resp = await api.fetchApi("/interrupt", { method: "POST" });
+            if (!resp?.ok) throw new Error(`POST /interrupt failed (${resp?.status})`);
+            return { tracked: true };
         }
 
         const resp = await fetch("/interrupt", { method: "POST" });
         if (!resp.ok) throw new Error(`POST /interrupt failed (${resp.status})`);
+        return { tracked: false };
     }
 
     async function handleClick() {
-        if (state === STATE.RUNNING) return;
-        setState(STATE.RUNNING);
+        if (state === STATE.RUNNING || state === STATE.STOPPING) return;
+        queuePending = true;
+        stopPending = false;
+        syncFromProgress();
         try {
-            await queueCurrentPrompt();
-            setState(STATE.IDLE);
+            const result = await queueCurrentPrompt();
+            if (!result?.tracked) {
+                queuePending = false;
+            }
+            syncFromProgress();
         } catch (e) {
             console.error?.("[MFV Run]", e);
-            setState(STATE.ERROR);
-            setTimeout(() => {
-                if (state === STATE.ERROR) setState(STATE.IDLE);
-            }, 1500);
+            enterTransientErrorState();
         }
     }
 
     async function handleStopClick() {
-        if (state === STATE.RUNNING) return;
-        stopBtn.disabled = true;
+        if (state !== STATE.RUNNING) return;
+        stopPending = true;
+        syncFromProgress();
         try {
-            await stopCurrentGeneration();
+            const result = await stopCurrentGeneration();
+            if (!result?.tracked) {
+                stopPending = false;
+                queuePending = false;
+            }
+            syncFromProgress();
         } catch (e) {
             console.error?.("[MFV Stop]", e);
+            stopPending = false;
+            syncFromProgress();
         } finally {
-            stopBtn.disabled = false;
+            // Progress events own the steady-state; this only clears fallback fetch cases.
         }
     }
 
     setStopLabel();
+    stopBtn.disabled = true;
 
     btn.addEventListener("click", handleClick);
     stopBtn.addEventListener("click", handleStopClick);
+    const handleProgressUpdate = (event) => {
+        syncFromProgress(event?.detail || floatingViewerProgressService.getSnapshot(), {
+            authoritative: true,
+        });
+    };
+    floatingViewerProgressService.addEventListener(PROGRESS_UPDATE_EVENT, handleProgressUpdate);
+    void ensureFloatingViewerProgressTracking({ timeoutMs: 4000 }).catch((e) => {
+        console.debug?.(e);
+    });
+    syncFromProgress();
 
     return {
         el: wrap,
         dispose() {
+            clearErrorResetTimer();
             btn.removeEventListener("click", handleClick);
             stopBtn.removeEventListener("click", handleStopClick);
+            floatingViewerProgressService.removeEventListener(
+                PROGRESS_UPDATE_EVENT,
+                handleProgressUpdate,
+            );
         },
     };
 }
@@ -191,7 +306,21 @@ async function queueCurrentPrompt() {
     const api = getComfyApi(app);
     if (api && typeof api.queuePrompt === "function") {
         await api.queuePrompt(0, enrichPromptDataForMfv(promptData));
-        return;
+        return { tracked: true };
+    }
+
+    if (api && typeof api.fetchApi === "function") {
+        const resp = await api.fetchApi("/prompt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(
+                buildPromptRequestBody(promptData, {
+                    clientId: resolveClientId(api, app),
+                }),
+            ),
+        });
+        if (!resp?.ok) throw new Error(`POST /prompt failed (${resp?.status})`);
+        return { tracked: true };
     }
 
     const resp = await fetch("/prompt", {
@@ -204,4 +333,5 @@ async function queueCurrentPrompt() {
         ),
     });
     if (!resp.ok) throw new Error(`POST /prompt failed (${resp.status})`);
+    return { tracked: false };
 }

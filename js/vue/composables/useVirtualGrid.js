@@ -587,6 +587,61 @@ export function getUpsertBatchState(gridContainer, upsertState) {
     return s;
 }
 
+function _normalizeAssetIdentityPart(value) {
+    return String(value ?? "")
+        .trim()
+        .toLowerCase();
+}
+
+function _isLivePlaceholderAsset(asset) {
+    return (
+        asset?._mjrLivePlaceholder === true ||
+        asset?.is_live_placeholder === true ||
+        String(asset?.id || "")
+            .trim()
+            .toLowerCase()
+            .startsWith("live:")
+    );
+}
+
+function _clearLivePlaceholderState(asset) {
+    if (!asset || typeof asset !== "object") return asset;
+    try {
+        delete asset._mjrLivePlaceholder;
+        delete asset._mjrLiveStatus;
+        delete asset._mjrLiveLabel;
+        delete asset.is_live_placeholder;
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return asset;
+}
+
+function _getAssetIdentityKey(asset) {
+    if (!asset || typeof asset !== "object") return "";
+    const type = _normalizeAssetIdentityPart(asset?.type || asset?.source || "output");
+    const rootId = _normalizeAssetIdentityPart(asset?.root_id || asset?.custom_root_id || "");
+    const subfolder = _normalizeAssetIdentityPart(asset?.subfolder || "");
+    const filename = _normalizeAssetIdentityPart(asset?.filename || "");
+    if (filename) return `${type}|${rootId}|${subfolder}|${filename}`;
+    const filepath = _normalizeAssetIdentityPart(
+        asset?.filepath || asset?.path || asset?.fullpath || asset?.full_path || "",
+    );
+    if (!filepath) return "";
+    return `${type}|${rootId}|path|${filepath}`;
+}
+
+function _findExistingAssetIndex(state, assetId, candidateAsset) {
+    const list = Array.isArray(state?.assets) ? state.assets : [];
+    if (assetId) {
+        const exactIndex = list.findIndex((asset) => String(asset?.id || "") === assetId);
+        if (exactIndex > -1) return exactIndex;
+    }
+    const identityKey = _getAssetIdentityKey(candidateAsset);
+    if (!identityKey) return -1;
+    return list.findIndex((asset) => _getAssetIdentityKey(asset) === identityKey);
+}
+
 function dedupeAssetsByKey(state, deps) {
     const seenIds = new Set();
     const seenKeys = new Set();
@@ -662,6 +717,7 @@ export function flushUpsertBatch(gridContainer, deps) {
     try {
         let modified = false;
         for (const [assetId, asset] of snapshot.entries()) {
+            const incomingIsPlaceholder = _isLivePlaceholderAsset(asset);
             state.assetKeyFn = deps.assetKey;
             const siblingCheck = shouldHideSiblingAsset(asset, state, deps.loadMajoorSettings);
             if (Array.isArray(siblingCheck?.removed) && siblingCheck.removed.length) {
@@ -692,22 +748,34 @@ export function flushUpsertBatch(gridContainer, deps) {
             const existingIndex = state.assets.findIndex((a) => String(a.id) === assetId);
             const existingAsset = existingIndex > -1 ? state.assets[existingIndex] : null;
             const candidateAsset = existingAsset ? { ...existingAsset, ...asset } : asset;
+            const resolvedExistingIndex =
+                existingIndex > -1
+                    ? existingIndex
+                    : _findExistingAssetIndex(state, assetId, candidateAsset);
+            const resolvedExistingAsset =
+                resolvedExistingIndex > -1 ? state.assets[resolvedExistingIndex] : null;
+            const mergedCandidate = resolvedExistingAsset
+                ? { ...resolvedExistingAsset, ...asset }
+                : candidateAsset;
             const key = deps.assetKey(candidateAsset);
-            const matchesFilters = _assetMatchesActiveFilters(gridContainer, candidateAsset);
+            const matchesFilters = _assetMatchesActiveFilters(gridContainer, mergedCandidate);
             if (!matchesFilters) {
-                if (existingIndex > -1) {
-                    const [removedAsset] = state.assets.splice(existingIndex, 1);
+                if (resolvedExistingIndex > -1) {
+                    const [removedAsset] = state.assets.splice(resolvedExistingIndex, 1);
                     unregisterHiddenSibling(state, removedAsset, state);
                     modified = true;
                 }
                 continue;
             }
-            if (existingIndex > -1) {
-                const previousKey = deps.assetKey(existingAsset);
-                Object.assign(existingAsset, asset);
-                const mergedAsset = { ...existingAsset };
+            if (resolvedExistingIndex > -1) {
+                const previousKey = deps.assetKey(resolvedExistingAsset);
+                Object.assign(resolvedExistingAsset, asset);
+                if (!incomingIsPlaceholder) {
+                    _clearLivePlaceholderState(resolvedExistingAsset);
+                }
+                const mergedAsset = { ...resolvedExistingAsset };
                 const nextKey = deps.assetKey(mergedAsset);
-                state.assets[existingIndex] = mergedAsset;
+                state.assets[resolvedExistingIndex] = mergedAsset;
                 if (previousKey && previousKey !== nextKey) {
                     state.seenKeys?.delete?.(previousKey);
                     if (nextKey) state.seenKeys?.add?.(nextKey);
@@ -719,10 +787,13 @@ export function flushUpsertBatch(gridContainer, deps) {
                     (asset.id != null && state.assetIdSet?.has?.(assetId));
                 if (!alreadySeen) {
                     const sortKey = gridContainer.dataset.mjrSort || "mtime_desc";
-                    const insertPos = findInsertPosition(state.assets, candidateAsset, sortKey);
+                    const assetToInsert = incomingIsPlaceholder
+                        ? candidateAsset
+                        : _clearLivePlaceholderState({ ...candidateAsset });
+                    const insertPos = findInsertPosition(state.assets, assetToInsert, sortKey);
                     state.seenKeys.add(key);
                     if (asset.id != null) state.assetIdSet?.add?.(assetId);
-                    state.assets.splice(insertPos, 0, candidateAsset); // findInsertPosition never returns -1
+                    state.assets.splice(insertPos, 0, assetToInsert); // findInsertPosition never returns -1
                     modified = true;
                 }
             }

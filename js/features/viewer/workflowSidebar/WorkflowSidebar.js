@@ -9,6 +9,8 @@
 import { getComfyApp } from "../../../app/comfyApiBridge.js";
 import { NodeWidgetRenderer } from "./NodeWidgetRenderer.js";
 
+const LIVE_SYNC_FALLBACK_MS = 16;
+
 export class WorkflowSidebar {
     /**
      * @param {object} opts
@@ -21,6 +23,9 @@ export class WorkflowSidebar {
         /** @type {NodeWidgetRenderer[]} */
         this._renderers = [];
         this._visible = false;
+        this._selectionKey = "";
+        this._liveSyncHandle = null;
+        this._liveSyncMode = "";
         this._el = this._build();
     }
 
@@ -30,12 +35,14 @@ export class WorkflowSidebar {
     show() {
         this._visible = true;
         this._el.classList.add("open");
-        this.refresh();
+        this.refresh({ force: true });
+        this._startLiveSync();
     }
 
     hide() {
         this._visible = false;
         this._el.classList.remove("open");
+        this._stopLiveSync();
     }
 
     toggle() {
@@ -48,10 +55,16 @@ export class WorkflowSidebar {
     }
 
     /** Re-read selected nodes and rebuild widget sections. */
-    refresh() {
+    refresh({ force = false } = {}) {
         if (!this._visible) return;
+        const { key, nodes } = _getSelectedNodeSnapshot();
+        if (!force && key === this._selectionKey && this._renderers.length === nodes.length) {
+            this.syncFromGraph({ allowSelectionRefresh: false });
+            return;
+        }
+
         this._clear();
-        const nodes = _getSelectedNodes();
+        this._selectionKey = key;
         if (!nodes.length) {
             this._showEmpty();
             return;
@@ -61,14 +74,22 @@ export class WorkflowSidebar {
             this._renderers.push(renderer);
             this._body.appendChild(renderer.el);
         }
+        this.syncFromGraph({ allowSelectionRefresh: false });
     }
 
     /** Sync existing renderers from graph values without full rebuild. */
-    syncFromGraph() {
+    syncFromGraph({ allowSelectionRefresh = true } = {}) {
+        if (!this._visible) return;
+        const { key } = _getSelectedNodeSnapshot();
+        if (allowSelectionRefresh && key !== this._selectionKey) {
+            this.refresh({ force: true });
+            return;
+        }
         for (const r of this._renderers) r.syncFromGraph();
     }
 
     dispose() {
+        this._stopLiveSync();
         this._clear();
         this._el?.remove();
     }
@@ -124,6 +145,43 @@ export class WorkflowSidebar {
         empty.textContent = "Select nodes on the canvas to edit their parameters";
         this._body.appendChild(empty);
     }
+
+    _startLiveSync() {
+        if (this._liveSyncHandle != null) return;
+        const frameHost = _getFrameHost(this._el);
+        const tick = () => {
+            this._liveSyncHandle = null;
+            this._liveSyncMode = "";
+            if (!this._visible) return;
+            this.syncFromGraph();
+            this._startLiveSync();
+        };
+
+        if (typeof frameHost.requestAnimationFrame === "function") {
+            this._liveSyncMode = "raf";
+            this._liveSyncHandle = frameHost.requestAnimationFrame(tick);
+            return;
+        }
+
+        this._liveSyncMode = "timeout";
+        this._liveSyncHandle = frameHost.setTimeout(tick, LIVE_SYNC_FALLBACK_MS);
+    }
+
+    _stopLiveSync() {
+        if (this._liveSyncHandle == null) return;
+        const frameHost = _getFrameHost(this._el);
+        try {
+            if (this._liveSyncMode === "raf" && typeof frameHost.cancelAnimationFrame === "function") {
+                frameHost.cancelAnimationFrame(this._liveSyncHandle);
+            } else if (typeof frameHost.clearTimeout === "function") {
+                frameHost.clearTimeout(this._liveSyncHandle);
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+        this._liveSyncHandle = null;
+        this._liveSyncMode = "";
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -147,4 +205,20 @@ function _getSelectedNodes() {
         console.debug?.("[MFV sidebar] _getSelectedNodes error", e);
     }
     return [];
+}
+
+function _getSelectedNodeSnapshot() {
+    const nodes = _getSelectedNodes();
+    const key = nodes
+        .map((node) => String(node?.id ?? ""))
+        .filter(Boolean)
+        .join("|");
+    return { key, nodes };
+}
+
+function _getFrameHost(el) {
+    const view = el?.ownerDocument?.defaultView || null;
+    if (view) return view;
+    if (typeof window !== "undefined") return window;
+    return globalThis;
 }

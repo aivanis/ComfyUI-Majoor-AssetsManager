@@ -23,9 +23,9 @@ from . import search_hydration as _hydr
 logger = get_logger(__name__)
 
 def _normalize_extension(value) -> str:
-    # NOTE: This is an intentional local copy of the same helper in
-    # mjr_am_backend/routes/handlers/filesystem.py. A shared import would
-    # create a cross-package dependency (features/index → routes/handlers)
+    # NOTE: This is an intentional local copy of normalize_extension() in
+    # mjr_am_backend/routes/search/query_sanitizer.py. A shared import would
+    # create a cross-package dependency (features/index → routes/search)
     # which would invert the dependency hierarchy. Keep both copies in sync.
     if value is None:
         return ""
@@ -1003,8 +1003,11 @@ class IndexSearcher:
         include_total: bool,
         metadata_tags_text_clause: str,
     ) -> Result[dict[str, Any]]:
-        total_field = "COUNT(*) OVER() as _total," if include_total else ""
-        sql_parts = [self._global_fts_select_sql(total_field, metadata_tags_text_clause)]
+        # Never use COUNT(*) OVER() here — on large result sets the window
+        # function forces SQLite to materialise every matching row before it
+        # can return page 1, making first-page loads slow at scale.
+        # _global_fts_total_count runs a lean UNION count query instead.
+        sql_parts = [self._global_fts_select_sql("", metadata_tags_text_clause)]
         params: list[Any] = [fts_query, fts_query]
 
         filter_clauses, filter_params = self._filter_clauses(filters)
@@ -1024,9 +1027,7 @@ class IndexSearcher:
         rows = rows_res.data or []
 
         total: int | None = None
-        if include_total and rows and "_total" in rows[0]:
-            total = rows[0]["_total"]
-        if include_total and total is None:
+        if include_total:
             total = await self._global_fts_total_count(fts_query, filter_clauses, filter_params)
         return Result.Ok({"rows": rows, "total": total})
 

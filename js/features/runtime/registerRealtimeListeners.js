@@ -4,6 +4,7 @@ import { vectorIndexAsset } from "../../api/client.js";
 
 const AUTO_VECTOR_INDEX_DEDUPE_MS = 30_000;
 const _autoVectorIndexSeenAt = new Map();
+const LIVE_PLACEHOLDER_PREFIX = "live";
 
 function toNullableBool(value) {
     if (value === true || value === 1 || value === "1") return true;
@@ -49,6 +50,93 @@ function maybeAutoVectorIndexAsset(detail) {
     if (hasVectorEmbedding(detail)) return;
     if (shouldSkipAutoVectorIndex(assetId)) return;
     void vectorIndexAsset(assetId).catch((e) => console.debug?.("[Majoor] auto vector index failed", e));
+}
+
+function inferLiveAssetKind(detail) {
+    const explicit = String(detail?.kind || "").trim().toLowerCase();
+    if (explicit) return explicit;
+    const rawName = String(
+        detail?.filename || detail?.filepath || detail?.path || detail?.fullpath || "",
+    ).trim();
+    const ext = rawName.includes(".") ? rawName.split(".").pop()?.toLowerCase?.() || "" : "";
+    if (!ext) return "";
+    if (["png", "jpg", "jpeg", "webp", "gif", "bmp", "tif", "tiff", "avif", "heic", "heif"].includes(ext)) {
+        return "image";
+    }
+    if (["mp4", "webm", "mov", "mkv", "avi", "m4v"].includes(ext)) return "video";
+    if (["mp3", "wav", "flac", "ogg"].includes(ext)) return "audio";
+    if (["glb", "gltf", "obj", "fbx", "ply", "stl", "splat", "ksplat", "spz"].includes(ext)) {
+        return "model3d";
+    }
+    return "unknown";
+}
+
+function buildLivePlaceholderAsset(detail, { jobId = "" } = {}) {
+    const filename = String(detail?.filename || "").trim();
+    const rawPath = String(
+        detail?.filepath || detail?.path || detail?.fullpath || detail?.full_path || "",
+    ).trim();
+    const subfolder = String(detail?.subfolder || detail?.sub_folder || detail?.subFolder || "").trim();
+    const type = String(detail?.type || detail?.source || "output")
+        .trim()
+        .toLowerCase();
+    const rootId = String(detail?.root_id || detail?.custom_root_id || "").trim();
+    const kind = inferLiveAssetKind(detail);
+    if (!kind || (!filename && !rawPath)) return null;
+    const normalizedName =
+        filename ||
+        rawPath.split(/[/\\]/).filter(Boolean).pop() ||
+        "";
+    if (!normalizedName) return null;
+    const normalizedPath = rawPath || (subfolder ? `${subfolder}/${normalizedName}` : normalizedName);
+    const identity = [
+        type || "output",
+        rootId,
+        subfolder,
+        normalizedName,
+    ]
+        .map((part) => String(part || "").trim().toLowerCase())
+        .join("|");
+    const nowSeconds = Date.now() / 1000;
+    const nextJobId = String(detail?.job_id || jobId || "").trim();
+    return {
+        id: `${LIVE_PLACEHOLDER_PREFIX}:${identity || normalizedPath.toLowerCase()}`,
+        filename: normalizedName,
+        filepath: normalizedPath,
+        path: normalizedPath,
+        subfolder,
+        type: type || "output",
+        source: type || "output",
+        kind,
+        mtime: Number(detail?.mtime) || nowSeconds,
+        has_workflow: detail?.has_workflow ?? detail?.hasWorkflow ?? null,
+        has_generation_data: detail?.has_generation_data ?? detail?.hasGenerationData ?? null,
+        generation_time_ms:
+            Number.isFinite(Number(detail?.generation_time_ms)) && Number(detail?.generation_time_ms) > 0
+                ? Number(detail.generation_time_ms)
+                : undefined,
+        source_node_id: String(detail?.source_node_id || "").trim() || undefined,
+        source_node_type: String(detail?.source_node_type || "").trim() || undefined,
+        job_id: nextJobId || undefined,
+        root_id: rootId || undefined,
+        custom_root_id: rootId || undefined,
+        is_live_placeholder: true,
+        _mjrLivePlaceholder: true,
+        _mjrLiveStatus: "pending",
+        _mjrLiveLabel: "In progress",
+    };
+}
+
+function safeEscapeAssetId(value) {
+    const raw = String(value || "");
+    try {
+        if (typeof CSS !== "undefined" && typeof CSS.escape === "function") {
+            return CSS.escape(raw);
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return raw.replace(/([!"#$%&'()*+,./:;<=>?@[\\\]^`{|}~])/g, "\\$1");
 }
 
 function resolveMaintenanceTitle(op, t) {
@@ -204,7 +292,7 @@ export async function registerRealtimeListeners({
                     existsInGrid = !!grid._mjrHasAssetId(assetId);
                 } else {
                     existsInGrid = !!grid.querySelector(
-                        `.mjr-asset-card[data-mjr-asset-id="${CSS.escape(assetId)}"]`,
+                        `.mjr-asset-card[data-mjr-asset-id="${safeEscapeAssetId(assetId)}"]`,
                     );
                 }
             } catch (e) {
@@ -258,6 +346,25 @@ export async function registerRealtimeListeners({
             markRecentAssetUpsert();
         }
     }
+
+    api._mjrNewGenerationOutputHandler = (event) => {
+        try {
+            const grid = getActiveGridContainer();
+            if (!grid) return;
+            const scope = String(grid?.dataset?.mjrScope || "output").trim().toLowerCase();
+            if (scope !== "output" && scope !== "all") return;
+            const files = Array.isArray(event?.detail?.files) ? event.detail.files : [];
+            const promptId = String(event?.detail?.prompt_id || event?.detail?.promptId || "").trim();
+            for (const file of files) {
+                const placeholder = buildLivePlaceholderAsset(file, { jobId: promptId });
+                if (!placeholder) continue;
+                upsertLiveAssetIntoGrid(grid, placeholder, { immediate: true, force: true });
+            }
+        } catch (error) {
+            reportError(error, "entry.new_generation_output");
+        }
+    };
+    registerCleanableListener(runtime, window, EVENTS.NEW_GENERATION_OUTPUT, api._mjrNewGenerationOutputHandler);
 
     api._mjrAssetAddedHandler = (event) => {
         try {

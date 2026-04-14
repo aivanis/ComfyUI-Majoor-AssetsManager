@@ -226,6 +226,21 @@ const genTimeFmt = computed(() => formatGenTime(genTimeMs.value));
 const genTimeColorVal = computed(() => genTimeColor(genTimeMs.value));
 
 const positivePrompt = computed(() => String(props.asset.positive_prompt || "").trim());
+const isLivePlaceholder = computed(
+    () =>
+        props.asset?._mjrLivePlaceholder === true ||
+        props.asset?.is_live_placeholder === true ||
+        String(props.asset?.id || "")
+            .trim()
+            .toLowerCase()
+            .startsWith("live:"),
+);
+const livePlaceholderLabel = computed(
+    () => String(props.asset?._mjrLiveLabel || "In progress").trim() || "In progress",
+);
+const livePlaceholderTitle = computed(() =>
+    `${livePlaceholderLabel.value}: waiting for indexed asset data`,
+);
 
 const resolution = computed(() => {
     const { width, height } = props.asset;
@@ -423,6 +438,11 @@ function onFileBadgeClick(event) {
 <template>
     <!-- ── THUMBNAIL ──────────────────────────────────────────────────────── -->
     <div class="mjr-thumb" ref="thumbRef">
+        <div
+            v-if="isLivePlaceholder"
+            class="mjr-live-placeholder-wash"
+            aria-hidden="true"
+        />
 
         <!-- Image -->
         <template v-if="isImage">
@@ -526,6 +546,16 @@ function onFileBadgeClick(event) {
 
         <!-- Generation time badge -->
         <GenTimeBadge :gen-time-ms="genTimeMs" />
+
+        <!-- Live placeholder state -->
+        <div
+            v-if="isLivePlaceholder"
+            class="mjr-live-pill"
+            :title="livePlaceholderTitle"
+        >
+            <span class="mjr-live-pill-dot" aria-hidden="true" />
+            <span>{{ livePlaceholderLabel }}</span>
+        </div>
 
         <!-- Hover info overlay -->
         <div

@@ -43,8 +43,23 @@ describe("FloatingViewer", () => {
         comfyToastMock.mockReset();
         globalThis.document = {
             adoptNode: vi.fn((node) => node),
+            querySelectorAll: vi.fn(() => []),
+            documentElement: {
+                className: "",
+                attributes: [],
+                style: {
+                    cssText: "",
+                    setProperty: vi.fn(),
+                },
+            },
             body: {
                 appendChild: vi.fn(),
+                className: "",
+                attributes: [],
+                style: {
+                    cssText: "",
+                    setProperty: vi.fn(),
+                },
             },
             createElement: vi.fn(() => ({
                 className: "",
@@ -517,6 +532,111 @@ describe("FloatingViewer", () => {
         expect(requestWindow).toHaveBeenCalledWith({ width: 640, height: 480 });
     });
 
+    it("mirrors theme state into about:blank popup documents", async () => {
+        const { installFloatingViewerPopoutStyles } = await import(
+            "../features/viewer/floatingViewerPopout.js"
+        );
+
+        const popupHeadNodes = [];
+        const htmlSetProperty = vi.fn();
+        const bodySetProperty = vi.fn();
+
+        globalThis.document = {
+            ...globalThis.document,
+            querySelectorAll: vi.fn(() => []),
+            documentElement: {
+                className: "comfy-theme dark-mode",
+                attributes: [{ name: "data-theme", value: "obsidian" }],
+                style: {
+                    cssText: "--inline-root: 1;",
+                    setProperty: vi.fn(),
+                },
+                lang: "fr",
+                dir: "ltr",
+            },
+            body: {
+                appendChild: vi.fn(),
+                className: "app-shell",
+                attributes: [{ name: "data-layout", value: "desktop" }],
+                style: {
+                    cssText: "",
+                    setProperty: vi.fn(),
+                },
+            },
+        };
+
+        globalThis.window = {
+            ...(globalThis.window || {}),
+            getComputedStyle: vi.fn((el) => ({
+                getPropertyValue: (name) => {
+                    if (el === document.documentElement) {
+                        return (
+                            {
+                                "--content-bg": "#101820",
+                                "--content-fg": "#f3f5f7",
+                                "--comfy-accent": "#4fd1b5",
+                                "--interface-panel-surface": "#111827",
+                                "color-scheme": "dark",
+                            }[name] || ""
+                        );
+                    }
+                    return (
+                        {
+                            "--comfy-menu-bg": "#1a2333",
+                            "--comfy-menu-secondary-bg": "#223148",
+                        }[name] || ""
+                    );
+                },
+            })),
+        };
+
+        const popupDoc = {
+            head: {
+                querySelectorAll: vi.fn(() => []),
+                appendChild: vi.fn((node) => popupHeadNodes.push(node)),
+            },
+            documentElement: {
+                className: "",
+                lang: "",
+                dir: "",
+                style: {
+                    setProperty: htmlSetProperty,
+                    colorScheme: "",
+                },
+                setAttribute: vi.fn(),
+            },
+            body: {
+                className: "",
+                style: {
+                    setProperty: bodySetProperty,
+                    colorScheme: "",
+                },
+                setAttribute: vi.fn(),
+            },
+            createElement: vi.fn(() => ({
+                setAttribute: vi.fn(),
+                textContent: "",
+            })),
+            importNode: vi.fn((node) => node),
+        };
+
+        installFloatingViewerPopoutStyles({}, popupDoc);
+
+        expect(popupDoc.documentElement.className).toContain("mjr-mfv-popout-document");
+        expect(popupDoc.body.className).toContain("mjr-mfv-popout-body");
+        expect(popupDoc.documentElement.setAttribute).toHaveBeenCalledWith("data-theme", "obsidian");
+        expect(popupDoc.body.setAttribute).toHaveBeenCalledWith("data-layout", "desktop");
+        expect(htmlSetProperty).toHaveBeenCalledWith("--content-bg", "#101820");
+        expect(bodySetProperty).toHaveBeenCalledWith("--comfy-menu-bg", "#1a2333");
+        expect(popupDoc.documentElement.lang).toBe("fr");
+        expect(popupDoc.documentElement.dir).toBe("ltr");
+        expect(
+            popupHeadNodes.some((node) =>
+                String(node?.textContent || "").includes("mjr-mfv-popout-body"),
+            ),
+        ).toBe(true);
+    });
+
     it("installs follower sync for compare-mode playable media", async () => {
         const { FloatingViewer, MFV_MODES } = await import("../features/viewer/FloatingViewer.js");
 
@@ -561,10 +681,22 @@ describe("FloatingViewer", () => {
     it("enables autoplay for audio in MFV", async () => {
         const { FloatingViewer } = await import("../features/viewer/FloatingViewer.js");
 
+        const originalHTMLMediaElement = globalThis.HTMLMediaElement;
+        const originalHTMLVideoElement = globalThis.HTMLVideoElement;
+        const originalHTMLAudioElement = globalThis.HTMLAudioElement;
+
+        class HTMLMediaElementMock {}
+        class HTMLVideoElementMock extends HTMLMediaElementMock {}
+        class HTMLAudioElementMock extends HTMLMediaElementMock {}
+
+        globalThis.HTMLMediaElement = HTMLMediaElementMock;
+        globalThis.HTMLVideoElement = HTMLVideoElementMock;
+        globalThis.HTMLAudioElement = HTMLAudioElementMock;
+
         const play = vi.fn(() => Promise.resolve());
         const addEventListener = vi.fn();
         const appendChild = vi.fn();
-        const audioEl = {
+        const audioEl = Object.assign(Object.create(globalThis.HTMLAudioElement.prototype), {
             className: "",
             src: "",
             controls: false,
@@ -572,34 +704,68 @@ describe("FloatingViewer", () => {
             preload: "",
             play,
             addEventListener,
-        };
+        });
         const genericEl = () => ({
             className: "",
+            classList: {
+                add: vi.fn(),
+                remove: vi.fn(),
+                toggle: vi.fn(),
+                contains: vi.fn(() => false),
+            },
             textContent: "",
+            style: {
+                display: "",
+                setProperty: vi.fn(),
+            },
             setAttribute: vi.fn(),
+            addEventListener: vi.fn(),
             appendChild,
             replaceChildren: vi.fn(),
+            focus: vi.fn(),
         });
 
-        globalThis.document.createElement = vi.fn((tag) => {
-            if (tag === "audio") return audioEl;
-            return genericEl();
-        });
+        try {
+            globalThis.document.createElement = vi.fn((tag) => {
+                if (tag === "audio") return audioEl;
+                return genericEl();
+            });
 
-        const viewer = new FloatingViewer();
-        const _wrap = viewer.constructor ? null : null;
-        const result = FloatingViewer.prototype._renderSimple.call({
-            _mediaA: { kind: "audio", url: "http://example.test/audio.mp3", filename: "audio.mp3" },
-            _contentEl: { appendChild: vi.fn() },
-            _buildGenInfoDOM: vi.fn(),
-        });
+            const viewer = new FloatingViewer();
+            const _wrap = viewer.constructor ? null : null;
+            const result = FloatingViewer.prototype._renderSimple.call({
+                _mediaA: {
+                    kind: "audio",
+                    url: "http://example.test/audio.mp3",
+                    filename: "audio.mp3",
+                },
+                _contentEl: { appendChild: vi.fn() },
+                _buildGenInfoDOM: vi.fn(),
+            });
 
-        expect(result).toBeUndefined();
-        expect(audioEl.autoplay).toBe(true);
-        expect(play).toHaveBeenCalled();
-        expect(addEventListener).toHaveBeenCalledWith("loadedmetadata", expect.any(Function), {
-            once: true,
-        });
+            expect(result).toBeUndefined();
+            expect(audioEl.autoplay).toBe(true);
+            expect(play).toHaveBeenCalled();
+            expect(addEventListener).toHaveBeenCalledWith("loadedmetadata", expect.any(Function), {
+                once: true,
+            });
+        } finally {
+            if (originalHTMLMediaElement) {
+                globalThis.HTMLMediaElement = originalHTMLMediaElement;
+            } else {
+                delete globalThis.HTMLMediaElement;
+            }
+            if (originalHTMLVideoElement) {
+                globalThis.HTMLVideoElement = originalHTMLVideoElement;
+            } else {
+                delete globalThis.HTMLVideoElement;
+            }
+            if (originalHTMLAudioElement) {
+                globalThis.HTMLAudioElement = originalHTMLAudioElement;
+            } else {
+                delete globalThis.HTMLAudioElement;
+            }
+        }
     });
 
     it("pauses playable media when the floating viewer is hidden", async () => {

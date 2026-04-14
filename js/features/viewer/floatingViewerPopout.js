@@ -2,6 +2,40 @@ import { EVENTS } from "../../app/events.js";
 import { t } from "../../app/i18n.js";
 import { comfyToast } from "../../app/toast.js";
 
+const FLOATING_VIEWER_POPOUT_THEME_PROPS = [
+    "--border-color",
+    "--border-default",
+    "--button-hover-surface",
+    "--button-surface",
+    "--comfy-accent",
+    "--comfy-font",
+    "--comfy-input-bg",
+    "--comfy-menu-bg",
+    "--comfy-menu-secondary-bg",
+    "--comfy-status-error",
+    "--comfy-status-success",
+    "--comfy-status-warning",
+    "--content-bg",
+    "--content-fg",
+    "--descrip-text",
+    "--destructive-background",
+    "--font-inter",
+    "--input-text",
+    "--interface-menu-surface",
+    "--interface-panel-hover-surface",
+    "--interface-panel-selected-surface",
+    "--interface-panel-surface",
+    "--modal-card-background",
+    "--muted-foreground",
+    "--primary-background",
+    "--primary-background-hover",
+    "--radius-lg",
+    "--radius-md",
+    "--radius-sm",
+    "--success-background",
+    "--warning-background",
+];
+
 function isFloatingViewerElectronAppHost() {
     try {
         const root = typeof window !== "undefined" ? window : globalThis;
@@ -47,6 +81,106 @@ function traceFloatingViewerPopout(stage, detail = null, level = "info") {
     } catch (e) {
         console.debug?.(e);
     }
+}
+
+function mergeFloatingViewerPopoutClasses(sourceClassName, ...extraClasses) {
+    return Array.from(
+        new Set(
+            [String(sourceClassName || ""), ...extraClasses]
+                .join(" ")
+                .split(/\s+/)
+                .filter(Boolean),
+        ),
+    ).join(" ");
+}
+
+function copyFloatingViewerPopoutAttributes(sourceEl, targetEl) {
+    if (!sourceEl || !targetEl) return;
+    for (const attr of Array.from(sourceEl.attributes || [])) {
+        const name = String(attr?.name || "");
+        if (!name || name === "class" || name === "style") continue;
+        try {
+            targetEl.setAttribute(name, attr.value);
+        } catch (e) {
+            console.debug?.(e);
+        }
+    }
+}
+
+function copyFloatingViewerPopoutThemeVars(sourceEl, targetEl) {
+    if (!sourceEl || !targetEl?.style) return;
+    const getComputedStyleFn =
+        (typeof window !== "undefined" && window?.getComputedStyle) || globalThis?.getComputedStyle;
+    if (typeof getComputedStyleFn !== "function") return;
+
+    let computed = null;
+    try {
+        computed = getComputedStyleFn(sourceEl);
+    } catch (e) {
+        console.debug?.(e);
+    }
+    if (!computed) return;
+
+    for (const propName of FLOATING_VIEWER_POPOUT_THEME_PROPS) {
+        try {
+            const value = String(computed.getPropertyValue?.(propName) || "").trim();
+            if (value) {
+                targetEl.style.setProperty(propName, value);
+            }
+        } catch (e) {
+            console.debug?.(e);
+        }
+    }
+
+    try {
+        const colorScheme = String(computed.getPropertyValue?.("color-scheme") || "").trim();
+        if (colorScheme) {
+            targetEl.style.colorScheme = colorScheme;
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+}
+
+function syncFloatingViewerPopoutDocumentTheme(doc) {
+    if (!doc?.documentElement || !doc?.body || !document?.documentElement) return;
+
+    const sourceHtml = document.documentElement;
+    const sourceBody = document.body;
+    const targetHtml = doc.documentElement;
+    const targetBody = doc.body;
+
+    targetHtml.className = mergeFloatingViewerPopoutClasses(
+        sourceHtml.className,
+        "mjr-mfv-popout-document",
+    );
+    targetBody.className = mergeFloatingViewerPopoutClasses(
+        sourceBody?.className,
+        "mjr-mfv-popout-body",
+    );
+
+    copyFloatingViewerPopoutAttributes(sourceHtml, targetHtml);
+    copyFloatingViewerPopoutAttributes(sourceBody, targetBody);
+    copyFloatingViewerPopoutThemeVars(sourceHtml, targetHtml);
+    copyFloatingViewerPopoutThemeVars(sourceBody, targetBody);
+
+    if (sourceHtml?.lang) targetHtml.lang = sourceHtml.lang;
+    if (sourceHtml?.dir) targetHtml.dir = sourceHtml.dir;
+}
+
+function createFloatingViewerPopoutRoot(doc) {
+    if (!doc?.body) return null;
+    try {
+        const existingRoot = doc.getElementById?.("mjr-mfv-popout-root");
+        existingRoot?.remove?.();
+    } catch (e) {
+        console.debug?.(e);
+    }
+    const root = doc.createElement("div");
+    root.id = "mjr-mfv-popout-root";
+    root.className = "mjr-mfv-popout-root";
+    doc.body.appendChild(root);
+    return root;
 }
 
 export function setFloatingViewerDesktopExpanded(viewer, active) {
@@ -210,12 +344,11 @@ export function popOutFloatingViewer(viewer) {
                 const doc = pipWindow.document;
                 doc.title = "Majoor Viewer";
                 viewer._installPopoutStyles(doc);
-                doc.body.style.cssText =
-                    "margin:0;display:flex;min-height:100vh;background:#0d0d0d;overflow:hidden;";
-                const root = doc.createElement("div");
-                root.id = "mjr-mfv-popout-root";
-                root.style.cssText = "flex:1;min-width:0;min-height:0;display:flex;";
-                doc.body.appendChild(root);
+                const root = createFloatingViewerPopoutRoot(doc);
+                if (!root) {
+                    viewer._activateDesktopExpandedFallback(new Error("Popup root creation failed"));
+                    return;
+                }
 
                 try {
                     const adopted = typeof doc.adoptNode === "function" ? doc.adoptNode(el) : el;
@@ -332,12 +465,8 @@ export function fallbackPopoutFloatingViewer(viewer, el, w, h) {
 
         doc.title = "Majoor Viewer";
         viewer._installPopoutStyles(doc);
-        doc.body.style.cssText =
-            "margin:0;display:flex;min-height:100vh;background:#0d0d0d;overflow:hidden;";
-        const root = doc.createElement("div");
-        root.id = "mjr-mfv-popout-root";
-        root.style.cssText = "flex:1;min-width:0;min-height:0;display:flex;";
-        doc.body.appendChild(root);
+        const root = createFloatingViewerPopoutRoot(doc);
+        if (!root) return;
 
         try {
             root.appendChild(doc.adoptNode(el));
@@ -440,6 +569,7 @@ export function installFloatingViewerPopoutStyles(viewer, doc) {
     } catch (e) {
         console.debug?.(e);
     }
+    syncFloatingViewerPopoutDocumentTheme(doc);
     // Copy CSS variables from the main document's <html> element (ComfyUI theme vars)
     try {
         const htmlInlineStyle = document.documentElement.style.cssText;
@@ -474,23 +604,51 @@ export function installFloatingViewerPopoutStyles(viewer, doc) {
     const overrideStyle = doc.createElement("style");
     overrideStyle.setAttribute("data-mjr-popout-cloned-style", "1");
     overrideStyle.textContent = `
-        html, body { background: #0d0d0d !important; }
-        .mjr-mfv {
+        html.mjr-mfv-popout-document {
+            min-height: 100%;
+            background:
+                radial-gradient(
+                    1200px 420px at 50% 0%,
+                    color-mix(in srgb, var(--primary-background, var(--comfy-accent, #5fb3ff)) 10%, transparent),
+                    transparent 62%
+                ),
+                linear-gradient(
+                    180deg,
+                    color-mix(in srgb, var(--interface-panel-surface, var(--content-bg, #16191f)) 82%, #000 18%),
+                    color-mix(in srgb, var(--interface-menu-surface, var(--comfy-menu-bg, #1f2227)) 84%, #000 16%)
+                ) !important;
+        }
+        body.mjr-mfv-popout-body {
+            margin: 0 !important;
+            display: flex !important;
+            min-height: 100vh !important;
+            overflow: hidden !important;
+            background: transparent !important;
+        }
+        #mjr-mfv-popout-root,
+        .mjr-mfv-popout-root {
+            flex: 1 !important;
+            min-width: 0 !important;
+            min-height: 0 !important;
+            display: flex !important;
+            isolation: isolate;
+        }
+        body.mjr-mfv-popout-body .mjr-mfv {
             position: static !important;
             width: 100% !important;
             height: 100% !important;
             min-width: 0 !important;
             min-height: 0 !important;
             resize: none !important;
-            border: none !important;
             border-radius: 0 !important;
-            box-shadow: none !important;
             display: flex !important;
             opacity: 1 !important;
             visibility: visible !important;
             pointer-events: auto !important;
             transform: none !important;
-            transition: none !important;
+            max-width: none !important;
+            max-height: none !important;
+            overflow: hidden !important;
         }
     `;
     doc.head.appendChild(overrideStyle);

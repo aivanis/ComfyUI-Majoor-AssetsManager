@@ -30,17 +30,24 @@ export class NodeWidgetRenderer {
     /** Re-read widget values from the live graph and update inputs. */
     syncFromGraph() {
         if (!this._node?.widgets) return;
+        const doc = this._el?.ownerDocument || document;
+        const activeEl = doc?.activeElement || null;
         for (const w of this._node.widgets) {
-            let input = this._inputMap.get(w.name);
+            const storedInput = this._inputMap.get(w.name);
+            let input = _resolveSyncInput(storedInput);
             if (!input) continue;
-            // If the stored element is a wrapper, find the actual input inside
-            if (input.classList?.contains("mjr-ws-text-wrapper")) {
-                input = input.querySelector("textarea") ?? input;
-            }
             if (input.type === "checkbox") {
-                input.checked = Boolean(w.value);
+                const nextChecked = Boolean(w.value);
+                if (input.checked !== nextChecked) {
+                    input.checked = nextChecked;
+                }
             } else {
-                input.value = w.value != null ? String(w.value) : "";
+                const nextValue = w.value != null ? String(w.value) : "";
+                if (String(input.value ?? "") === nextValue) continue;
+                if (activeEl && input === activeEl) continue;
+                input.value = nextValue;
+                storedInput?._mjrAutoFit?.();
+                input?._mjrAutoFit?.();
             }
         }
     }
@@ -152,4 +159,12 @@ export class NodeWidgetRenderer {
             console.debug?.("[MFV sidebar] locateNode error", e);
         }
     }
+}
+
+function _resolveSyncInput(input) {
+    if (!input) return null;
+    if (input.classList?.contains?.("mjr-ws-text-wrapper")) {
+        return input.querySelector?.("textarea") ?? input;
+    }
+    return input;
 }

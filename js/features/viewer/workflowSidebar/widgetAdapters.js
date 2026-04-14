@@ -152,6 +152,7 @@ function _textInput(widget, onChange) {
     // Real-time: write on every keystroke.
     textarea.addEventListener("input", () => {
         writeWidgetValue(widget, textarea.value);
+        onChange?.(widget.value);
         autoFit();
     });
 
@@ -162,6 +163,8 @@ function _textInput(widget, onChange) {
 
     wrapper.appendChild(textarea);
     wrapper.appendChild(expandBtn);
+    wrapper._mjrAutoFit = autoFit;
+    textarea._mjrAutoFit = autoFit;
 
     // Initial fit after insertion
     requestAnimationFrame(autoFit);

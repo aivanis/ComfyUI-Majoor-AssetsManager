@@ -474,7 +474,13 @@ export function createExecutionRuntimeController({
         });
         try {
             window.dispatchEvent(
-                new CustomEvent(EVENTS.NEW_GENERATION_OUTPUT, { detail: { files } }),
+                new CustomEvent(EVENTS.NEW_GENERATION_OUTPUT, {
+                    detail: {
+                        files,
+                        prompt_id: String(promptId || ""),
+                        promptId: String(promptId || ""),
+                    },
+                }),
             );
         } catch (e) {
             console.debug?.(e);

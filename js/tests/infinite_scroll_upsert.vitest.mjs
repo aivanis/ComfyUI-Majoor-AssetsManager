@@ -237,4 +237,70 @@ describe("InfiniteScroll upsert", () => {
         });
         expect(setItems).toHaveBeenCalledTimes(1);
     });
+
+    it("merges a live placeholder with the indexed asset that shares the same file identity", () => {
+        const gridContainer = { dataset: { mjrSort: "mtime_desc" } };
+        const state = {
+            assets: [
+                {
+                    id: "live:output||shots|gen_live_0002.png",
+                    filename: "gen_live_0002.png",
+                    subfolder: "shots",
+                    type: "output",
+                    source: "output",
+                    kind: "image",
+                    mtime: 100,
+                    is_live_placeholder: true,
+                    _mjrLivePlaceholder: true,
+                    _mjrLiveLabel: "In progress",
+                },
+            ],
+            seenKeys: new Set(["id:live:output||shots|gen_live_0002.png"]),
+            assetIdSet: new Set(["live:output||shots|gen_live_0002.png"]),
+            hiddenPngSiblings: 0,
+        };
+        const setItems = vi.fn();
+        const deps = {
+            upsertState: new Map(),
+            getOrCreateState: () => state,
+            ensureVirtualGrid: () => ({ setItems }),
+            assetKey,
+            loadMajoorSettings: () => ({}),
+            maxBatchSize: 50,
+            debounceMs: 0,
+        };
+
+        expect(
+            upsertAsset(
+                gridContainer,
+                {
+                    id: 99,
+                    filename: "gen_live_0002.png",
+                    subfolder: "shots",
+                    type: "output",
+                    source: "output",
+                    kind: "image",
+                    filepath: "shots/gen_live_0002.png",
+                    rating: 4,
+                    mtime: 200,
+                },
+                deps,
+            ),
+        ).toBe(true);
+        flushUpsertBatch(gridContainer, deps);
+
+        expect(state.assets).toHaveLength(1);
+        expect(state.assets[0]).toMatchObject({
+            id: 99,
+            filename: "gen_live_0002.png",
+            subfolder: "shots",
+            rating: 4,
+            mtime: 200,
+        });
+        expect(state.assets[0]._mjrLivePlaceholder).toBeUndefined();
+        expect(state.assets[0].is_live_placeholder).toBeUndefined();
+        expect(state.assetIdSet.has("99")).toBe(true);
+        expect(state.assetIdSet.has("live:output||shots|gen_live_0002.png")).toBe(false);
+        expect(setItems).toHaveBeenCalledTimes(1);
+    });
 });

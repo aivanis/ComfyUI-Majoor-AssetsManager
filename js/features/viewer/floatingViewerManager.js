@@ -318,6 +318,7 @@ let _origOnSelectionChange = null;
 let _origOnNodeDeselected = null;
 let _canvasPointerupHandler = null;
 let _sidebarRefreshTimer = null;
+let _sidebarRefreshTimerKind = "";
 
 function _onCanvasNodeSelection() {
     // Refresh the sidebar when canvas node selection changes
@@ -327,8 +328,39 @@ function _onCanvasNodeSelection() {
 // Debounced version for DOM-level fallback — avoids double-refresh when
 // LiteGraph callbacks already fired for the same interaction.
 function _scheduleCanvasNodeSelection() {
-    clearTimeout(_sidebarRefreshTimer);
-    _sidebarRefreshTimer = setTimeout(_onCanvasNodeSelection, 150);
+    _clearScheduledCanvasNodeSelection();
+    const host = typeof window !== "undefined" ? window : globalThis;
+    if (typeof host.requestAnimationFrame === "function") {
+        _sidebarRefreshTimerKind = "raf";
+        _sidebarRefreshTimer = host.requestAnimationFrame(() => {
+            _sidebarRefreshTimer = null;
+            _sidebarRefreshTimerKind = "";
+            _onCanvasNodeSelection();
+        });
+        return;
+    }
+    _sidebarRefreshTimerKind = "timeout";
+    _sidebarRefreshTimer = host.setTimeout(() => {
+        _sidebarRefreshTimer = null;
+        _sidebarRefreshTimerKind = "";
+        _onCanvasNodeSelection();
+    }, 16);
+}
+
+function _clearScheduledCanvasNodeSelection() {
+    if (_sidebarRefreshTimer == null) return;
+    const host = typeof window !== "undefined" ? window : globalThis;
+    try {
+        if (_sidebarRefreshTimerKind === "raf" && typeof host.cancelAnimationFrame === "function") {
+            host.cancelAnimationFrame(_sidebarRefreshTimer);
+        } else if (typeof host.clearTimeout === "function") {
+            host.clearTimeout(_sidebarRefreshTimer);
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    _sidebarRefreshTimer = null;
+    _sidebarRefreshTimerKind = "";
 }
 
 function _bindNodeSelectionListener() {
@@ -373,8 +405,7 @@ function _bindNodeSelectionListener() {
 
 function _unbindNodeSelectionListener() {
     if (!_nodeSelectionBound) return;
-    clearTimeout(_sidebarRefreshTimer);
-    _sidebarRefreshTimer = null;
+    _clearScheduledCanvasNodeSelection();
     try {
         const app = getComfyApp();
         const canvas = app?.canvas;

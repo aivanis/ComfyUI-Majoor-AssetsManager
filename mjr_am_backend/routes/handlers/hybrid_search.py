@@ -264,7 +264,28 @@ async def _run_fts_search(
             # Blend classic FTS with AI textual hints so short visual queries
             # (e.g. "green") can still match enhanced captions / auto-tags.
             safe_q = clean_q.replace('"', '""')
-            like_q = f"%{clean_q.lower()}%"
+            # Only run the LIKE branch for queries of 3+ chars: single-char and
+            # two-char queries are better handled by FTS prefix matching and the
+            # full table scan would dominate query time for no recall gain.
+            # The subquery LIMIT caps rows scanned even when many rows match.
+            if len(clean_q) >= 3:
+                like_q = f"%{clean_q.lower()}%"
+                like_cap = max(top_k * 4, 200)
+                like_branch = (
+                    f"    UNION ALL "
+                    f"    SELECT asset_id, _rank FROM ("
+                    f"        SELECT a.id AS asset_id, 25.0 AS _rank "
+                    f"        FROM assets a "
+                    f"        LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id "
+                    f"        WHERE LOWER(COALESCE(a.enhanced_caption, '')) LIKE ? "
+                    f"           OR LOWER(COALESCE(ae.auto_tags, '')) LIKE ? "
+                    f"        LIMIT {like_cap}"
+                    f"    ) "
+                )
+                like_params: tuple = (like_q, like_q)
+            else:
+                like_branch = ""
+                like_params = ()
             query = (
                 f"WITH candidates AS ( "
                 f"    SELECT a.id AS asset_id, bm25(assets_fts) AS _rank "
@@ -276,12 +297,7 @@ async def _run_fts_search(
                 f"    FROM asset_metadata_fts "
                 f"    JOIN assets a ON asset_metadata_fts.rowid = a.id "
                 f"    WHERE asset_metadata_fts MATCH ? "
-                f"    UNION ALL "
-                f"    SELECT a.id AS asset_id, 25.0 AS _rank "
-                f"    FROM assets a "
-                f"    LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id "
-                f"    WHERE LOWER(COALESCE(a.enhanced_caption, '')) LIKE ? "
-                f"       OR LOWER(COALESCE(ae.auto_tags, '')) LIKE ? "
+                f"{like_branch}"
                 f") "
                 f"SELECT c.asset_id, MIN(c._rank) AS _rank "
                 f"FROM candidates c "
@@ -291,7 +307,7 @@ async def _run_fts_search(
                 f"GROUP BY c.asset_id "
                 f"ORDER BY _rank LIMIT ?"
             )
-            rows = await db.aquery(query, (safe_q, safe_q, like_q, like_q, *params, top_k))
+            rows = await db.aquery(query, (safe_q, safe_q, *like_params, *params, top_k))
         else:
             query = (
                 f"SELECT a.id AS asset_id, 0.0 AS _rank "

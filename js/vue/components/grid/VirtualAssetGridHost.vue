@@ -219,6 +219,17 @@ function isAssetStacked(asset) {
     return !!String(asset?.stack_id || "").trim() && Number(asset?.stack_asset_count || 0) > 1;
 }
 
+function isLivePlaceholderAsset(asset) {
+    return (
+        asset?._mjrLivePlaceholder === true ||
+        asset?.is_live_placeholder === true ||
+        String(asset?.id || "")
+            .trim()
+            .toLowerCase()
+            .startsWith("live:")
+    );
+}
+
 function isRenderableAsset(asset) {
     return !!asset && asset._mjrDupHidden !== true;
 }
@@ -1346,12 +1357,16 @@ defineExpose({
                         tabindex="0"
                         draggable="true"
                         :style="[cardStyle(), asset._mjrDupHidden ? { display: 'none' } : null]"
-                        :class="{ 'is-selected': isSelected(asset) }"
+                        :class="{
+                            'is-selected': isSelected(asset),
+                            'mjr-live-placeholder': isLivePlaceholderAsset(asset),
+                        }"
                         :data-mjr-asset-id="String(asset.id ?? '')"
                         :data-mjr-filename-key="String(asset.filename || '').toLowerCase()"
                         :data-mjr-ext="getAssetExt(asset)"
                         :data-mjr-stem="getAssetStem(asset)"
                         :data-mjr-kind="String(asset.kind || '')"
+                        :data-mjr-live-placeholder="isLivePlaceholderAsset(asset) ? 'true' : undefined"
                         :data-mjr-stacked="isAssetStacked(asset) ? 'true' : undefined"
                         :data-mjr-stack-count="isAssetStacked(asset) ? String(asset.stack_asset_count || 0) : undefined"
                         :data-mjr-dup-stacked="asset._mjrDupStack ? 'true' : undefined"
@@ -1398,12 +1413,16 @@ defineExpose({
                         tabindex="0"
                         draggable="true"
                         :style="[cardStyle(), asset._mjrDupHidden ? { display: 'none' } : null]"
-                        :class="{ 'is-selected': isSelected(asset) }"
+                        :class="{
+                            'is-selected': isSelected(asset),
+                            'mjr-live-placeholder': isLivePlaceholderAsset(asset),
+                        }"
                         :data-mjr-asset-id="String(asset.id ?? '')"
                         :data-mjr-filename-key="String(asset.filename || '').toLowerCase()"
                         :data-mjr-ext="getAssetExt(asset)"
                         :data-mjr-stem="getAssetStem(asset)"
                         :data-mjr-kind="String(asset.kind || '')"
+                        :data-mjr-live-placeholder="isLivePlaceholderAsset(asset) ? 'true' : undefined"
                         :data-mjr-stacked="isAssetStacked(asset) ? 'true' : undefined"
                         :data-mjr-stack-count="isAssetStacked(asset) ? String(asset.stack_asset_count || 0) : undefined"
                         :data-mjr-dup-stacked="asset._mjrDupStack ? 'true' : undefined"

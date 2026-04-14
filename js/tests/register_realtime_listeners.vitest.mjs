@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
+import { EVENTS } from "../app/events.js";
 import { registerRealtimeListeners } from "../features/runtime/registerRealtimeListeners.js";
 
 function ensureBrowserShims() {
@@ -40,6 +41,7 @@ function createRuntimeHarness({ defer = false, renderable = true } = {}) {
     const runtime = {};
     const grid = { dataset: {}, querySelector: () => null };
     const upsertAsset = vi.fn(() => true);
+    const upsertAssetNow = vi.fn(() => true);
     const pushGeneratedAsset = vi.fn();
 
     return {
@@ -47,6 +49,7 @@ function createRuntimeHarness({ defer = false, renderable = true } = {}) {
         runtime,
         grid,
         upsertAsset,
+        upsertAssetNow,
         pushGeneratedAsset,
         executionRuntime: createExecutionRuntimeMock({ defer, renderable }),
     };
@@ -184,6 +187,76 @@ describe("registerRealtimeListeners", () => {
         expect(harness.upsertAsset).toHaveBeenCalledTimes(1);
         expect(harness.upsertAsset).toHaveBeenCalledWith(harness.grid, expect.objectContaining(detail));
         expect(Number(window.__mjrLastAssetUpsertCount || 0)).toBeGreaterThan(0);
+    });
+
+    it("upsert un placeholder live instantane des la sortie executed", async () => {
+        ensureBrowserShims();
+        const harness = createRuntimeHarness();
+        harness.grid.dataset = { mjrScope: "output", mjrQuery: "portrait" };
+
+        const registered = [];
+        const registerCleanableListener = (_runtime, target, event, handler) => {
+            registered.push({ target, event, handler });
+        };
+
+        await registerRealtimeListeners({
+            api: harness.api,
+            runtime: harness.runtime,
+            executionRuntime: harness.executionRuntime,
+            appRef: {},
+            liveStreamModule: null,
+            ensureExecutionRuntime: () => ({ queue_remaining: 0, active_prompt_id: null }),
+            emitRuntimeStatus: () => {},
+            getActiveGridContainer: () => harness.grid,
+            pushGeneratedAsset: harness.pushGeneratedAsset,
+            upsertAsset: harness.upsertAsset,
+            upsertAssetNow: harness.upsertAssetNow,
+            removeAssetsFromGrid: () => {},
+            getEnrichmentState: () => ({ active: false }),
+            setEnrichmentState: () => {},
+            comfyToast: () => {},
+            t: (_k, fallback) => fallback,
+            reportError: () => {},
+            registerCleanableListener,
+        });
+
+        const liveHandler = registered.find(
+            (entry) => entry.target === window && entry.event === EVENTS.NEW_GENERATION_OUTPUT,
+        )?.handler;
+        expect(typeof liveHandler).toBe("function");
+
+        liveHandler({
+            detail: {
+                prompt_id: "job-live-1",
+                files: [
+                    {
+                        filename: "gen_live_0001.png",
+                        subfolder: "ComfyUI",
+                        type: "output",
+                        generation_time_ms: 1234,
+                    },
+                ],
+            },
+        });
+
+        expect(harness.upsertAssetNow).toHaveBeenCalledTimes(1);
+        expect(harness.upsertAssetNow).toHaveBeenCalledWith(
+            harness.grid,
+            expect.objectContaining({
+                id: expect.stringMatching(/^live:/),
+                filename: "gen_live_0001.png",
+                subfolder: "ComfyUI",
+                type: "output",
+                source: "output",
+                kind: "image",
+                job_id: "job-live-1",
+                generation_time_ms: 1234,
+                is_live_placeholder: true,
+                _mjrLivePlaceholder: true,
+                _mjrLiveLabel: "In progress",
+            }),
+        );
+        expect(harness.upsertAsset).not.toHaveBeenCalled();
     });
 
     it("synchronise l etat d execution vers le backend au start et a la fin", async () => {

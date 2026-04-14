@@ -204,6 +204,7 @@ CREATE INDEX IF NOT EXISTS idx_assets_filename_lower ON assets(LOWER(filename), 
 CREATE INDEX IF NOT EXISTS idx_assets_ext_lower ON assets(LOWER(ext));
 CREATE INDEX IF NOT EXISTS idx_assets_source_size_desc ON assets(source, size DESC, mtime DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_assets_source_kind_mtime_desc ON assets(source, kind, mtime DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_assets_enhanced_caption_nonempty ON assets(enhanced_caption) WHERE enhanced_caption IS NOT NULL AND enhanced_caption != '';
 
 CREATE INDEX IF NOT EXISTS idx_scan_journal_dir ON scan_journal(dir_path);
 CREATE INDEX IF NOT EXISTS idx_metadata_cache_state ON metadata_cache(state_hash);
@@ -258,6 +259,7 @@ CREATE TABLE IF NOT EXISTS vec.asset_embeddings (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 CREATE UNIQUE INDEX IF NOT EXISTS vec.idx_asset_embeddings_asset_id ON asset_embeddings(asset_id);
+CREATE INDEX IF NOT EXISTS vec.idx_asset_embeddings_auto_tags_nonempty ON asset_embeddings(auto_tags) WHERE auto_tags IS NOT NULL AND auto_tags NOT IN ('', '[]');
 """
 
 _SAFE_IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
