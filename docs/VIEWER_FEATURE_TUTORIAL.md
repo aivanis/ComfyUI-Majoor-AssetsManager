@@ -1,14 +1,15 @@
 # Majoor Assets Manager - Viewer Feature Tutorial
 
 **Version**: 2.4.5
-**Last Updated**: April 14, 2026
+**Last Updated**: April 15, 2026
 
 ## Overview
 The Majoor Assets Manager provides **two viewer experiences**:
 
 ### 1. Majoor Floating Viewer (MFV) — NEW! 🎉
 A lightweight, draggable floating panel for **real-time generation comparison**:
-- **Live Stream Mode**: Automatically follows new generations
+- **Live Stream Mode**: Automatically follows new generations and is **enabled by default**
+- **KSampler Preview**: Streams denoising-step previews in the MFV and is **enabled by default**
 - **Compare Modes**: Simple, A/B Compare, Side-by-Side, Grid Compare (up to 4 assets)
 - **Multi-Pin References (A/B/C/D)**: Pin up to 4 images simultaneously for comparison
 - **Node Parameters Sidebar**: Edit workflow node widgets directly in the viewer
@@ -87,7 +88,12 @@ There are several ways to open the Majoor Floating Viewer:
 
 ### Live Stream Mode
 
-**Live Stream Mode** automatically tracks new generations in real-time:
+**Live Stream Mode** automatically tracks new generations in real-time.
+
+**Default behavior**:
+- **Live Stream** starts **enabled by default**
+- **KSampler Preview** also starts **enabled by default**
+- You can change both in **Settings → Majoor Assets Manager › Viewer**
 
 #### Enabling Live Stream
 1. Open the Floating Viewer

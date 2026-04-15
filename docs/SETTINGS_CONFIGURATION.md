@@ -1,7 +1,7 @@
 # Majoor Assets Manager - Settings & Configuration Guide
 
-**Version**: 2.4.5  
-**Last Updated**: April 7, 2026
+**Version**: 2.4.5
+**Last Updated**: April 15, 2026
 
 ## Overview
 The Majoor Assets Manager offers extensive configuration options to customize the interface, performance, and functionality to match your workflow. This guide covers all available settings and configuration options.
@@ -110,6 +110,17 @@ Use that line as the quickest confirmation that the current browser session can 
 - **Recommendation**: 30,000ms (30 seconds) for good balance
 
 ## Metadata & Viewer Settings
+
+### Floating Viewer Default Toggles
+- **UI location**: Settings → Majoor Assets Manager › Viewer
+- **Majoor: MFV Live Stream Enabled by Default**
+  - **Setting key**: `viewer.mfvLiveDefault`
+  - **Default**: Enabled / On
+  - **Purpose**: Controls whether Live Stream starts enabled when the Floating Viewer opens, initializes, or resets
+- **Majoor: MFV KSampler Preview Enabled by Default**
+  - **Setting key**: `viewer.mfvPreviewDefault`
+  - **Default**: Enabled / On
+  - **Purpose**: Controls whether the KSampler denoising preview starts enabled when the Floating Viewer opens, initializes, or resets
 
 ### Media Probe Backend
 - **Auto**: Automatically choose the best available backend
@@ -386,5 +397,5 @@ export MAJOOR_DB_TIMEOUT=60.0
 - Check release notes for configuration changes
 
 ---
-*Settings & Configuration Guide Version: 1.0*  
+*Settings & Configuration Guide Version: 1.0*
 *Last Updated: April 5, 2026*
