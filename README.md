@@ -20,9 +20,9 @@
 
 ## Samples
 
-![Majoor Assets Manager - Floating Viewer generation info](samples/majoor-floating-viewer-generation-info.png)
+![Majoor Assets Manager - Floating Viewer generation info](ressources/majoor-floating-viewer-generation-info.png)
 
-![Majoor Assets Manager - Graph Map workflow inspection](samples/majoor-graph-map-workflow-inspection.png)
+![Majoor Assets Manager - Graph Map workflow inspection](ressources/majoor-graph-map-workflow-inspection.png)
 
 ## Quick Start
 
