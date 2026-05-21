@@ -1,6 +1,7 @@
 """
 Route handlers package.
 """
+from .api_v2_assets import register_api_v2_asset_routes
 from .asset_docs import register_asset_docs_routes
 from .assets import register_asset_routes, register_download_routes
 from .audit import register_audit_routes
@@ -25,6 +26,7 @@ from .version import register_version_routes
 from .viewer import register_viewer_routes
 
 __all__ = [
+    "register_api_v2_asset_routes",
     "register_asset_docs_routes",
     "register_scan_routes",
     "register_asset_routes",
