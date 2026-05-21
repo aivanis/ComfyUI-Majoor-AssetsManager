@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .handlers import (
+    register_api_v2_asset_routes,
     register_asset_docs_routes,
     register_asset_routes,
     register_audit_routes,
@@ -121,6 +122,17 @@ OPTIONAL_ROUTE_REGISTRATIONS: tuple[RouteRegistration, ...] = (
         "integration",
         register_integration_routes,
         ("  POST /mjr/am/integration/send-from-node (Added)",),
+    ),
+    RouteRegistration(
+        "api v2 assets (compat)",
+        register_api_v2_asset_routes,
+        (
+            "  HEAD /api/v2/assets/hash/{hash} (Added)",
+            "  GET  /api/v2/assets (Added)",
+            "  GET  /api/v2/assets/{id} (Added)",
+            "  GET  /api/v2/assets/{id}/content (Added)",
+            "  GET  /api/v2/assets/{id}/tags (Added)",
+        ),
     ),
 )
 
