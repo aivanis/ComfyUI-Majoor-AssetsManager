@@ -25,12 +25,14 @@ const {
     mockUnmountKeepAlive,
     mockRegisterSidebarTabCompat,
     mockRegisterBottomPanelTabCompat,
+    mockRegisterKeybindingCompat,
     mockGet,
 } = vi.hoisted(() => ({
     mockMountKeepAlive: vi.fn(() => true),
     mockUnmountKeepAlive: vi.fn(),
     mockRegisterSidebarTabCompat: vi.fn((_app, def) => def),
     mockRegisterBottomPanelTabCompat: vi.fn((_app, def) => def),
+    mockRegisterKeybindingCompat: vi.fn(() => true),
     mockGet: vi.fn(() => Promise.resolve(null)),
 }));
 
@@ -47,7 +49,7 @@ vi.mock("../app/comfyApiBridge.js", () => ({
     registerSidebarTabCompat: mockRegisterSidebarTabCompat,
     registerBottomPanelTabCompat: mockRegisterBottomPanelTabCompat,
     registerCommandCompat: vi.fn(() => true),
-    registerKeybindingCompat: vi.fn(() => true),
+    registerKeybindingCompat: mockRegisterKeybindingCompat,
     setComfyApp: vi.fn((app) => app),
     getComfyApp: vi.fn(() => null),
     getExtensionToastApi: vi.fn(() => null),
@@ -82,11 +84,16 @@ vi.mock("../app/events.js", () => ({
         OPEN_ASSETS_MANAGER: "mjr:open-assets-manager",
         RELOAD_GRID: "mjr:reload-grid",
         MFV_TOGGLE: "mjr:mfv-toggle",
+        OPEN_NODE_CONTEXT: "mjr:open-node-context",
     },
 }));
 
 vi.mock("../app/toast.js", () => ({
     comfyToast: vi.fn(),
+}));
+
+vi.mock("../app/openMajoorSettings.js", () => ({
+    openMajoorSettings: vi.fn(),
 }));
 
 vi.mock("../app/i18n.js", () => ({
@@ -102,11 +109,17 @@ vi.mock("../vue/GeneratedFeedApp.vue", () => ({ default: { render: () => null } 
 // Static import — all mocks are in place when this resolves.
 
 import {
+    buildAboutPageBadges,
     consumeEarlyFetch,
     getGeneratedFeedBottomPanelTab,
+    buildNativeCommands,
+    buildNativeKeybindings,
+    buildNativeMenuCommands,
+    getMajoorSelectionToolboxCommands,
     isMajoorTrackableNode,
     mountGlobalRuntime,
     registerAssetsSidebar,
+    registerNativeKeybindings,
     teardownAssetsSidebar,
     teardownGeneratedFeed,
     teardownGlobalRuntime,
@@ -286,6 +299,106 @@ describe("isMajoorTrackableNode — node classifier", () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+describe("native ComfyUI frontend registration payloads", () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it("builds command palette actions for panel, viewer, refresh, scan, and settings", () => {
+        const commands = buildNativeCommands(
+            {},
+            { sidebarTabId: "majoor-assets", triggerStartupScan: vi.fn() },
+        );
+        expect(commands.map((command) => command.id)).toEqual([
+            "mjr.openAssetsManager",
+            "mjr.scanAssets",
+            "mjr.toggleFloatingViewer",
+            "mjr.refreshAssetsGrid",
+            "mjr.openFloatingViewer",
+            "mjr.openSettings",
+            "mjr.openNodeContext",
+        ]);
+    });
+
+    it("adds tooltips for commands shown as selection toolbox icons", () => {
+        const commands = buildNativeCommands(
+            {},
+            { sidebarTabId: "majoor-assets", triggerStartupScan: vi.fn() },
+        );
+        const byId = new Map(commands.map((command) => [command.id, command]));
+
+        for (const id of [
+            "mjr.openNodeContext",
+            "mjr.openAssetsManager",
+            "mjr.openFloatingViewer",
+        ]) {
+            const command = byId.get(id);
+            expect(command.tooltip).toBeTruthy();
+            expect(command.title).toBe(command.tooltip);
+            expect(command.description).toBe(command.tooltip);
+        }
+    });
+
+    it("builds declarative keybindings using non-browser-reserved combinations", () => {
+        expect(buildNativeKeybindings()).toEqual([
+            {
+                combo: { alt: true, shift: true, key: "a" },
+                commandId: "mjr.openAssetsManager",
+            },
+            {
+                combo: { alt: true, shift: true, key: "v" },
+                commandId: "mjr.toggleFloatingViewer",
+            },
+        ]);
+    });
+
+    it("registers keybindings imperatively for older ComfyUI hosts", () => {
+        const app = { extensionManager: {} };
+
+        registerNativeKeybindings(app);
+
+        expect(mockRegisterKeybindingCompat).toHaveBeenCalledTimes(2);
+        expect(mockRegisterKeybindingCompat.mock.calls[0][0]).toBe(app);
+        expect(mockRegisterKeybindingCompat.mock.calls[0][1].commandId).toBe(
+            "mjr.openAssetsManager",
+        );
+    });
+
+    it("builds topbar menu commands under Extensions / Majoor Assets Manager", () => {
+        const menuCommands = buildNativeMenuCommands();
+        expect(menuCommands).toHaveLength(1);
+        expect(menuCommands[0].path).toEqual(["Extensions", "Majoor Assets Manager"]);
+        expect(menuCommands[0].commands).toContain("mjr.openSettings");
+    });
+
+    it("builds About page badges with version and docs metadata", () => {
+        const badges = buildAboutPageBadges();
+        expect(badges.map((badge) => badge.label)).toEqual([
+            "Majoor Assets Manager",
+            "v2.4.8",
+            "Docs",
+        ]);
+        expect(badges[2].url).toContain("MajoorWaldi");
+    });
+});
+
+describe("selection toolbox commands", () => {
+    it("returns toolbox commands for trackable selected nodes", () => {
+        expect(getMajoorSelectionToolboxCommands({ id: 12, comfyClass: "SaveImage" })).toEqual([
+            "mjr.openNodeContext",
+            "mjr.openAssetsManager",
+            "mjr.openFloatingViewer",
+        ]);
+    });
+
+    it("supports multi-selection containers and ignores non-trackable nodes", () => {
+        expect(
+            getMajoorSelectionToolboxCommands({
+                items: [{ comfyClass: "KSampler" }, { id: 9, type: "PreviewImage" }],
+            }),
+        ).toEqual(["mjr.openNodeContext", "mjr.openAssetsManager", "mjr.openFloatingViewer"]);
+        expect(getMajoorSelectionToolboxCommands({ comfyClass: "CLIPTextEncode" })).toEqual([]);
+    });
+});
+
 describe("consumeEarlyFetch — module-level state guard", () => {
     it("returns null for a key that does not match the cached key", () => {
         // Key mismatch always returns null regardless of whether a fetch was started.

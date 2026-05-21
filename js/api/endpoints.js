@@ -310,6 +310,21 @@ export function buildStackByJobURL(jobId) {
     return `${ENDPOINTS.STACKS}/by-job/${encodeURIComponent(String(jobId || ""))}`;
 }
 
+export function buildNodeContextMembersURL(sourceNodeId, options = {}) {
+    const nodeId = String(sourceNodeId || "").trim();
+    let url = `${ENDPOINTS.STACKS}/by-node/${encodeURIComponent(nodeId)}/members`;
+    const params = [];
+    const jobId = String(options?.jobId || options?.job_id || "").trim();
+    if (jobId) params.push(`job_id=${encodeURIComponent(jobId)}`);
+    if (options?.latest === false) params.push("latest=0");
+    const limit = Number(options?.limit || 0);
+    if (Number.isFinite(limit) && limit > 0) {
+        params.push(`limit=${encodeURIComponent(String(Math.trunc(limit)))}`);
+    }
+    if (params.length) url += `?${params.join("&")}`;
+    return url;
+}
+
 export function buildStackCoverURL(stackId) {
     return `${buildStackURL(stackId)}/cover`;
 }

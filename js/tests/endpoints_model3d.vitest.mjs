@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildViewerResourceURL } from "../api/endpoints.js";
+import { buildNodeContextMembersURL, buildViewerResourceURL } from "../api/endpoints.js";
 
 describe("buildViewerResourceURL", () => {
     it("prefers asset_id when available", () => {
@@ -31,5 +31,23 @@ describe("buildViewerResourceURL", () => {
         );
         expect(url).toContain("filepath=C%3A%2Fassets%2Fmodels%2Frobot.gltf");
         expect(url).not.toContain("asset_id=");
+    });
+});
+
+describe("buildNodeContextMembersURL", () => {
+    it("builds latest node context URL by default", () => {
+        expect(buildNodeContextMembersURL("12")).toBe("/mjr/am/stacks/by-node/12/members");
+    });
+
+    it("adds job, latest, and limit parameters when provided", () => {
+        expect(
+            buildNodeContextMembersURL("Save Image", {
+                jobId: "prompt/1",
+                latest: false,
+                limit: 25,
+            }),
+        ).toBe(
+            "/mjr/am/stacks/by-node/Save%20Image/members?job_id=prompt%2F1&latest=0&limit=25",
+        );
     });
 });

@@ -70,13 +70,18 @@ import { registerRealtimeListeners } from "./features/runtime/registerRealtimeLi
 import { exposeDebugApis } from "./features/runtime/entryDebugApi.js";
 import { installBenignConsoleNoiseFilter } from "./features/runtime/benignConsoleNoise.js";
 import {
+    buildAboutPageBadges,
     buildBottomPanelTabs,
     buildNativeCommands,
+    buildNativeKeybindings,
+    buildNativeMenuCommands,
     getMajoorNodeMenuItems,
+    getMajoorSelectionToolboxCommands,
     mountGlobalRuntime,
     prewarmAssetsSidebar,
     registerAssetsSidebar,
     registerNativeCommands,
+    registerNativeKeybindings,
     startEarlyFetch,
     teardownTopBarMfvButton,
     teardownGeneratedFeed,
@@ -401,6 +406,9 @@ app.registerExtension({
         sidebarTabId: SIDEBAR_TAB_ID,
         triggerStartupScan,
     }),
+    keybindings: buildNativeKeybindings(),
+    menuCommands: buildNativeMenuCommands(),
+    aboutPageBadges: buildAboutPageBadges(),
 
     /**
      * Declarative bottom-panel tabs — processed by ComfyUI's extension service.
@@ -464,6 +472,7 @@ app.registerExtension({
             sidebarTabId: SIDEBAR_TAB_ID,
             triggerStartupScan,
         });
+        registerNativeKeybindings(runtimeApp);
 
         // 8. Version check (deferred so it doesn't slow startup).
         setTimeout(() => {
@@ -554,5 +563,10 @@ app.registerExtension({
     /** Context-menu items injected into ComfyUI node right-click menus. */
     getNodeMenuItems(node) {
         return getMajoorNodeMenuItems(node, app, { sidebarTabId: SIDEBAR_TAB_ID });
+    },
+
+    /** ComfyUI v1.10.9+ selection toolbox buttons for trackable canvas nodes. */
+    getSelectionToolboxCommands(selectedItem) {
+        return getMajoorSelectionToolboxCommands(selectedItem);
     },
 });

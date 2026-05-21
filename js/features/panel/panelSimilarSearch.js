@@ -1,7 +1,17 @@
 import { EVENTS } from "../../app/events.js";
-import { vectorFindSimilar } from "../../api/client.js";
+import { get, vectorFindSimilar } from "../../api/client.js";
+import { buildNodeContextMembersURL } from "../../api/endpoints.js";
 import { comfyToast } from "../../app/toast.js";
 import { t } from "../../app/i18n.js";
+
+function isNodeContextRouteMissing(res) {
+    return (
+        Number(res?.status || 0) === 404 &&
+        String(res?.error || "")
+            .toLowerCase()
+            .includes("non-json")
+    );
+}
 
 /**
  * Binds the "Find Similar" button and the stack-group open event.
@@ -26,6 +36,74 @@ export function bindSimilarSearch({
     scopeController,
     closePopovers,
 }) {
+    const openNodeContext = async (detail = {}) => {
+        const sourceNodeId = String(detail?.sourceNodeId || detail?.source_node_id || "").trim();
+        if (!sourceNodeId) return;
+        try {
+            closePopovers?.();
+        } catch (err) {
+            console.debug?.(err);
+        }
+        try {
+            const res = await get(
+                buildNodeContextMembersURL(sourceNodeId, {
+                    jobId: detail?.jobId || detail?.job_id || "",
+                    latest: detail?.latest !== false,
+                    limit: 500,
+                }),
+                { timeoutMs: 30_000 },
+            );
+            if (!res?.ok) {
+                if (isNodeContextRouteMissing(res)) {
+                    const root = (window.MajoorAssetsManager ||= {});
+                    if (!root.nodeContextRouteMissingToastShown) {
+                        root.nodeContextRouteMissingToastShown = true;
+                        comfyToast(
+                            t(
+                                "nodeContext.routeMissing",
+                                "Node context backend route is not loaded yet. Restart ComfyUI after updating Majoor Assets Manager.",
+                            ),
+                            "warn",
+                            7000,
+                        );
+                    }
+                    return;
+                }
+                comfyToast(
+                    String(res?.error || t("nodeContext.loadFailed", "Failed to load node assets")),
+                    "error",
+                    3000,
+                );
+                return;
+            }
+            const list = Array.isArray(res?.data) ? res.data : [];
+            if (!list.length) {
+                comfyToast(
+                    t("nodeContext.noAssets", "No indexed assets found for this node yet."),
+                    "info",
+                    2600,
+                );
+                return;
+            }
+            const nodeLabel = String(
+                detail?.title || detail?.sourceNodeType || detail?.source_node_type || sourceNodeId,
+            ).trim();
+            writePanelValue("similarResults", list);
+            writePanelValue("similarSourceAssetId", `node:${sourceNodeId}`);
+            writePanelValue(
+                "similarTitle",
+                t("nodeContext.resultsTitle", "Node {node} outputs ({n} assets)", {
+                    node: nodeLabel || sourceNodeId,
+                    n: list.length,
+                }),
+            );
+            await scopeController?.setScope?.("similar");
+        } catch (err) {
+            console.debug?.(err);
+            comfyToast(t("nodeContext.loadFailed", "Failed to load node assets"), "error", 3000);
+        }
+    };
+
     // ── Similar button click ───────────────────────────────────────────────
 
     similarBtn?.addEventListener(
@@ -127,4 +205,24 @@ export function bindSimilarSearch({
         },
         { signal: panelLifecycleAC?.signal },
     );
+
+    window.addEventListener(
+        EVENTS.OPEN_NODE_CONTEXT,
+        (event) => {
+            void openNodeContext(event?.detail || {});
+        },
+        { signal: panelLifecycleAC?.signal },
+    );
+
+    try {
+        const pending = window.MajoorAssetsManager?.pendingNodeContext || null;
+        if (pending) {
+            window.MajoorAssetsManager.pendingNodeContext = null;
+            setTimeout(() => {
+                void openNodeContext(pending);
+            }, 0);
+        }
+    } catch (err) {
+        console.debug?.(err);
+    }
 }

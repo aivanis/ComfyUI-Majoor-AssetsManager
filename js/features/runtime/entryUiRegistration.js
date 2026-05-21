@@ -20,9 +20,11 @@ import {
     activateSidebarTabCompat,
     registerBottomPanelTabCompat,
     registerCommandCompat,
+    registerKeybindingCompat,
     registerSidebarTabCompat,
 } from "../../app/comfyApiBridge.js";
 import { EVENTS } from "../../app/events.js";
+import { openMajoorSettings } from "../../app/openMajoorSettings.js";
 import { comfyToast } from "../../app/toast.js";
 import { t } from "../../app/i18n.js";
 import { mountKeepAlive, unmountKeepAlive } from "../../vue/createVueApp.js";
@@ -37,6 +39,7 @@ const GLOBAL_RUNTIME_ROOT_ID = "mjr-global-runtime-root";
 const GLOBAL_RUNTIME_MOUNT_KEY = "_mjrGlobalRuntimeVueApp";
 const SIDEBAR_MOUNT_KEY = "_mjrSidebarVueApp";
 const FEED_MOUNT_KEY = "_mjrFeedVueApp";
+let _lastSelectionToolboxNode = null;
 
 // Re-exported from the dedicated lightweight module so existing imports
 // continue to work. The module is auto-evaluated as a top-level side effect
@@ -111,11 +114,55 @@ export function triggerRefreshGrid() {
 
 // ── commands (declarative array for ComfyUI extension API) ────────────────────
 
+function firstTrackableSelectionItem(selectedItem) {
+    return getSelectionItems(selectedItem).find(isMajoorTrackableNode) || null;
+}
+
+function resolveNodeContextDetail(node) {
+    const sourceNodeId = String(node?.id ?? node?.nodeId ?? node?.node_id ?? "").trim();
+    if (!sourceNodeId) return null;
+    const sourceNodeType = String(
+        node?.comfyClass || node?.type || node?.constructor?.type || "",
+    ).trim();
+    const title = String(
+        node?.title || node?.properties?.title || node?.properties?.name || sourceNodeType || "",
+    ).trim();
+    return {
+        source_node_id: sourceNodeId,
+        sourceNodeId,
+        source_node_type: sourceNodeType,
+        sourceNodeType,
+        title,
+    };
+}
+
+function openNodeContext(runtimeApp, sidebarTabId) {
+    const detail = resolveNodeContextDetail(_lastSelectionToolboxNode);
+    if (!detail) {
+        comfyToast(t("toast.nodeContextMissing", "Select an output node first."), "info", 2200);
+        return false;
+    }
+    openAssetsManagerPanel(runtimeApp, sidebarTabId);
+    try {
+        if (typeof window !== "undefined") {
+            window.MajoorAssetsManager = window.MajoorAssetsManager || {};
+            window.MajoorAssetsManager.pendingNodeContext = detail;
+            window.dispatchEvent(new CustomEvent(EVENTS.OPEN_NODE_CONTEXT, { detail }));
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return true;
+}
+
 export function buildNativeCommands(runtimeApp, { sidebarTabId, triggerStartupScan }) {
     return [
         {
             id: "mjr.openAssetsManager",
             label: t("manager.title", "Assets Manager"),
+            tooltip: t("tooltip.openAssetsManager", "Open Majoor Assets Manager"),
+            title: t("tooltip.openAssetsManager", "Open Majoor Assets Manager"),
+            description: t("tooltip.openAssetsManager", "Open Majoor Assets Manager"),
             icon: "pi pi-folder-open",
             function: () => openAssetsManagerPanel(runtimeApp, sidebarTabId),
         },
@@ -143,6 +190,91 @@ export function buildNativeCommands(runtimeApp, { sidebarTabId, triggerStartupSc
             icon: "pi pi-sync",
             function: () => triggerRefreshGrid(),
         },
+        {
+            id: "mjr.openFloatingViewer",
+            label: t("command.openFloatingViewer", "Open floating viewer"),
+            tooltip: t("tooltip.openFloatingViewer", "Open Majoor floating viewer"),
+            title: t("tooltip.openFloatingViewer", "Open Majoor floating viewer"),
+            description: t("tooltip.openFloatingViewer", "Open Majoor floating viewer"),
+            icon: "pi pi-window-maximize",
+            function: () => {
+                try {
+                    window.dispatchEvent(new Event(EVENTS.MFV_OPEN));
+                } catch (e) {
+                    console.debug?.(e);
+                }
+            },
+        },
+        {
+            id: "mjr.openSettings",
+            label: t("command.openSettings", "Open Majoor settings"),
+            icon: "pi pi-cog",
+            function: () => openMajoorSettings(runtimeApp),
+        },
+        {
+            id: "mjr.openNodeContext",
+            label: t("command.openNodeContext", "Show assets from selected node"),
+            tooltip: t(
+                "tooltip.openNodeContext",
+                "Show the latest indexed assets produced by this node",
+            ),
+            title: t(
+                "tooltip.openNodeContext",
+                "Show the latest indexed assets produced by this node",
+            ),
+            description: t(
+                "tooltip.openNodeContext",
+                "Show the latest indexed assets produced by this node",
+            ),
+            icon: "pi pi-sitemap",
+            function: () => openNodeContext(runtimeApp, sidebarTabId),
+        },
+    ];
+}
+
+export function buildNativeKeybindings() {
+    return [
+        {
+            combo: { alt: true, shift: true, key: "a" },
+            commandId: "mjr.openAssetsManager",
+        },
+        {
+            combo: { alt: true, shift: true, key: "v" },
+            commandId: "mjr.toggleFloatingViewer",
+        },
+    ];
+}
+
+export function buildNativeMenuCommands() {
+    return [
+        {
+            path: ["Extensions", "Majoor Assets Manager"],
+            commands: [
+                "mjr.openAssetsManager",
+                "mjr.openFloatingViewer",
+                "mjr.refreshAssetsGrid",
+                "mjr.scanAssets",
+                "mjr.openSettings",
+            ],
+        },
+    ];
+}
+
+export function buildAboutPageBadges() {
+    return [
+        {
+            label: "Majoor Assets Manager",
+            icon: "pi pi-folder",
+        },
+        {
+            label: "v2.4.8",
+            icon: "pi pi-tag",
+        },
+        {
+            label: "Docs",
+            icon: "pi pi-book",
+            url: "https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/blob/main/user_guide.html",
+        },
     ];
 }
 
@@ -150,6 +282,12 @@ export function buildNativeCommands(runtimeApp, { sidebarTabId, triggerStartupSc
 export function registerNativeCommands(runtimeApp, options) {
     for (const command of buildNativeCommands(runtimeApp, options)) {
         registerCommandCompat(runtimeApp, command);
+    }
+}
+
+export function registerNativeKeybindings(runtimeApp) {
+    for (const keybinding of buildNativeKeybindings()) {
+        registerKeybindingCompat(runtimeApp, keybinding);
     }
 }
 
@@ -296,6 +434,22 @@ export function isMajoorTrackableNode(node) {
     ).trim();
     if (!comfyClass) return false;
     return /save|load|preview/i.test(comfyClass);
+}
+
+function getSelectionItems(selectedItem) {
+    if (!selectedItem) return [];
+    if (Array.isArray(selectedItem)) return selectedItem.filter(Boolean);
+    if (selectedItem instanceof Set) return Array.from(selectedItem).filter(Boolean);
+    if (selectedItem instanceof Map) return Array.from(selectedItem.values()).filter(Boolean);
+    if (Array.isArray(selectedItem?.items)) return selectedItem.items.filter(Boolean);
+    if (Array.isArray(selectedItem?.nodes)) return selectedItem.nodes.filter(Boolean);
+    return [selectedItem];
+}
+
+export function getMajoorSelectionToolboxCommands(selectedItem) {
+    _lastSelectionToolboxNode = firstTrackableSelectionItem(selectedItem);
+    if (!_lastSelectionToolboxNode) return [];
+    return ["mjr.openNodeContext", "mjr.openAssetsManager", "mjr.openFloatingViewer"];
 }
 
 function nodeMenuEntry(label, callback) {

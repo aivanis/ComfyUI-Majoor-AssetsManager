@@ -7,6 +7,7 @@ from mjr_am_backend.features.geninfo import parser_impl as p
 
 def test_detect_api_node_known_providers():
     assert x._detect_api_node("geminiimagenode") == "google_gemini"
+    assert x._detect_api_node("openaigptimage1") == "openai"
     assert x._detect_api_node("openaiimagenode") == "openai"
     assert x._detect_api_node("claudenode") == "anthropic"
     assert x._detect_api_node("bytedanceseedancenode") == "bytedance_seedance"
@@ -271,6 +272,49 @@ def test_extract_api_node_geninfo_fallback_openai():
     assert result is not None
     assert result["engine"]["api_provider"] == "openai"
     assert result["positive"]["value"] == "a serene mountain lake"
+
+
+def test_extract_api_node_geninfo_fallback_openai_gpt_image_linked_prompt():
+    nodes = {
+        "1": {"class_type": "PrimitiveStringMultiline", "inputs": {"value": "shoe"}},
+        "2": {
+            "class_type": "StringReplace",
+            "inputs": {
+                "string": "Create a product technical analysis infographic for [YOUR PRODUCT].",
+                "find": "[YOUR PRODUCT]",
+                "replace": ["1", 0],
+            },
+        },
+        "3": {
+            "class_type": "OpenAIGPTImage1",
+            "inputs": {
+                "prompt": ["2", 0],
+                "seed": 126220530,
+                "quality": "low",
+                "background": "auto",
+                "size": "1024x1024",
+                "n": 1,
+                "model": "gpt-image-2",
+                "custom_width": 1024,
+                "custom_height": 1024,
+                "image": ["4", 0],
+            },
+        },
+        "4": {"class_type": "LoadImage", "inputs": {"image": "reference.png"}},
+        "5": {"class_type": "SaveImage", "inputs": {"images": ["3", 0]}},
+    }
+    result = x._extract_api_node_geninfo_fallback(nodes, None)
+    assert result is not None
+    assert result["engine"]["api_provider"] == "openai"
+    assert result["engine"]["type"] == "txt2img"
+    assert result["positive"]["value"] == "Create a product technical analysis infographic for shoe."
+    assert result["checkpoint"]["name"] == "gpt-image-2"
+    assert result["seed"]["value"] == 126220530
+    assert result["quality"]["value"] == "low"
+    assert result["batch_size"]["value"] == 1
+    assert result["size"]["width"] == 1024
+    assert result["size"]["height"] == 1024
+    assert result["inputs"][0]["filename"] == "reference.png"
 
 
 def test_extract_api_node_geninfo_fallback_seedance_dotted_keys():

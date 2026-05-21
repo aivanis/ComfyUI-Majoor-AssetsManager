@@ -221,6 +221,64 @@ class StacksService:
             return Result.Err("DB_ERROR", res.error or "Failed to get members by job_id")
         return Result.Ok([dict(r) for r in res.data or []])
 
+    async def get_members_by_source_node(
+        self,
+        source_node_id: str,
+        *,
+        job_id: str = "",
+        latest_job: bool = True,
+        limit: int = MAX_STACK_MEMBERS,
+    ) -> Result[list[dict[str, Any]]]:
+        """Return assets produced by a ComfyUI output node.
+
+        When no explicit job_id is provided, latest_job narrows the result to
+        the most recent execution for that node. This gives the canvas node
+        selection a useful "current run" context instead of showing all history.
+        """
+        node_id = str(source_node_id or "").strip()
+        if not node_id:
+            return Result.Err("INVALID_INPUT", "source_node_id is required")
+        normalized_job_id = _normalize_job_id(job_id)
+        safe_limit = max(1, min(MAX_STACK_MEMBERS, int(limit or MAX_STACK_MEMBERS)))
+
+        if latest_job and not normalized_job_id:
+            latest_res = await self.db.aquery(
+                "SELECT job_id FROM assets "
+                "WHERE source_node_id = ? AND job_id IS NOT NULL AND job_id != '' "
+                "ORDER BY mtime DESC LIMIT 1",
+                (node_id,),
+            )
+            if not latest_res.ok:
+                return Result.Err("DB_ERROR", latest_res.error or "Failed to get latest node job")
+            if latest_res.data:
+                normalized_job_id = str(latest_res.data[0].get("job_id") or "").strip()
+
+        where = "a.source_node_id = ?"
+        params: list[Any] = [node_id]
+        if normalized_job_id:
+            where += " AND a.job_id = ?"
+            params.append(normalized_job_id)
+        params.append(safe_limit)
+
+        res = await self.db.aquery(
+            "SELECT a.id, a.filename, a.subfolder, a.filepath, a.kind, a.ext, "
+            "  a.size, a.mtime, a.width, a.height, a.duration, "
+            "  a.source, a.source AS type, a.root_id, a.job_id, a.stack_id, "
+            "  a.source_node_id, a.source_node_type, "
+            "  COALESCE(m.rating, 0) as rating, "
+            "  COALESCE(m.tags, '[]') as tags, "
+            "  m.has_workflow, m.has_generation_data "
+            "FROM assets a "
+            "LEFT JOIN asset_metadata m ON a.id = m.asset_id "
+            f"WHERE {where} "
+            "ORDER BY a.mtime DESC "
+            "LIMIT ?",
+            tuple(params),
+        )
+        if not res.ok:
+            return Result.Err("DB_ERROR", res.error or "Failed to get members by source_node_id")
+        return Result.Ok([dict(r) for r in res.data or []])
+
     # ── Cover management ─────────────────────────────────────────────────
 
     async def update_name(self, stack_id: int, name: str) -> Result[bool]:
