@@ -53,6 +53,8 @@ _API_NODE_SIGNATURES: list[tuple[str, str]] = [
     ("veo3videogeneration",      "google_veo"),
     ("veo3firstlastframe",       "google_veo"),
     # ── OpenAI / DALL-E / Sora ────────────────────────────────────────────────
+    ("openaigptimage",           "openai"),
+    ("gptimage",                 "openai"),
     ("openaiimagenode",          "openai"),
     ("openaiimage",              "openai"),
     ("openaivideosora",          "openai"),
@@ -464,6 +466,31 @@ _AUDIO_KWS    = ("texttospeech", "texttosound", "texttodialogue", "texttomusic",
                  "speechtotext", "speechtospeech", "audioisolation", "texttosong")
 
 
+def _parse_size_string(value: Any) -> tuple[int, int] | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip().lower().replace("px", "").replace(" ", "")
+    if "x" not in text:
+        return None
+    left, right = text.split("x", 1)
+    try:
+        width = int(float(left))
+        height = int(float(right))
+    except Exception:
+        return None
+    if width <= 0 or height <= 0:
+        return None
+    return width, height
+
+
+def _first_scalar(ins: dict[str, Any], *keys: str) -> Any:
+    for key in keys:
+        value = _scalar(ins.get(key))
+        if value is not None:
+            return value
+    return None
+
+
 def _refine_engine_type(out: dict[str, Any], ct: str, ins: dict[str, Any]) -> None:
     """Refine out['engine']['type'] based on class_type fragments and inputs."""
     if any(kw in ct for kw in _TXT2IMG_KWS):
@@ -494,6 +521,95 @@ def _refine_engine_type(out: dict[str, Any], ct: str, ins: dict[str, Any]) -> No
         out["engine"]["type"] = "img2vid" if has_image_input else "txt2vid"
 
 
+def _populate_api_node_prompts(
+    out: dict[str, Any],
+    ins: dict[str, Any],
+    nodes_by_id: dict[str, Any],
+    source: str,
+) -> None:
+    prompt = _extract_api_node_prompt(ins, nodes_by_id)
+    if prompt:
+        out["positive"] = {"value": prompt, "confidence": "high", "source": source}
+
+    negative = _extract_api_node_negative(ins, nodes_by_id)
+    if negative:
+        out["negative"] = {"value": negative, "confidence": "high", "source": source}
+
+    sys_prompt = _extract_api_system_prompt(ins)
+    if sys_prompt:
+        out["system_prompt"] = {"value": sys_prompt, "confidence": "high", "source": source}
+
+
+def _populate_api_node_model_and_seed(
+    out: dict[str, Any],
+    ins: dict[str, Any],
+    node_id: str,
+    node: dict[str, Any],
+    source: str,
+) -> None:
+    model_field = _extract_api_node_model(ins, node_id, node)
+    if model_field:
+        out["checkpoint"] = model_field
+        out["models"] = {"checkpoint": model_field}
+
+    seed_val = _scalar(ins.get("seed") or ins.get("noise_seed"))
+    _set_value_field(out, "seed", seed_val, source)
+
+
+def _populate_api_node_size_fields(out: dict[str, Any], ins: dict[str, Any], source: str) -> None:
+    aspect = ins.get("aspect_ratio") or ins.get("ratio") or ins.get("ar")
+    if isinstance(aspect, str) and aspect.strip() and aspect.lower() not in ("auto", "none", ""):
+        out["aspect_ratio"] = {"value": aspect.strip(), "confidence": "high", "source": source}
+
+    width = _first_scalar(ins, "width", "custom_width")
+    height = _first_scalar(ins, "height", "custom_height")
+    if width is not None and height is not None:
+        try:
+            out["size"] = {
+                "width": int(width),
+                "height": int(height),
+                "confidence": "high",
+                "source": source,
+            }
+        except Exception as exc:
+            logger.debug("size conversion failed for node %s: %s", source, exc)
+    elif "size" not in out:
+        parsed_size = _parse_size_string(ins.get("size") or ins.get("resolution"))
+        if parsed_size:
+            out["size"] = {
+                "width": parsed_size[0],
+                "height": parsed_size[1],
+                "confidence": "high",
+                "source": source,
+            }
+
+    resolution = ins.get("model.resolution") or ins.get("resolution")
+    if isinstance(resolution, str) and resolution.strip():
+        out["resolution"] = {"value": resolution.strip(), "confidence": "high", "source": source}
+        if "size" not in out:
+            wh = _seedance_size_from_resolution(resolution)
+            if wh:
+                out["size"] = {"width": wh[0], "height": wh[1], "confidence": "medium", "source": source}
+
+
+def _populate_api_node_controls(out: dict[str, Any], ins: dict[str, Any], source: str) -> None:
+    duration = _scalar(ins.get("model.duration") or ins.get("duration"))
+    if duration is not None:
+        out["duration"] = {"value": duration, "confidence": "high", "source": source}
+
+    quality = ins.get("quality")
+    if isinstance(quality, str) and quality.strip() and quality.lower() not in ("auto", "none", ""):
+        out["quality"] = {"value": quality.strip(), "confidence": "high", "source": source}
+
+    background = ins.get("background")
+    if isinstance(background, str) and background.strip() and background.lower() not in ("auto", "none", ""):
+        out["background"] = {"value": background.strip(), "confidence": "high", "source": source}
+
+    count = _scalar(ins.get("n") or ins.get("count") or ins.get("batch_size"))
+    if count is not None:
+        out["batch_size"] = {"value": count, "confidence": "high", "source": source}
+
+
 def _populate_api_node_output(
     out: dict[str, Any],
     nodes_by_id: dict[str, Any],
@@ -509,66 +625,10 @@ def _populate_api_node_output(
         _populate_seedance_output(out, nodes_by_id, node_id, node)
         return
 
-    # Prompt / negative
-    prompt = _extract_api_node_prompt(ins, nodes_by_id)
-    if prompt:
-        out["positive"] = {"value": prompt, "confidence": "high", "source": source}
-
-    negative = _extract_api_node_negative(ins, nodes_by_id)
-    if negative:
-        out["negative"] = {"value": negative, "confidence": "high", "source": source}
-
-    # Model (used as "checkpoint" so UI panels already know how to display it)
-    model_field = _extract_api_node_model(ins, node_id, node)
-    if model_field:
-        out["checkpoint"] = model_field
-        out["models"] = {"checkpoint": model_field}
-
-    # Seed
-    seed_val = _scalar(ins.get("seed") or ins.get("noise_seed"))
-    _set_value_field(out, "seed", seed_val, source)
-
-    # Aspect ratio — try multiple field names
-    aspect = (
-        ins.get("aspect_ratio")
-        or ins.get("ratio")
-        or ins.get("ar")
-    )
-    if isinstance(aspect, str) and aspect.strip() and aspect.lower() not in ("auto", "none", ""):
-        out["aspect_ratio"] = {"value": aspect.strip(), "confidence": "high", "source": source}
-
-    # Explicit width / height
-    width  = _scalar(ins.get("width"))
-    height = _scalar(ins.get("height"))
-    if width is not None and height is not None:
-        try:
-            out["size"] = {
-                "width": int(width), "height": int(height),
-                "confidence": "high", "source": source,
-            }
-        except Exception as exc:
-            logger.debug("size conversion failed for node %s: %s", source, exc)
-
-    # Resolution string (e.g. "1080p", "720p") — convert to size when possible
-    resolution = ins.get("model.resolution") or ins.get("resolution")
-    if isinstance(resolution, str) and resolution.strip():
-        out["resolution"] = {"value": resolution.strip(), "confidence": "high", "source": source}
-        if "size" not in out:
-            wh = _seedance_size_from_resolution(resolution)
-            if wh:
-                out["size"] = {"width": wh[0], "height": wh[1], "confidence": "medium", "source": source}
-
-    # Duration (seconds or frames)
-    duration = _scalar(ins.get("model.duration") or ins.get("duration"))
-    if duration is not None:
-        out["duration"] = {"value": duration, "confidence": "high", "source": source}
-
-    # System prompt (optional — many Gemini nodes expose one)
-    sys_prompt = _extract_api_system_prompt(ins)
-    if sys_prompt:
-        out["system_prompt"] = {"value": sys_prompt, "confidence": "high", "source": source}
-
-    # Refine engine.type based on class_type name and inputs
+    _populate_api_node_prompts(out, ins, nodes_by_id, source)
+    _populate_api_node_model_and_seed(out, ins, node_id, node, source)
+    _populate_api_node_size_fields(out, ins, source)
+    _populate_api_node_controls(out, ins, source)
     _refine_engine_type(out, ct, ins)
 
     # Input files fed to this API node (image-to-image context)

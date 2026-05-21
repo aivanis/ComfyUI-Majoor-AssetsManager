@@ -231,6 +231,51 @@ async def test_get_members_returns_grid_compatible_drag_fields():
     assert "a.source AS type" in sql
 
 
+async def test_get_members_by_source_node_uses_latest_job_context():
+    db = _DbStub(
+        query_results=[
+            _ok([{"job_id": "prompt-2"}]),
+            _ok(
+                [
+                    {
+                        "id": 8,
+                        "filename": "latest.png",
+                        "subfolder": "",
+                        "filepath": "/outputs/latest.png",
+                        "kind": "image",
+                        "source": "output",
+                        "type": "output",
+                        "job_id": "prompt-2",
+                        "source_node_id": "12",
+                    }
+                ]
+            ),
+        ],
+    )
+    service = StacksService(db)
+
+    result = await service.get_members_by_source_node("12")
+
+    assert result.ok is True
+    assert result.data[0]["filename"] == "latest.png"
+    assert db.queries[0][1] == ("12",)
+    assert db.queries[1][1] == ("12", "prompt-2", 500)
+
+
+async def test_get_members_by_source_node_all_history_when_latest_disabled():
+    db = _DbStub(
+        query_results=[
+            _ok([]),
+        ],
+    )
+    service = StacksService(db)
+
+    result = await service.get_members_by_source_node("12", latest_job=False, limit=20)
+
+    assert result.ok is True
+    assert db.queries[0][1] == ("12", 20)
+
+
 async def test_auto_select_cover_propagates_set_cover_failure():
     db = _DbStub(
         query_results=[

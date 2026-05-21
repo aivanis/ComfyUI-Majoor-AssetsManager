@@ -5,7 +5,7 @@
  * alert/confirm/prompt popups. Falls back to window.* when unavailable.
  */
 
-import { getComfyApp, getExtensionDialogApi } from "./comfyApiBridge.js";
+import { getComfyApp, getExtensionDialogApi, getExtensionToastApi } from "./comfyApiBridge.js";
 
 export const getComfyUi = () => {
     try {
@@ -31,6 +31,28 @@ export const getExtensionManagerDialog = () => {
         const dlg = app?.extensionManager?.dialog || null;
         if (dlg && typeof dlg.confirm === "function" && typeof dlg.prompt === "function") {
             return dlg;
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return null;
+};
+
+export const getExtensionManagerToast = () => {
+    try {
+        const app = getComfyApp();
+        const toast = getExtensionToastApi(app);
+        if (toast && typeof toast.add === "function") {
+            return toast;
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    try {
+        const app = typeof window !== "undefined" ? window?.app : null;
+        const toast = app?.extensionManager?.toast || null;
+        if (toast && typeof toast.add === "function") {
+            return toast;
         }
     } catch (e) {
         console.debug?.(e);

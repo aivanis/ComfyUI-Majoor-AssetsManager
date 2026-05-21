@@ -9,6 +9,7 @@ import {
     $el,
     getComfyDialogCtor,
     getExtensionManagerDialog,
+    getExtensionManagerToast,
     getNativeDialog,
     hideDialogNativeClose,
     styleDialog,
@@ -17,6 +18,26 @@ import {
 import { t } from "./i18n.js";
 
 export const comfyAlert = async (message, title = "Majoor", options = {}) => {
+    const extensionToast = getExtensionManagerToast();
+    if (extensionToast) {
+        try {
+            const detail = String(message || "");
+            if (typeof extensionToast.addAlert === "function") {
+                extensionToast.addAlert(detail);
+            } else {
+                extensionToast.add({
+                    severity: "info",
+                    summary: String(title || "Majoor"),
+                    detail,
+                    life: 5000,
+                });
+            }
+            return;
+        } catch (e) {
+            console.debug?.(e);
+        }
+    }
+
     const forceNative = options?.native !== false;
     if (forceNative) {
         const nativeDialog = getNativeDialog();

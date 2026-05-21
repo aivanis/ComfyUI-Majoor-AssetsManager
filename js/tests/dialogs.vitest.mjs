@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getExtensionDialogApi = vi.fn(() => null);
+const getExtensionToastApi = vi.fn(() => null);
 const getComfyApp = vi.fn(() => null);
 
 vi.mock("../app/comfyApiBridge.js", () => ({
     getComfyApp,
     getExtensionDialogApi,
+    getExtensionToastApi,
 }));
 
 vi.mock("../app/i18n.js", () => ({
@@ -16,6 +18,7 @@ beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
     getExtensionDialogApi.mockReturnValue(null);
+    getExtensionToastApi.mockReturnValue(null);
     getComfyApp.mockReturnValue(null);
     globalThis.window = {
         confirm: vi.fn(() => true),
@@ -39,6 +42,20 @@ describe("dialogs", () => {
         await expect(mod.comfyPrompt("Name", "x")).resolves.toBe("native-value");
         expect(window.confirm).not.toHaveBeenCalled();
         expect(window.prompt).not.toHaveBeenCalled();
+    });
+
+    it("uses extension toast alert before browser alert", async () => {
+        const addAlert = vi.fn();
+        getExtensionToastApi.mockReturnValue({
+            add: vi.fn(),
+            addAlert,
+        });
+
+        const mod = await import("../app/dialogs.js");
+        await mod.comfyAlert("Indexed");
+
+        expect(addAlert).toHaveBeenCalledWith("Indexed");
+        expect(window.alert).not.toHaveBeenCalled();
     });
 
     it("falls back to window dialogs when no native surface exists", async () => {
