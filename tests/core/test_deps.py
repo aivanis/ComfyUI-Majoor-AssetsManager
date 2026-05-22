@@ -5,6 +5,20 @@ from mjr_am_backend import deps as deps_mod
 from mjr_am_backend.shared import Result
 
 
+def _stub_versioned_migrations(monkeypatch) -> None:
+    """Replace the versioned MigrationRunner so deps tests can mock the DB."""
+    from mjr_am_backend.adapters.db import migrations as _migrations_mod
+
+    class _Runner:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        async def run(self, _db):
+            return Result.Ok([])
+
+    monkeypatch.setattr(_migrations_mod, "MigrationRunner", _Runner)
+
+
 def test_resolve_db_path_default_and_custom(monkeypatch):
     monkeypatch.setattr(deps_mod, "get_runtime_index_db_path", lambda: Path("C:/default.sqlite"))
     assert deps_mod._resolve_db_path(None).replace("\\", "/") == "C:/default.sqlite"
@@ -156,9 +170,6 @@ async def test_build_services_success_without_watcher(monkeypatch):
     async def _migrate(_db):
         return Result.Ok(True)
 
-    async def _has_column(_db, _table, _column):
-        return True
-
     async def _load_scope(_db):
         return {"scope": "output", "custom_root_id": ""}
 
@@ -173,8 +184,8 @@ async def test_build_services_success_without_watcher(monkeypatch):
     monkeypatch.setattr(deps_mod, "DuplicatesService", _Dup)
     monkeypatch.setattr(deps_mod, "RatingTagsSyncWorker", _Sync)
     monkeypatch.setattr(deps_mod, "migrate_schema", _migrate)
-    monkeypatch.setattr(deps_mod, "table_has_column", _has_column)
     monkeypatch.setattr(deps_mod, "load_watcher_scope", _load_scope)
+    _stub_versioned_migrations(monkeypatch)
 
     out = await deps_mod.build_services("C:/db.sqlite")
     assert out.ok is True

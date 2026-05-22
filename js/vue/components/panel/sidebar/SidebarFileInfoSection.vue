@@ -32,7 +32,19 @@ function isAnimatedMedia(asset) {
 }
 
 function readAssetField(asset, key) {
-    return asset?.[key] ?? asset?.file_info?.[key] ?? "";
+    const direct = asset?.[key] ?? asset?.file_info?.[key];
+    if (direct !== undefined && direct !== null && direct !== "") return direct;
+    // Fallback for fields nested under user_metadata (the backend may surface
+    // workflow.id only inside the raw metadata payload). Keep this fallback
+    // narrow to known keys to avoid surprising consumers.
+    if (key === "workflow_id") {
+        return (
+            asset?.user_metadata?.workflow?.id
+            ?? asset?.metadata?.workflow_id
+            ?? ""
+        );
+    }
+    return "";
 }
 
 const rows = computed(() => {

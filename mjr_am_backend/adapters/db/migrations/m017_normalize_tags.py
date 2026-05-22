@@ -122,6 +122,13 @@ class NormalizeTagsMigration(Migration):
         return Result.Ok(True)
 
     async def _backfill(self, db: Sqlite) -> Result[bool]:
+        columns = await db.aquery("PRAGMA table_info(asset_metadata)")
+        if not columns.ok:
+            logger.info("v17 backfill: no asset_metadata to inspect (%s)", columns.error)
+            return Result.Ok(True)
+        if "tags" not in {str(row.get("name")) for row in (columns.data or [])}:
+            logger.info("v17 backfill: legacy asset_metadata.tags column absent")
+            return Result.Ok(True)
         rows_result = await db.aquery(
             "SELECT asset_id, tags FROM asset_metadata "
             "WHERE tags IS NOT NULL AND tags != '' AND tags != '[]'"

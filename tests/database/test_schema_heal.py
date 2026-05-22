@@ -52,7 +52,7 @@ async def _assert_schema_healed_queries(db) -> None:
     assert (
         await db.aquery(
             """
-            SELECT tags, tags_text, metadata_text, metadata_raw, has_workflow, has_generation_data, metadata_quality
+            SELECT metadata_text, metadata_raw, has_workflow, has_generation_data, metadata_quality
             FROM asset_metadata
             LIMIT 0
             """
@@ -94,8 +94,6 @@ async def test_schema_self_heals_missing_columns(tmp_path):
             db,
             "asset_metadata",
             [
-                "tags",
-                "tags_text",
                 "metadata_text",
                 "workflow_hash",
                 "has_workflow",

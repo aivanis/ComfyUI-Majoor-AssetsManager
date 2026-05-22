@@ -158,11 +158,14 @@ class IndexService:
         self.db = db
         self.metadata = metadata_service
         self._scan_lock = asyncio.Lock()
-        self._has_tags_text_column = has_tags_text_column
+        # Compatibility parameter kept for older construction sites; v19 removed
+        # asset_metadata.tags_text, so downstream components always operate
+        # without it.
+        self._has_tags_text_column = False
         self._vector_service: VectorService | None = None
         self._vector_searcher: VectorSearcher | None = None
         self._vector_services_resolver = None
-        logger.debug("asset_metadata.tags_text column available: %s", self._has_tags_text_column)
+        logger.debug("legacy asset_metadata.tags_text disabled (v19 normalized tags)")
 
         # Initialize specialized components
         self._scanner = IndexScanner(db, metadata_service, self._scan_lock)

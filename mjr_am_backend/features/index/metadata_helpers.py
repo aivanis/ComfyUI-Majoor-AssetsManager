@@ -962,23 +962,15 @@ class MetadataHelpers:
             f"""
             INSERT INTO asset_metadata
             (
-                asset_id, rating, tags, tags_text, has_workflow, has_generation_data,
+                asset_id, rating, has_workflow, has_generation_data,
                 metadata_quality, workflow_type, generation_time_ms, positive_prompt, metadata_raw
             )
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?
             WHERE EXISTS (SELECT 1 FROM assets WHERE id = ?)
             ON CONFLICT(asset_id) DO UPDATE SET
                 rating = CASE
                     WHEN COALESCE(asset_metadata.rating, 0) = 0 THEN excluded.rating
                     ELSE asset_metadata.rating
-                END,
-                tags = CASE
-                    WHEN COALESCE(asset_metadata.tags, '[]') IN ('[]', '') THEN excluded.tags
-                    ELSE asset_metadata.tags
-                END,
-                tags_text = CASE
-                    WHEN COALESCE(asset_metadata.tags, '[]') IN ('[]', '') THEN excluded.tags_text
-                    ELSE asset_metadata.tags_text
                 END,
                 has_workflow = CASE
                     WHEN {should_upgrade} THEN excluded.has_workflow
@@ -1041,8 +1033,6 @@ class MetadataHelpers:
             (
                 asset_id,
                 extracted_rating,
-                extracted_tags_json,
-                extracted_tags_text,
                 db_has_workflow,
                 db_has_generation,
                 metadata_quality,
@@ -1069,6 +1059,40 @@ class MetadataHelpers:
                 )
             except Exception:
                 pass
+            # Stop-write phase: do not update legacy JSON tag columns. Metadata
+            # extraction may seed normalized tags only when the asset has no
+            # user tag links yet.
+            try:
+                import json as _json
+
+                from ...data.repositories import TagsRepository
+
+                existing_res = await db.aquery(
+                    "SELECT 1 FROM asset_tags WHERE asset_id = ? LIMIT 1",
+                    (asset_id,),
+                )
+                existing = bool(existing_res.ok and existing_res.data)
+                parsed = _json.loads(extracted_tags_json or "[]")
+                extracted_names = [
+                    tag for tag in parsed if isinstance(tag, str) and tag.strip()
+                ] if isinstance(parsed, list) else []
+                if not existing and extracted_names:
+                    replace_res = await TagsRepository(db).replace_all(
+                        asset_id,
+                        extracted_names,
+                    )
+                    if not replace_res.ok:
+                        logger.warning(
+                            "Normalized metadata tags write failed for asset %s: %s",
+                            asset_id,
+                            replace_res.error,
+                        )
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.warning(
+                    "Normalized metadata tags write raised for asset %s: %s",
+                    asset_id,
+                    exc,
+                )
             # Stamp the ComfyUI-core-aligned enrichment level on the assets row.
             # Level 2 = "metadata enriched"; never downgrade from a higher value.
             try:

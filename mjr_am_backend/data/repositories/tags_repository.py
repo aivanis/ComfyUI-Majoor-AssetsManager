@@ -1,9 +1,10 @@
 """Repository for the normalized ``tags`` / ``asset_tags`` tables (v17+).
 
-The legacy JSON-based ``asset_metadata.tags`` column is *not* accessed by this
-repository — that remains the domain of the existing service-layer code while
-the migration is in flight (dual-write transition). New consumers should
-read/write through this repository.
+The legacy JSON-based ``asset_metadata.tags`` column is read by
+:meth:`TagsRepository.sync_from_legacy_row` to support the dual-write
+transition: writers continue to update the legacy column, then call
+``sync_from_legacy_row`` so the normalized tables stay in lockstep. Once all
+readers have migrated, the legacy column will be dropped.
 
 All public methods return ``Result``. Tag names are case-insensitive at the
 storage layer (``COLLATE NOCASE``); we still normalize input by stripping
@@ -12,6 +13,7 @@ whitespace before passing to SQL.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 
 from ...shared import Result
@@ -158,3 +160,79 @@ class TagsRepository(Repository):
         if not rows:
             return Result.Ok(0)
         return Result.Ok(int(rows[0]["n"]))
+
+    # ── dual-write helpers (transition only) ─────────────────────────── #
+
+    async def replace_all(self, asset_id: int, names: list[str]) -> Result[list[Tag]]:
+        """Atomically replace the tag set attached to *asset_id*.
+
+        Deletes existing ``asset_tags`` rows for the asset, ensures each
+        provided tag exists in ``tags``, then re-links. Duplicates and
+        empty/whitespace names are dropped (case-insensitive dedup).
+        """
+        aid = int(asset_id)
+        # Normalize + dedup (case-insensitive).
+        cleaned: list[str] = []
+        seen: set[str] = set()
+        for raw in names or []:
+            if not isinstance(raw, str):
+                continue
+            name = _normalize(raw)
+            if not name:
+                continue
+            key = name.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            cleaned.append(name)
+
+        delete = await self._db.aexecute(
+            "DELETE FROM asset_tags WHERE asset_id = ?", (aid,)
+        )
+        if not delete.ok:
+            return Result.Err(delete.code, delete.error or "")
+
+        attached: list[Tag] = []
+        for name in cleaned:
+            tag_result = await self.attach(aid, name)
+            if not tag_result.ok:
+                return Result.Err(tag_result.code, tag_result.error or "")
+            if tag_result.data is not None:
+                attached.append(tag_result.data)
+        return Result.Ok(attached)
+
+    async def sync_from_legacy_row(self, asset_id: int) -> Result[list[Tag]]:
+        """Read ``asset_metadata.tags`` JSON for *asset_id* and mirror it
+        into ``tags`` / ``asset_tags``.
+
+        Used by writer sites during the dual-write transition: after they
+        update the legacy JSON column, they call this method so the
+        normalized tables stay consistent with whatever the UPSERT/UPDATE
+        actually committed (handles CASE-WHEN preservation logic).
+
+        Missing rows or malformed JSON are treated as empty tag sets.
+        """
+        aid = int(asset_id)
+        columns = await self._db.aquery("PRAGMA table_info(asset_metadata)")
+        if not columns.ok:
+            return Result.Err(columns.code, columns.error or "")
+        if "tags" not in {str(row.get("name")) for row in (columns.data or [])}:
+            return await self.replace_all(aid, [])
+        row_result = await self._db.aquery(
+            "SELECT tags FROM asset_metadata WHERE asset_id = ?", (aid,)
+        )
+        if not row_result.ok:
+            return Result.Err(row_result.code, row_result.error or "")
+        rows = row_result.data or []
+        if not rows:
+            return await self.replace_all(aid, [])
+        raw = rows[0].get("tags")
+        names: list[str] = []
+        if isinstance(raw, str) and raw:
+            try:
+                parsed = json.loads(raw)
+            except (ValueError, TypeError):
+                parsed = []
+            if isinstance(parsed, list):
+                names = [t for t in parsed if isinstance(t, str)]
+        return await self.replace_all(aid, names)

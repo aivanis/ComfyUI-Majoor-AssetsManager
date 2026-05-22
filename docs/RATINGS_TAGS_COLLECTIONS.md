@@ -81,6 +81,17 @@ Tags are customizable keywords that help categorize and organize your assets:
 - Hierarchical tagging support (e.g., "style:anime", "color:warm")
 - Searchable across all assets
 
+### Storage Model
+
+Tags are stored in normalized database tables:
+
+- `tags` stores one canonical row per tag name, using case-insensitive
+  uniqueness.
+- `asset_tags` stores the many-to-many relationship between assets and tags.
+- `asset_metadata.tags` and `asset_metadata.tags_text` were legacy pre-v19
+  columns and are no longer the source of truth.
+- Full-text search tag fields are maintained from the normalized tables.
+
 ### Adding Tags
 
 #### Via Context Menu

@@ -102,8 +102,11 @@ async def reindex_asset_metadata_fts(self, rec_conn: aiosqlite.Connection) -> No
             self,
             rec_conn,
             "INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)"
-            " SELECT asset_id, COALESCE(tags, ''), COALESCE(tags_text, ''), COALESCE(metadata_text, '')"
-            " FROM asset_metadata",
+            " SELECT m.asset_id,"
+            " COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = m.asset_id), ''),"
+            " COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = m.asset_id), ''),"
+            " COALESCE(m.metadata_text, '')"
+            " FROM asset_metadata m",
         )
     except sqlite3.OperationalError as fts_exc:
         if not tx_is_missing_table_error(fts_exc):

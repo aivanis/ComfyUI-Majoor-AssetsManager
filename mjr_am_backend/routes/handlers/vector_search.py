@@ -551,7 +551,18 @@ async def _hydrate_vector_results(
             SELECT a.id, a.filepath, a.filename, a.subfolder, a.kind,
                      a.source AS type,
                                          a.size AS file_size, a.width, a.height, a.mtime, a.enhanced_caption,
-                   m.rating, m.tags, m.has_workflow, m.has_generation_data
+                   m.rating,
+                   COALESCE((
+                       SELECT '[' || group_concat(json_quote(name)) || ']'
+                       FROM (
+                           SELECT t.name AS name
+                           FROM asset_tags at
+                           JOIN tags t ON t.id = at.tag_id
+                           WHERE at.asset_id = a.id
+                           ORDER BY t.name
+                       )
+                   ), '[]') AS tags,
+                   m.has_workflow, m.has_generation_data
             FROM assets a
             LEFT JOIN asset_metadata m ON a.id = m.asset_id
             WHERE a.id IN ({placeholders})

@@ -6,7 +6,7 @@ Simple, debug-friendly DI without framework magic.
 import asyncio
 from pathlib import Path, PureWindowsPath
 
-from .adapters.db.schema import migrate_schema, table_has_column
+from .adapters.db.schema import migrate_schema
 from .adapters.db.sqlite import Sqlite
 from .adapters.tools import ExifTool, FFProbe
 from .config import (
@@ -23,6 +23,7 @@ from .config import (
     initialize_directories,
     is_vector_search_enabled,
 )
+from .data.repositories import TagsRepository
 from .features.duplicates import DuplicatesService
 from .features.health import HealthService
 from .features.index import IndexService
@@ -149,6 +150,7 @@ def _build_services_dict(
         "index": index_service,
         "settings": settings_service,
         "duplicates": DuplicatesService(db),
+        "tags_repo": TagsRepository(db),
     }
     # ── Vector / multimodal search (opt-in) ───────────────────────────
     if is_vector_search_enabled():
@@ -165,6 +167,34 @@ async def _load_watcher_scope_or_default(db: Sqlite) -> dict[str, str]:
     except Exception as exc:
         logger.debug("Falling back to default watcher scope: %s", exc)
         return {"scope": "output", "custom_root_id": ""}
+
+
+async def _record_tag_drift_bootstrap_counter(db: Sqlite) -> None:
+    try:
+        cols = await db.aquery("PRAGMA table_info(asset_metadata)")
+        if not cols.ok:
+            return
+        has_legacy_tags = "tags" in {str(row.get("name")) for row in (cols.data or [])}
+        count = 0
+        if has_legacy_tags:
+            res = await db.aquery(
+                "SELECT COUNT(*) AS n "
+                "FROM asset_metadata m "
+                "WHERE COALESCE(m.tags, '') NOT IN ('', '[]') "
+                "AND NOT EXISTS (SELECT 1 FROM asset_tags at WHERE at.asset_id = m.asset_id)"
+            )
+            if res.ok and res.data:
+                count = int(res.data[0].get("n") or 0)
+        from .bootstrap_report import record_stage
+
+        record_stage(
+            "tag_drift",
+            "ok" if count == 0 else "degraded",
+            "degraded" if count else "none",
+            f"legacy_nonempty_without_asset_tags={count}",
+        )
+    except Exception as exc:
+        logger.debug("Tag drift bootstrap counter skipped: %s", exc)
 
 
 def _attach_rating_tags_sync_worker(services: dict, exiftool: ExifTool) -> None:
@@ -213,6 +243,7 @@ async def build_services(db_path: str | None = None) -> Result[dict]:
     migrate_result = await _migrate_db_or_error(db)
     if not migrate_result.ok:
         return migrate_result  # type: ignore[return-value]
+    await _record_tag_drift_bootstrap_counter(db)
 
     exiftool, ffprobe, settings_service = _init_tools_and_settings(db)
     await apply_startup_settings(
@@ -235,13 +266,10 @@ async def build_services(db_path: str | None = None) -> Result[dict]:
         ffprobe=ffprobe
     )
 
-    # Check for optional columns
-    matches = await table_has_column(db, "asset_metadata", "tags_text")
-
     index_service = IndexService(
         db=db,
         metadata_service=metadata_service,
-        has_tags_text_column=matches
+        has_tags_text_column=False
     )
 
     services = _build_services_dict(

@@ -2,6 +2,8 @@ import json
 from pathlib import Path
 
 import pytest
+from mjr_am_backend.adapters.db.migrations import MigrationRunner
+from mjr_am_backend.adapters.db.migrations.registry import MIGRATIONS
 from mjr_am_backend.adapters.db.schema import migrate_schema
 from mjr_am_backend.adapters.db.sqlite import Sqlite
 from mjr_am_backend.features.index import metadata_helpers as mh
@@ -39,6 +41,8 @@ async def _make_db(tmp_path: Path) -> Sqlite:
     db = Sqlite(str(db_path), attach={"vec": str(tmp_path / "vectors.sqlite")})
     mig = await migrate_schema(db)
     assert mig.ok
+    runner_res = await MigrationRunner(MIGRATIONS).run(db)
+    assert runner_res.ok, runner_res.error
     return db
 
 

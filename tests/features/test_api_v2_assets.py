@@ -252,3 +252,180 @@ async def test_content_endpoint_returns_404_when_path_disallowed(monkeypatch):
     req.match_info["id"] = "1"
     resp = await api_v2_assets._get_asset_content(req)
     assert resp.status == 404
+
+
+# --------------------------------------------------------------------------- #
+# workflow_id hoist (top-level + user_metadata fallback)
+# --------------------------------------------------------------------------- #
+
+
+def test_row_to_asset_hoists_workflow_id_to_top_level():
+    asset = api_v2_assets._row_to_asset(_row(workflow_id="wf-direct"))
+    assert asset["workflow_id"] == "wf-direct"
+    assert asset["metadata"]["workflow_id"] == "wf-direct"
+
+
+def test_row_to_asset_falls_back_to_user_metadata_workflow_id():
+    raw = json.dumps({"workflow": {"id": "wf-from-meta"}, "foo": "bar"})
+    asset = api_v2_assets._row_to_asset(_row(workflow_id="", metadata_raw=raw))
+    assert asset["workflow_id"] == "wf-from-meta"
+
+
+def test_row_to_asset_omits_workflow_id_when_absent_everywhere():
+    asset = api_v2_assets._row_to_asset(_row(workflow_id="", metadata_raw="{}"))
+    assert "workflow_id" not in asset
+
+
+# --------------------------------------------------------------------------- #
+# /api/v2/assets/seed/status
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_seed_status_reports_totals_and_breakdown(monkeypatch):
+    def _handle(sql, params):
+        if "GROUP BY enrichment_level" in sql:
+            return Result.Ok([
+                {"lvl": 0, "n": 4},
+                {"lvl": 1, "n": 7},
+                {"lvl": 2, "n": 11},
+            ])
+        if "COUNT(*)" in sql:
+            return Result.Ok([{"n": 22}])
+        return Result.Ok([])
+
+    async def _services():
+        return {"db": _FakeDB(_handle)}, None
+
+    monkeypatch.setattr(api_v2_assets, "_require_services", _services)
+    req = make_mocked_request("GET", "/api/v2/assets/seed/status")
+    resp = await api_v2_assets._seed_status(req)
+    body = json.loads(resp.text)
+    if resp.status != 200:
+        pytest.fail(f"expected 200, got {resp.status}: {body}")
+    if body["state"] != "idle":
+        pytest.fail(f"expected state=idle, got {body['state']}")
+    if body["total"] != 22:
+        pytest.fail(f"expected total=22, got {body['total']}")
+    if body["enriched"] != 18:
+        pytest.fail(f"expected enriched=18 (lvl>=1 = 7+11), got {body['enriched']}")
+    if body["pending"] != 4:
+        pytest.fail(f"expected pending=4 (lvl 0), got {body['pending']}")
+    if body["by_enrichment_level"] != {"0": 4, "1": 7, "2": 11}:
+        pytest.fail(f"unexpected breakdown: {body['by_enrichment_level']}")
+
+
+@pytest.mark.asyncio
+async def test_seed_status_handles_empty_db(monkeypatch):
+    def _handle(sql, params):
+        if "GROUP BY enrichment_level" in sql:
+            return Result.Ok([])
+        if "COUNT(*)" in sql:
+            return Result.Ok([{"n": 0}])
+        return Result.Ok([])
+
+    async def _services():
+        return {"db": _FakeDB(_handle)}, None
+
+    monkeypatch.setattr(api_v2_assets, "_require_services", _services)
+    req = make_mocked_request("GET", "/api/v2/assets/seed/status")
+    resp = await api_v2_assets._seed_status(req)
+    body = json.loads(resp.text)
+    if resp.status != 200:
+        pytest.fail(f"expected 200, got {resp.status}: {body}")
+    if body["total"] != 0 or body["enriched"] != 0 or body["pending"] != 0:
+        pytest.fail(f"expected zeros, got {body}")
+    if body["by_enrichment_level"] != {}:
+        pytest.fail(f"expected empty dict, got {body['by_enrichment_level']}")
+
+
+# --------------------------------------------------------------------------- #
+# /api/v2/assets/tags/refine
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_tags_refine_returns_histogram(monkeypatch):
+    captured: dict = {}
+
+    def _handle(sql, params):
+        captured["sql"] = sql
+        captured["params"] = params
+        return Result.Ok([
+            {"name": "cat", "count": 12},
+            {"name": "cute", "count": 9},
+            {"name": "dog", "count": 4},
+        ])
+
+    async def _services():
+        return {"db": _FakeDB(_handle)}, None
+
+    monkeypatch.setattr(api_v2_assets, "_require_services", _services)
+    req = make_mocked_request(
+        "GET",
+        "/api/v2/assets/tags/refine?include_tags=cat&exclude_tags=blurry&limit=10",
+    )
+    resp = await api_v2_assets._tags_refine(req)
+    body = json.loads(resp.text)
+    if resp.status != 200:
+        pytest.fail(f"expected 200, got {resp.status}: {body}")
+    if body["total"] != 3:
+        pytest.fail(f"expected total=3, got {body['total']}")
+    if body["tags"][0] != {"name": "cat", "count": 12}:
+        pytest.fail(f"unexpected top tag: {body['tags'][0]}")
+    # SQL should reference the normalized tables and pass the limit last.
+    if "asset_tags at" not in captured["sql"] or "tags t" not in captured["sql"]:
+        pytest.fail(f"SQL missing normalized joins: {captured['sql']}")
+    if captured["params"][-1] != 10:
+        pytest.fail(f"limit not appended, got params={captured['params']}")
+
+
+@pytest.mark.asyncio
+async def test_tags_refine_handles_no_filters(monkeypatch):
+    def _handle(sql, params):
+        return Result.Ok([])
+
+    async def _services():
+        return {"db": _FakeDB(_handle)}, None
+
+    monkeypatch.setattr(api_v2_assets, "_require_services", _services)
+    req = make_mocked_request("GET", "/api/v2/assets/tags/refine")
+    resp = await api_v2_assets._tags_refine(req)
+    body = json.loads(resp.text)
+    if resp.status != 200:
+        pytest.fail(f"expected 200, got {resp.status}: {body}")
+    if body != {"tags": [], "total": 0}:
+        pytest.fail(f"unexpected empty payload: {body}")
+
+
+# --------------------------------------------------------------------------- #
+# Route registration: static paths must resolve before /{id}
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.asyncio
+async def test_seed_status_is_not_eaten_by_id_route(monkeypatch):
+    """Regression guard: /seed/status must hit _seed_status, not _get_asset."""
+
+    async def _services():
+        return {"db": _FakeDB(lambda *_: Result.Ok([{"n": 0}]))}, None
+
+    monkeypatch.setattr(api_v2_assets, "_require_services", _services)
+    app = _build_app()
+    req = make_mocked_request("GET", "/api/v2/assets/seed/status", app=app)
+    match = await app.router.resolve(req)
+    if match.handler is not api_v2_assets._seed_status:
+        pytest.fail(f"seed/status routed to {match.handler.__name__}")
+
+
+@pytest.mark.asyncio
+async def test_tags_refine_is_not_eaten_by_id_route(monkeypatch):
+    async def _services():
+        return {"db": _FakeDB(lambda *_: Result.Ok([]))}, None
+
+    monkeypatch.setattr(api_v2_assets, "_require_services", _services)
+    app = _build_app()
+    req = make_mocked_request("GET", "/api/v2/assets/tags/refine", app=app)
+    match = await app.router.resolve(req)
+    if match.handler is not api_v2_assets._tags_refine:
+        pytest.fail(f"tags/refine routed to {match.handler.__name__}")

@@ -56,6 +56,8 @@ async def _drop_asset_metadata_fts_objects(db, *, include_table: bool) -> None:
         "DROP TRIGGER IF EXISTS asset_metadata_fts_insert;",
         "DROP TRIGGER IF EXISTS asset_metadata_fts_delete;",
         "DROP TRIGGER IF EXISTS asset_metadata_fts_update;",
+        "DROP TRIGGER IF EXISTS asset_tags_fts_insert;",
+        "DROP TRIGGER IF EXISTS asset_tags_fts_delete;",
     ]
     if include_table:
         script_parts.append("DROP TABLE IF EXISTS asset_metadata_fts;")
@@ -77,11 +79,20 @@ async def _create_asset_metadata_fts_table_if_needed(db, *, needs_table_rebuild:
 
 
 async def _create_asset_metadata_fts_triggers(db) -> None:
+    # Triggers source the FTS ``tags`` column from the normalized
+    # ``asset_tags`` + ``tags`` tables (see migration v18). The same
+    # text is also written into ``tags_text`` to preserve cross-column
+    # MATCH semantics for callers that still spell out that column.
     await db.aexecutescript(
         """
         CREATE TRIGGER IF NOT EXISTS asset_metadata_fts_insert AFTER INSERT ON asset_metadata BEGIN
             INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)
-            VALUES (new.asset_id, COALESCE(new.tags, ''), COALESCE(new.tags_text, ''), COALESCE(new.metadata_text, ''));
+            VALUES (
+                new.asset_id,
+                COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
+                COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
+                COALESCE(new.metadata_text, '')
+            );
         END;
 
         CREATE TRIGGER IF NOT EXISTS asset_metadata_fts_delete AFTER DELETE ON asset_metadata BEGIN
@@ -90,24 +101,76 @@ async def _create_asset_metadata_fts_triggers(db) -> None:
 
         CREATE TRIGGER IF NOT EXISTS asset_metadata_fts_update AFTER UPDATE ON asset_metadata BEGIN
             UPDATE asset_metadata_fts
-            SET tags = COALESCE(new.tags, ''),
-                tags_text = COALESCE(new.tags_text, ''),
+            SET tags = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
+                tags_text = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
                 metadata_text = COALESCE(new.metadata_text, '')
             WHERE rowid = new.asset_id;
         END;
         """
     )
 
-
-async def _reindex_asset_metadata_fts(db) -> None:
+    # The ``asset_tags_fts_*`` triggers can only be created once the
+    # normalized ``asset_tags`` table exists (created by migration v17).
+    # Skip silently otherwise; migration v18 will install them.
+    try:
+        has_asset_tags = await db.ahas_table("asset_tags")
+    except Exception:
+        has_asset_tags = False
+    if not has_asset_tags:
+        return
     await db.aexecutescript(
         """
-        DELETE FROM asset_metadata_fts;
-        INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)
-        SELECT asset_id, COALESCE(tags, ''), COALESCE(tags_text, ''), COALESCE(metadata_text, '')
-        FROM asset_metadata;
+        CREATE TRIGGER IF NOT EXISTS asset_tags_fts_insert AFTER INSERT ON asset_tags
+        WHEN EXISTS (SELECT 1 FROM asset_metadata_fts WHERE rowid = new.asset_id)
+        BEGIN
+            UPDATE asset_metadata_fts
+            SET tags = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
+                tags_text = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), '')
+            WHERE rowid = new.asset_id;
+        END;
+
+        CREATE TRIGGER IF NOT EXISTS asset_tags_fts_delete AFTER DELETE ON asset_tags
+        WHEN EXISTS (SELECT 1 FROM asset_metadata_fts WHERE rowid = old.asset_id)
+        BEGIN
+            UPDATE asset_metadata_fts
+            SET tags = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = old.asset_id), ''),
+                tags_text = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = old.asset_id), '')
+            WHERE rowid = old.asset_id;
+        END;
         """
     )
+
+
+async def _reindex_asset_metadata_fts(db) -> None:
+    # Rebuild FTS rows. When the normalized ``asset_tags`` table is not
+    # yet available (legacy DB before migration v17 has run), fall back
+    # to writing empty tag columns — migration v18 will reindex from the
+    # normalized source once those tables exist.
+    try:
+        has_asset_tags = await db.ahas_table("asset_tags")
+    except Exception:
+        has_asset_tags = False
+    if has_asset_tags:
+        await db.aexecutescript(
+            """
+            DELETE FROM asset_metadata_fts;
+            INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)
+            SELECT m.asset_id,
+                   COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = m.asset_id), ''),
+                   COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = m.asset_id), ''),
+                   COALESCE(m.metadata_text, '')
+            FROM asset_metadata m;
+            """
+        )
+    else:
+        await db.aexecutescript(
+            """
+            DELETE FROM asset_metadata_fts;
+            INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)
+            SELECT asset_id, '', '', COALESCE(metadata_text, '')
+            FROM asset_metadata;
+            """
+        )
 
 
 async def repair_asset_metadata_fts(db) -> Result[bool]:

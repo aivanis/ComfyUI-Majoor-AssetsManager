@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 
 import pytest
+from mjr_am_backend.adapters.db.migrations import MigrationRunner
+from mjr_am_backend.adapters.db.migrations.registry import MIGRATIONS
 from mjr_am_backend.adapters.db.schema import migrate_schema
 from mjr_am_backend.adapters.db.sqlite import Sqlite
 from mjr_am_backend.features.index.metadata_helpers import MetadataHelpers
@@ -16,7 +18,20 @@ async def _make_db(tmp_path: Path) -> Sqlite:
     db = Sqlite(str(db_path), attach={"vec": str(tmp_path / "vectors.sqlite")})
     mig = await migrate_schema(db)
     assert mig.ok
+    runner_res = await MigrationRunner(MIGRATIONS).run(db)
+    assert runner_res.ok, runner_res.error
     return db
+
+
+async def _normalized_tags(db: Sqlite, asset_id: int) -> list[str]:
+    res = await db.aquery(
+        "SELECT t.name AS name FROM asset_tags at "
+        "JOIN tags t ON t.id = at.tag_id "
+        "WHERE at.asset_id = ? ORDER BY t.name",
+        (asset_id,),
+    )
+    assert res.ok
+    return [str(row["name"]) for row in (res.data or [])]
 
 
 @pytest.mark.asyncio
@@ -36,12 +51,11 @@ async def test_imports_rating_tags_when_db_empty(tmp_path: Path):
         w = await MetadataHelpers.write_asset_metadata_row(db, asset_id, meta)
         assert w.ok
 
-        rows = (await db.aquery("SELECT rating, tags, tags_text FROM asset_metadata WHERE asset_id = ?", (asset_id,))).data
+        rows = (await db.aquery("SELECT rating FROM asset_metadata WHERE asset_id = ?", (asset_id,))).data
         assert rows
         row = rows[0]
         assert row["rating"] == 4
-        assert json.loads(row["tags"]) == ["foo", "bar"]
-        assert row["tags_text"] == "foo bar"
+        assert await _normalized_tags(db, asset_id) == ["bar", "foo"]
     finally:
         await db.aclose()
 
@@ -60,20 +74,23 @@ async def test_does_not_override_existing_db_rating_tags(tmp_path: Path):
         asset_id = asset_rows[0]["id"]
 
         await db.aexecute(
-            "INSERT INTO asset_metadata(asset_id, rating, tags, tags_text, has_workflow, has_generation_data, metadata_quality, metadata_raw) VALUES(?, ?, ?, ?, 0, 0, 'none', '{}')",
-            (asset_id, 5, json.dumps(["keep"], ensure_ascii=False), "keep"),
+            "INSERT INTO asset_metadata(asset_id, rating, has_workflow, has_generation_data, metadata_quality, metadata_raw) VALUES(?, ?, 0, 0, 'none', '{}')",
+            (asset_id, 5),
         )
+        from mjr_am_backend.data.repositories import TagsRepository
+
+        seeded = await TagsRepository(db).replace_all(asset_id, ["keep"])
+        assert seeded.ok
 
         meta = Result.Ok({"rating": 1, "tags": ["overwrite"], "quality": "partial"})
         w = await MetadataHelpers.write_asset_metadata_row(db, asset_id, meta)
         assert w.ok
 
-        rows = (await db.aquery("SELECT rating, tags, tags_text FROM asset_metadata WHERE asset_id = ?", (asset_id,))).data
+        rows = (await db.aquery("SELECT rating FROM asset_metadata WHERE asset_id = ?", (asset_id,))).data
         assert rows
         row = rows[0]
         assert row["rating"] == 5
-        assert json.loads(row["tags"]) == ["keep"]
-        assert row["tags_text"] == "keep"
+        assert await _normalized_tags(db, asset_id) == ["keep"]
     finally:
         await db.aclose()
 

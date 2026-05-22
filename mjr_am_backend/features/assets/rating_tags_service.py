@@ -53,7 +53,22 @@ def normalize_tags_payload(raw_tags: object) -> list[str]:
 async def fetch_asset_rating_tags(db: Any, asset_id: int) -> tuple[int, list[str]]:
     try:
         meta_res = await db.aquery(
-            "SELECT rating, tags FROM asset_metadata WHERE asset_id = ?",
+            """
+            SELECT
+                COALESCE(m.rating, 0) AS rating,
+                COALESCE((
+                    SELECT '[' || group_concat(json_quote(name)) || ']'
+                    FROM (
+                        SELECT t.name AS name
+                        FROM asset_tags at
+                        JOIN tags t ON t.id = at.tag_id
+                        WHERE at.asset_id = m.asset_id
+                        ORDER BY t.name
+                    )
+                ), '[]') AS tags
+            FROM asset_metadata m
+            WHERE m.asset_id = ?
+            """,
             (asset_id,),
         )
         if not meta_res.ok or not meta_res.data:
