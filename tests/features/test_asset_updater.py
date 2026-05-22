@@ -4,7 +4,7 @@ from mjr_am_backend.shared import Result
 
 
 def test_asset_updater_sanitize_tags_dedupes_case_insensitively() -> None:
-    updater = AssetUpdater(db=object(), has_tags_text_column=False)
+    updater = AssetUpdater(db=object(), has_tags_text_column=False)  # type: ignore[arg-type]
     long_tag = "x" * (MAX_TAG_LENGTH + 1)
 
     sanitized = updater._sanitize_tags([" Cat ", "cat", "", "DOG", "dog", 42, long_tag])  # type: ignore[list-item]
@@ -25,7 +25,7 @@ class _Db:
 
 @pytest.mark.asyncio
 async def test_asset_updater_get_all_tags_reads_normalized_table_order() -> None:
-    updater = AssetUpdater(db=_Db(), has_tags_text_column=False)
+    updater = AssetUpdater(db=_Db(), has_tags_text_column=False)  # type: ignore[arg-type]
 
     result = await updater.get_all_tags()
 
