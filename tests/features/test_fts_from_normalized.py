@@ -153,6 +153,8 @@ async def test_asset_tags_insert_updates_fts(services) -> None:
 
     await _add_normalized_tag(db, asset_id, "freshtag")
     row = await _fts_row(db, asset_id)
+    if row is None:
+        pytest.fail("FTS row missing after asset_tags insert")
     if "freshtag" not in (row["tags"] or ""):
         pytest.fail(f"FTS tags did not reflect new asset_tags insert: {row['tags']!r}")
 
@@ -170,6 +172,8 @@ async def test_asset_tags_delete_updates_fts(services) -> None:
 
     await _remove_normalized_tag(db, asset_id, "removeme")
     row = await _fts_row(db, asset_id)
+    if row is None:
+        pytest.fail("FTS row missing after asset_tags delete")
     remaining = set((row["tags"] or "").split())
     if remaining != {"keepme"}:
         pytest.fail(f"FTS tags after delete unexpected: {row['tags']!r}")
@@ -199,6 +203,8 @@ async def test_metadata_update_refreshes_fts_tags(services) -> None:
         pytest.fail(f"metadata update failed: {res.error}")
 
     row = await _fts_row(db, asset_id)
+    if row is None:
+        pytest.fail("FTS row missing after metadata UPDATE")
     if "after_update" not in (row["tags"] or ""):
         pytest.fail(f"UPDATE trigger did not refresh tags: {row['tags']!r}")
     if "some meta" not in (row["metadata_text"] or ""):
