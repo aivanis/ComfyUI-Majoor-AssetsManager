@@ -89,7 +89,16 @@ async def query_browser_rows(db: Any, filepaths: list[str]) -> list[dict] | None
                 a.source_node_type,
                 a.workflow_id,
                 COALESCE(m.rating, 0) AS rating,
-                COALESCE(m.tags, '[]') AS tags,
+                COALESCE((
+                    SELECT '[' || group_concat(json_quote(name)) || ']'
+                    FROM (
+                        SELECT t.name AS name
+                        FROM asset_tags at
+                        JOIN tags t ON t.id = at.tag_id
+                        WHERE at.asset_id = a.id
+                        ORDER BY t.name
+                    )
+                ), '[]') AS tags,
                 m.has_workflow AS has_workflow,
                 m.has_generation_data AS has_generation_data,
                 UPPER(COALESCE(

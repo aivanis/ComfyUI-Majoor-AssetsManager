@@ -85,6 +85,21 @@ _AI_SELECT_SQL = """
 """
 
 
+def _normalized_tags_json_select(asset_alias: str = "a", *, alias: str = "tags") -> str:
+    return (
+        "COALESCE(("
+        "SELECT '[' || group_concat(json_quote(name)) || ']' "
+        "FROM ("
+        "SELECT t.name AS name "
+        "FROM asset_tags at "
+        "JOIN tags t ON t.id = at.tag_id "
+        f"WHERE at.asset_id = {asset_alias}.id "
+        "ORDER BY t.name"
+        ")"
+        f"), '[]') AS {alias}"
+    )
+
+
 def _normalize_sort_key(sort: str | None) -> str:
     s = str(sort or "").strip().lower()
     if s in VALID_SORT_KEYS:
@@ -240,13 +255,17 @@ def _append_tag_filter(filters: dict[str, Any], clauses: list[str], params: list
     if not isinstance(tags, list):
         return
     for tag in tags:
-        tag_clean = str(tag or "").strip().lower()[:100]
+        tag_clean = str(tag or "").strip()[:100]
         if not tag_clean:
             continue
+        # Normalized tag lookup via asset_tags + tags (case-insensitive via
+        # COLLATE NOCASE on tags.name). Relies on idx_asset_tags_tag for
+        # the inner SELECT and tags.name UNIQUE index for the lookup.
         clauses.append(
             "AND EXISTS ("
-            "SELECT 1 FROM json_each(NULLIF(m.tags, '')) "
-            "WHERE LOWER(value) = ?"
+            "SELECT 1 FROM asset_tags at "
+            "JOIN tags t ON t.id = at.tag_id "
+            "WHERE at.asset_id = m.asset_id AND t.name = ?"
             ")"
         )
         params.append(tag_clean)
@@ -903,16 +922,16 @@ class IndexSearcher:
     and bulk filepath lookups for asset enrichment.
     """
 
-    def __init__(self, db: Sqlite, has_tags_text_column: bool):
+    def __init__(self, db: Sqlite, has_tags_text_column: bool = False):
         """
         Initialize index searcher.
 
         Args:
             db: Database adapter instance
-            has_tags_text_column: Whether the tags_text column exists in asset_metadata
+            has_tags_text_column: Legacy compatibility parameter; ignored after v19.
         """
         self.db = db
-        self._has_tags_text_column = has_tags_text_column
+        self._has_tags_text_column = False
         self.fts_vocab_ready = False
         # Lightweight total-count cache: avoids expensive COUNT(*)
         # on every search-as-you-type keystroke. Entries expire after
@@ -1048,7 +1067,7 @@ class IndexSearcher:
                 a.source, a.root_id, a.job_id, a.stack_id,
                 a.width, a.height, a.duration, a.size, a.mtime,
                 COALESCE(m.rating, 0) as rating,
-                COALESCE(m.tags, '[]') as tags,
+                {_normalized_tags_json_select('a')},
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 {_generation_time_ms_select()} as generation_time_ms,
@@ -1188,7 +1207,7 @@ class IndexSearcher:
                 a.source, a.root_id, a.job_id, a.stack_id,
                 a.width, a.height, a.duration, a.size, a.mtime,
                 COALESCE(m.rating, 0) as rating,
-                COALESCE(m.tags, '[]') as tags,
+                {_normalized_tags_json_select('a')},
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 {_generation_time_ms_select()} as generation_time_ms,
@@ -1256,7 +1275,7 @@ class IndexSearcher:
                 a.source, a.root_id, a.job_id, a.stack_id,
                 a.width, a.height, a.duration, a.size, a.mtime,
                 COALESCE(m.rating, 0) as rating,
-                COALESCE(m.tags, '[]') as tags,
+                {_normalized_tags_json_select('a')},
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 {_generation_time_ms_select()} as generation_time_ms,
@@ -1349,7 +1368,7 @@ class IndexSearcher:
                 a.source, a.root_id, a.job_id, a.stack_id,
                 a.width, a.height, a.duration, a.size, a.mtime,
                 COALESCE(m.rating, 0) as rating,
-                COALESCE(m.tags, '[]') as tags,
+                {_normalized_tags_json_select('a')},
 {metadata_tags_text_clause}{_AI_SELECT_SQL}                    m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 {_generation_time_ms_select()} as generation_time_ms,
@@ -1843,8 +1862,7 @@ class IndexSearcher:
             SELECT
                 a.*,
                 COALESCE(m.rating, 0) AS rating,
-                COALESCE(m.tags, '') AS tags,
-                COALESCE(m.tags_text, '') AS tags_text,
+                {_normalized_tags_json_select('a')},
                 m.workflow_hash,
                 m.has_workflow AS has_workflow,
                 m.has_generation_data AS has_generation_data,
@@ -1899,12 +1917,11 @@ class IndexSearcher:
             return Result.Ok([])
 
         result = await self.db.aquery_in(
-            """
+            f"""
             SELECT
                 a.*,
                 COALESCE(m.rating, 0) AS rating,
-                COALESCE(m.tags, '') AS tags,
-                COALESCE(m.tags_text, '') AS tags_text,
+                {_normalized_tags_json_select('a')},
                 m.workflow_hash,
                 m.has_workflow AS has_workflow,
                 m.has_generation_data AS has_generation_data,
@@ -1933,7 +1950,7 @@ class IndexSearcher:
             FROM assets a
             LEFT JOIN asset_metadata m ON m.asset_id = a.id
             LEFT JOIN vec.asset_embeddings ae ON ae.asset_id = a.id
-            WHERE {IN_CLAUSE}
+            WHERE {{IN_CLAUSE}}
             """,
             "a.id",
             cleaned,
@@ -1967,7 +1984,7 @@ class IndexSearcher:
                 a.source,
                 a.root_id,
                 COALESCE(m.rating, 0) as rating,
-                COALESCE(m.tags, '[]') as tags,
+                {_normalized_tags_json_select('a')},
                 m.has_workflow as has_workflow,
                 m.has_generation_data as has_generation_data,
                 COALESCE(ae.auto_tags, '[]') as auto_tags,
@@ -2107,6 +2124,4 @@ class IndexSearcher:
         return None
 
     def _build_tags_text_clause(self) -> str:
-        if self._has_tags_text_column:
-            return "                    COALESCE(m.tags_text, '') as tags_text,\n"
         return ""

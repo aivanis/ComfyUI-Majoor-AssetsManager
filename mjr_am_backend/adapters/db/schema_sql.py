@@ -59,8 +59,6 @@ CREATE TABLE IF NOT EXISTS assets (
 CREATE TABLE IF NOT EXISTS asset_metadata (
     asset_id INTEGER PRIMARY KEY,
     rating INTEGER DEFAULT 0,
-    tags TEXT DEFAULT '',  -- JSON array stored as string
-     tags_text TEXT DEFAULT '',  -- Legacy text column
      metadata_text TEXT DEFAULT '',  -- Full metadata text for FTS
     workflow_hash TEXT,
     has_workflow BOOLEAN DEFAULT 0,
@@ -147,8 +145,6 @@ COLUMN_DEFINITIONS = {
     ],
     "asset_metadata": [
         ("rating", "rating INTEGER DEFAULT 0"),
-        ("tags", "tags TEXT DEFAULT ''"),
-        ("tags_text", "tags_text TEXT DEFAULT ''"),
         ("metadata_text", "metadata_text TEXT DEFAULT ''"),
         ("workflow_hash", "workflow_hash TEXT"),
         ("has_workflow", "has_workflow BOOLEAN DEFAULT 0"),
@@ -243,7 +239,12 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS asset_metadata_fts_insert AFTER INSERT ON asset_metadata BEGIN
      INSERT INTO asset_metadata_fts(rowid, tags, tags_text, metadata_text)
-     VALUES (new.asset_id, COALESCE(new.tags, ''), COALESCE(new.tags_text, ''), COALESCE(new.metadata_text, ''));
+     VALUES (
+         new.asset_id,
+         COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
+         COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
+         COALESCE(new.metadata_text, '')
+     );
 END;
 
 CREATE TRIGGER IF NOT EXISTS asset_metadata_fts_delete AFTER DELETE ON asset_metadata BEGIN
@@ -252,11 +253,14 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS asset_metadata_fts_update AFTER UPDATE ON asset_metadata BEGIN
     UPDATE asset_metadata_fts
-    SET tags = COALESCE(new.tags, ''),
-        tags_text = COALESCE(new.tags_text, ''),
+    SET tags = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
+        tags_text = COALESCE((SELECT group_concat(t.name, ' ') FROM asset_tags at JOIN tags t ON t.id = at.tag_id WHERE at.asset_id = new.asset_id), ''),
         metadata_text = COALESCE(new.metadata_text, '')
     WHERE rowid = new.asset_id;
 END;
+
+-- Triggers on ``asset_tags`` are installed by migration v18 (since the
+-- ``asset_tags`` table is created by v17, which runs after this baseline).
 """
 
 VEC_SCHEMA = """

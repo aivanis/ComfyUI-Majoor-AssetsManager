@@ -1,6 +1,6 @@
 # Architecture Map
 
-**Version**: 2.4.5  
+**Version**: 2.4.5
 **Last Updated**: April 10, 2026
 
 This map is the working reference for backend refactors. It is intentionally short and operational.
@@ -85,3 +85,10 @@ These zones should be refactored behind stable service facades before adding new
 - Public internal APIs should be thin, stable facades under `features/*` or `routes/core/*`.
 - Route modules may import facades and helpers, but should not directly orchestrate storage internals across multiple subsystems.
 - New security-sensitive mutations must call shared security and path helpers instead of duplicating checks.
+
+## Tags Storage
+
+- User tags are stored in normalized tags and asset_tags tables.
+- mjr_am_backend/data/repositories/tags_repository.py owns tag persistence and asset/tag links.
+- asset_metadata.tags and asset_metadata.tags_text are pre-v19 legacy columns only; application readers and writers must use normalized tags.
+- FTS tag columns are populated from normalized tags by v18+ triggers.

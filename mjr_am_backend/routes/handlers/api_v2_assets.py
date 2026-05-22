@@ -214,6 +214,22 @@ def _row_to_asset(row: dict[str, Any]) -> dict[str, Any]:
         # `prompt_id` is the deprecated alias in the spec.
         asset["prompt_id"] = job_id
 
+    # Hoist workflow_id to the top level. The column on ``assets`` is the
+    # primary source; fall back to ``user_metadata.workflow.id`` for rows
+    # whose ingestion landed before workflow_id was lifted into the schema.
+    workflow_id = str(row.get("workflow_id") or "").strip()
+    if not workflow_id:
+        user_meta = asset.get("user_metadata") or {}
+        wf = user_meta.get("workflow") if isinstance(user_meta, dict) else None
+        if isinstance(wf, dict):
+            workflow_id = str(wf.get("id") or "").strip()
+    if workflow_id:
+        asset["workflow_id"] = workflow_id
+        # Also mirror it inside ``metadata`` so existing consumers that read
+        # the system-metadata block keep working.
+        if isinstance(asset.get("metadata"), dict):
+            asset["metadata"].setdefault("workflow_id", workflow_id)
+
     return asset
 
 
@@ -230,7 +246,16 @@ SELECT
     a.content_hash, a.phash, a.hash_algo, a.enrichment_level,
     a.job_id, a.stack_id, a.workflow_id,
     a.source_node_id, a.source_node_type,
-    COALESCE(m.tags, '') AS tags,
+    COALESCE((
+        SELECT '[' || group_concat(json_quote(name)) || ']'
+        FROM (
+            SELECT t.name AS name
+            FROM asset_tags at
+            JOIN tags t ON t.id = at.tag_id
+            WHERE at.asset_id = a.id
+            ORDER BY t.name
+        )
+    ), '[]') AS tags,
     COALESCE(m.metadata_raw, '') AS metadata_raw,
     COALESCE(m.workflow_type, '') AS workflow_type,
     COALESCE(m.metadata_quality, 'none') AS metadata_quality,
@@ -269,15 +294,23 @@ async def _query_list(
         clauses.append("LOWER(a.filename) LIKE ?")
         params.append(f"%{name_contains.lower()}%")
 
-    # Tag filters operate on the JSON-string column. A LIKE on the quoted token
-    # is good enough for compat-layer needs; full-fidelity filtering already
-    # lives behind /mjr/am/search.
+    # Tag filters use the normalized ``asset_tags`` + ``tags`` tables
+    # (case-insensitive via COLLATE NOCASE on tags.name; backed by
+    # idx_asset_tags_tag and the UNIQUE index on tags.name).
     for tag in include_tags:
-        clauses.append("INSTR(COALESCE(m.tags, ''), ?) > 0")
-        params.append(f'"{tag}"')
+        clauses.append(
+            "EXISTS (SELECT 1 FROM asset_tags at "
+            "JOIN tags t ON t.id = at.tag_id "
+            "WHERE at.asset_id = a.id AND t.name = ?)"
+        )
+        params.append(tag)
     for tag in exclude_tags:
-        clauses.append("(COALESCE(m.tags, '') = '' OR INSTR(m.tags, ?) = 0)")
-        params.append(f'"{tag}"')
+        clauses.append(
+            "NOT EXISTS (SELECT 1 FROM asset_tags at "
+            "JOIN tags t ON t.id = at.tag_id "
+            "WHERE at.asset_id = a.id AND t.name = ?)"
+        )
+        params.append(tag)
 
     where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
 
@@ -524,6 +557,131 @@ async def _get_asset_tags(request: web.Request) -> web.Response:
     return web.json_response({"tags": _parse_tags(row.get("tags"))})
 
 
+async def _seed_status(request: web.Request) -> web.Response:
+    """Compat shim for ``GET /api/v2/assets/seed/status``.
+
+    We do not run a background "seeder" the way ComfyUI core does; our
+    ingestion pipeline is the scanner + watcher loop. This endpoint reports
+    a derived snapshot so clients can poll for a stable, schema-aligned
+    response. The ``state`` field is always ``"idle"`` because there is no
+    pausable seeder process to surface here.
+    """
+    services, err = await _require_services()
+    if err is not None:
+        return _json_response(err)
+    if not isinstance(services, dict) or "db" not in services:
+        return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Database unavailable"))
+    db = services["db"]
+
+    try:
+        total_res = await db.aquery("SELECT COUNT(*) AS n FROM assets")
+        level_res = await db.aquery(
+            "SELECT enrichment_level AS lvl, COUNT(*) AS n FROM assets "
+            "GROUP BY enrichment_level"
+        )
+    except Exception as exc:
+        logger.warning("api/v2/assets seed/status failed: %s", exc, exc_info=True)
+        return _json_response(Result.Err("DB_ERROR", "Seed status lookup failed"))
+
+    total = 0
+    if total_res.ok and total_res.data:
+        try:
+            total = int(total_res.data[0].get("n") or 0)
+        except (TypeError, ValueError, AttributeError):
+            total = 0
+
+    by_level: dict[str, int] = {}
+    enriched = 0
+    if level_res.ok and isinstance(level_res.data, list):
+        for row in level_res.data:
+            raw_lvl = row.get("lvl")
+            key = "unknown" if raw_lvl is None else str(raw_lvl)
+            count = int(row.get("n") or 0)
+            by_level[key] = count
+            # ``enrichment_level`` ranges 0 (stub) → 2 (full).
+            try:
+                if int(raw_lvl) >= 1:
+                    enriched += count
+            except (TypeError, ValueError):
+                continue
+
+    return web.json_response({
+        "state": "idle",
+        "total": total,
+        "enriched": enriched,
+        "pending": max(0, total - enriched),
+        "by_enrichment_level": by_level,
+    })
+
+
+async def _tags_refine(request: web.Request) -> web.Response:
+    """``GET /api/v2/assets/tags/refine`` — tag histogram for filtered subset.
+
+    Accepts the same filters as ``GET /api/v2/assets`` (``name_contains``,
+    ``include_tags``, ``exclude_tags``) and returns the most-frequent tags
+    among matching assets. Results are read from the normalized
+    ``asset_tags`` + ``tags`` tables.
+    """
+    services, err = await _require_services()
+    if err is not None:
+        return _json_response(err)
+    if not isinstance(services, dict) or "db" not in services:
+        return _json_response(Result.Err("SERVICE_UNAVAILABLE", "Database unavailable"))
+    db = services["db"]
+
+    q = request.rel_url.query
+    name_contains = (q.get("name_contains") or "").strip() or None
+    multi = {k: q.getall(k, []) for k in ("include_tags", "exclude_tags")}
+    include_tags = _parse_multi(multi, "include_tags")
+    exclude_tags = _parse_multi(multi, "exclude_tags")
+    limit = _parse_int(q.get("limit"), 100, lo=1, hi=1000)
+
+    clauses: list[str] = []
+    params: list[Any] = []
+    if name_contains:
+        clauses.append("LOWER(a.filename) LIKE ?")
+        params.append(f"%{name_contains.lower()}%")
+    for tag in include_tags:
+        clauses.append(
+            "EXISTS (SELECT 1 FROM asset_tags at2 "
+            "JOIN tags t2 ON t2.id = at2.tag_id "
+            "WHERE at2.asset_id = a.id AND t2.name = ?)"
+        )
+        params.append(tag)
+    for tag in exclude_tags:
+        clauses.append(
+            "NOT EXISTS (SELECT 1 FROM asset_tags at2 "
+            "JOIN tags t2 ON t2.id = at2.tag_id "
+            "WHERE at2.asset_id = a.id AND t2.name = ?)"
+        )
+        params.append(tag)
+    where_sql = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+
+    sql = (
+        "SELECT t.name AS name, COUNT(*) AS count "
+        "FROM assets a "
+        "JOIN asset_tags at ON at.asset_id = a.id "
+        "JOIN tags t ON t.id = at.tag_id "
+        f"{where_sql} "
+        "GROUP BY t.name ORDER BY count DESC, t.name ASC LIMIT ?"
+    )
+    try:
+        res = await db.aquery(sql, tuple([*params, limit]))
+    except Exception as exc:
+        logger.warning("api/v2/assets tags/refine failed: %s", exc, exc_info=True)
+        return _json_response(Result.Err("DB_ERROR", "Tag refine failed"))
+
+    tags: list[dict[str, Any]] = []
+    if res.ok and isinstance(res.data, list):
+        for row in res.data:
+            name = str(row.get("name") or "").strip()
+            if not name:
+                continue
+            tags.append({"name": name, "count": int(row.get("count") or 0)})
+
+    return web.json_response({"tags": tags, "total": len(tags)})
+
+
 # --------------------------------------------------------------------------- #
 # Registration
 # --------------------------------------------------------------------------- #
@@ -532,6 +690,10 @@ async def _get_asset_tags(request: web.Request) -> web.Response:
 def register_api_v2_asset_routes(routes: web.RouteTableDef) -> None:
     """Register the ``/api/v2/assets/*`` compat surface."""
     routes.head("/api/v2/assets/hash/{hash}")(_check_asset_by_hash)
+    # Static-path routes MUST be declared before the catch-all ``/{id}``
+    # variants so aiohttp doesn't route ``seed`` / ``tags`` to ``_get_asset``.
+    routes.get("/api/v2/assets/seed/status")(_seed_status)
+    routes.get("/api/v2/assets/tags/refine")(_tags_refine)
     routes.get("/api/v2/assets")(_list_assets)
     routes.get("/api/v2/assets/{id}")(_get_asset)
     routes.get("/api/v2/assets/{id}/content")(_get_asset_content)

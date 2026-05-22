@@ -16,15 +16,15 @@ class _Db:
     async def aquery(self, _sql, _params=()):
         return Result.Ok(
             [
-                {"tags": '["Dog", "cat"]'},
-                {"tags": '["dog", "Bird"]'},
-                {"tags": '["CAT"]'},
+                {"name": "Bird"},
+                {"name": "cat"},
+                {"name": "Dog"},
             ]
         )
 
 
 @pytest.mark.asyncio
-async def test_asset_updater_get_all_tags_collapses_case_variants() -> None:
+async def test_asset_updater_get_all_tags_reads_normalized_table_order() -> None:
     updater = AssetUpdater(db=_Db(), has_tags_text_column=False)
 
     result = await updater.get_all_tags()

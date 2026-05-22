@@ -13,6 +13,7 @@ from mjr_am_shared.hashing import compute_file_hash as _shared_compute_file_hash
 from PIL import Image
 
 from ...adapters.db.sqlite import Sqlite
+from ...data.repositories import TagsRepository
 from ...shared import Result, get_logger
 
 logger = get_logger(__name__)
@@ -257,7 +258,17 @@ class DuplicatesService:
     def _exact_duplicates_query(where: str) -> str:
         if where:
             return f"""
-                SELECT a.id, a.filepath, a.filename, a.content_hash, m.tags
+                SELECT a.id, a.filepath, a.filename, a.content_hash,
+                       COALESCE((
+                           SELECT '[' || group_concat(json_quote(name)) || ']'
+                           FROM (
+                               SELECT t.name AS name
+                               FROM asset_tags at
+                               JOIN tags t ON t.id = at.tag_id
+                               WHERE at.asset_id = a.id
+                               ORDER BY t.name
+                           )
+                       ), '[]') AS tags
                 FROM assets a
                 LEFT JOIN asset_metadata m ON m.asset_id = a.id
                 {where}
@@ -272,7 +283,17 @@ class DuplicatesService:
                 ORDER BY a.content_hash, a.id
             """
         return """
-            SELECT a.id, a.filepath, a.filename, a.content_hash, m.tags
+            SELECT a.id, a.filepath, a.filename, a.content_hash,
+                   COALESCE((
+                       SELECT '[' || group_concat(json_quote(name)) || ']'
+                       FROM (
+                           SELECT t.name AS name
+                           FROM asset_tags at
+                           JOIN tags t ON t.id = at.tag_id
+                           WHERE at.asset_id = a.id
+                           ORDER BY t.name
+                       )
+                   ), '[]') AS tags
             FROM assets a
             LEFT JOIN asset_metadata m ON m.asset_id = a.id
             WHERE a.content_hash IS NOT NULL
@@ -440,21 +461,30 @@ class DuplicatesService:
 
         ids = [keep_asset_id] + merge_ids
         rows = await self.db.aquery_in(
-            "SELECT asset_id, tags FROM asset_metadata WHERE {IN_CLAUSE}",
-            "asset_id",
+            "SELECT at.asset_id AS asset_id, t.name AS tag "
+            "FROM asset_tags at JOIN tags t ON t.id = at.tag_id "
+            "WHERE {IN_CLAUSE} ORDER BY at.asset_id, t.name",
+            "at.asset_id",
             ids,
         )
         if not rows.ok:
             return Result.Err("DB_ERROR", rows.error or "Failed to load tags")
 
         merged = self._collect_merged_tags(rows.data or [])
-
-        upd = await self.db.aexecute(
-            "UPDATE asset_metadata SET tags = ?, tags_text = ? WHERE asset_id = ?",
-            (json.dumps(merged, ensure_ascii=False), " ".join(merged), keep_asset_id),
-        )
-        if not upd.ok:
-            return Result.Err("DB_ERROR", upd.error or "Failed to update tags")
+        try:
+            sync_res = await TagsRepository(self.db).replace_all(keep_asset_id, merged)
+            if not sync_res.ok:
+                logger.warning(
+                    "Normalized tags sync failed after merge for asset %s: %s",
+                    keep_asset_id,
+                    sync_res.error,
+                )
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning(
+                "Normalized tags sync raised after merge for asset %s: %s",
+                keep_asset_id,
+                exc,
+            )
         return Result.Ok({"asset_id": keep_asset_id, "tags": merged, "merged_from": merge_ids})
 
     def _normalize_merge_ids(self, keep_asset_id: int, merge_asset_ids: list[int]) -> list[int]:
@@ -481,6 +511,9 @@ class DuplicatesService:
         return merged
 
     def _extract_tags_from_row(self, row: dict[str, Any]) -> list[str]:
+        tag = (row or {}).get("tag")
+        if isinstance(tag, str):
+            return [tag]
         raw = (row or {}).get("tags")
         if isinstance(raw, list):
             return [value for value in raw if isinstance(value, str)]

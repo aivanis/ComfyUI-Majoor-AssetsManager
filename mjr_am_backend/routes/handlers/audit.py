@@ -78,8 +78,18 @@ def register_audit_routes(routes: web.RouteTableDef) -> None:
             where.append("a.root_id = ?")
             params.append(custom_root_id)
 
+        # Tag presence is checked via the normalized ``asset_tags`` table
+        # (backed by idx_asset_tags_tag). This is both faster and more
+        # correct than the legacy IN ('', '[]') check on the JSON column.
+        _HAS_TAGS_EXPR = (
+            "EXISTS (SELECT 1 FROM asset_tags WHERE asset_id = a.id)"
+        )
+        _NO_TAGS_EXPR = (
+            "NOT EXISTS (SELECT 1 FROM asset_tags WHERE asset_id = a.id)"
+        )
+
         if filter_mode == "no_tags":
-            where.append("(COALESCE(m.tags, '') IN ('', '[]'))")
+            where.append(f"({_NO_TAGS_EXPR})")
         elif filter_mode == "no_rating":
             where.append("COALESCE(m.rating, 0) = 0")
         elif filter_mode == "no_workflow":
@@ -88,13 +98,13 @@ def register_audit_routes(routes: web.RouteTableDef) -> None:
             where.append("e.aesthetic_score IS NOT NULL AND e.aesthetic_score < 0.4")
         else:  # incomplete (default): missing any quality signal
             where.append(
-                "(COALESCE(m.tags, '') IN ('', '[]') "
+                f"({_NO_TAGS_EXPR} "
                 "OR COALESCE(m.rating, 0) = 0 "
                 "OR COALESCE(m.has_workflow, 0) = 0)"
             )
 
         _COMPLETENESS_EXPR = (
-            "(CASE WHEN COALESCE(m.tags,'') NOT IN ('','[]') THEN 1 ELSE 0 END "
+            f"(CASE WHEN {_HAS_TAGS_EXPR} THEN 1 ELSE 0 END "
             "+ CASE WHEN COALESCE(m.rating,0) > 0 THEN 1 ELSE 0 END "
             "+ CASE WHEN COALESCE(m.has_workflow,0) > 0 THEN 1 ELSE 0 END)"
         )
@@ -119,7 +129,18 @@ def register_audit_routes(routes: web.RouteTableDef) -> None:
         query = (
             f"SELECT a.id, a.filename, a.subfolder, a.filepath, a.kind, a.source AS type, "
             f"a.mtime, a.size AS file_size, a.width, a.height, "
-            f"m.rating, m.tags, m.has_workflow, m.has_generation_data, "
+            f"m.rating, "
+            f"COALESCE(("
+            f"SELECT '[' || group_concat(json_quote(name)) || ']' "
+            f"FROM ("
+            f"SELECT t.name AS name "
+            f"FROM asset_tags at "
+            f"JOIN tags t ON t.id = at.tag_id "
+            f"WHERE at.asset_id = a.id "
+            f"ORDER BY t.name"
+            f")"
+            f"), '[]') AS tags, "
+            f"m.has_workflow, m.has_generation_data, "
             f"e.aesthetic_score, e.auto_tags "
             f"FROM assets a "
             f"LEFT JOIN asset_metadata m ON a.id = m.asset_id "

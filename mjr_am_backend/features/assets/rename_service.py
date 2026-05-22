@@ -178,7 +178,17 @@ async def _load_fresh_asset(services: dict[str, Any], matched_asset_id: int | No
             """
             SELECT a.id, a.filename, a.subfolder, a.filepath, a.source, a.root_id, a.kind, a.ext,
                    a.size, a.mtime, a.width, a.height, a.duration,
-                   COALESCE(m.rating, 0) AS rating, COALESCE(m.tags, '[]') AS tags
+                   COALESCE(m.rating, 0) AS rating,
+                   COALESCE((
+                       SELECT '[' || group_concat(json_quote(name)) || ']'
+                       FROM (
+                           SELECT t.name AS name
+                           FROM asset_tags at
+                           JOIN tags t ON t.id = at.tag_id
+                           WHERE at.asset_id = a.id
+                           ORDER BY t.name
+                       )
+                   ), '[]') AS tags
             FROM assets a
             LEFT JOIN asset_metadata m ON m.asset_id = a.id
             WHERE a.id = ?
