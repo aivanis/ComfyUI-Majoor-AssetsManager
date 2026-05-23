@@ -227,10 +227,16 @@ const _pickBestPathWidget = (node, droppedExt, cfg) => {
 };
 
 const _VIDEO_CFG = {
-    exactNames: new Set(["video_path", "input_video", "source_video", "video"]),
-    knownNodeIncludes: ["loadvideo", "vhs_loadvideo", "videoloader"],
-    mediaTerms: ["video"],
-    extraTerms: [{ terms: ["media", "clip", "footage"], score: 45 }],
+    exactNames: new Set([
+        "video_path", "input_video", "source_video", "video", "driven_video", "footage",
+        "input_path", "directory", "folder_path", "folder", "path", "video_directory"
+    ]),
+    knownNodeIncludes: [
+        "loadvideo", "vhs_loadvideo", "videoloader", "sadtalker", "wav2lip", "reactor",
+        "multiimageloader", "ltxdirector", "ltxsequencer", "ltxkeyframer"
+    ],
+    mediaTerms: ["video", "footage", "clip", "movie"],
+    extraTerms: [{ terms: ["media", "clip", "footage", "drive"], score: 45 }],
     exactSingleNames: new Set(["video"]),
     looksLikeFn: looksLikeVideoPath,
     comboChecker: comboHasAnyVideoValue,
@@ -238,28 +244,46 @@ const _VIDEO_CFG = {
 };
 
 const _IMAGE_CFG = {
-    exactNames: new Set(["image", "image_path", "input_image", "source_image"]),
-    knownNodeIncludes: ["loadimage", "loadimagemask", "imageloader"],
-    mediaTerms: ["image", "img", "mask", "frame", "photo", "picture"],
-    extraTerms: [{ terms: ["media", "source", "first", "last"], score: 35 }],
-    exactSingleNames: new Set(["image"]),
+    exactNames: new Set([
+        "image", "image_path", "input_image", "source_image", "ref_image", "pose_image",
+        "hint_image", "target_image", "ipadapter_image", "input_path", "directory",
+        "folder_path", "folder", "path", "image_directory"
+    ]),
+    knownNodeIncludes: [
+        "loadimage", "loadimagemask", "imageloader", "reactor", "roop", "ipadapter",
+        "controlnet", "instantid", "pulid", "multiimageloader", "ltxdirector",
+        "ltxsequencer", "ltxkeyframer"
+    ],
+    mediaTerms: ["image", "img", "mask", "frame", "photo", "picture", "face", "ipadapter"],
+    extraTerms: [{ terms: ["media", "source", "first", "last", "target", "reference"], score: 35 }],
+    exactSingleNames: new Set(["image", "face"]),
     looksLikeFn: looksLikeImagePath,
     comboChecker: comboHasAnyImageValue,
     scoreKey: "__mjrImagePickScore",
 };
 
 const _AUDIO_CFG = {
-    exactNames: new Set(["audio_path", "input_audio", "source_audio", "audio"]),
+    exactNames: new Set([
+        "audio_path", "input_audio", "source_audio", "audio", "driven_audio", "voice",
+        "bgm", "soundtrack", "input_path", "directory", "folder_path", "folder",
+        "path", "audio_directory"
+    ]),
     knownNodeIncludes: [
         "loadaudio",
         "vhs_loadaudioupload",
         "vhs_loadaudio",
         "audioloader",
         "inputaudio",
+        "sadtalker",
+        "wav2lip",
+        "multiimageloader",
+        "ltxdirector",
+        "ltxsequencer",
+        "ltxkeyframer"
     ],
-    mediaTerms: ["audio", "sound", "music"],
-    extraTerms: [{ terms: ["media", "track"], score: 45 }],
-    exactSingleNames: new Set(["audio"]),
+    mediaTerms: ["audio", "sound", "music", "voice", "speech", "wav", "mp3"],
+    extraTerms: [{ terms: ["media", "track", "drive"], score: 45 }],
+    exactSingleNames: new Set(["audio", "voice"]),
     looksLikeFn: looksLikeAudioPath,
     comboChecker: comboHasAnyAudioValue,
     scoreKey: "__mjrAudioPickScore",
@@ -279,6 +303,12 @@ const _MODEL3D_CFG = {
         "model",
         "mesh",
         "geometry",
+        "input_path",
+        "directory",
+        "folder_path",
+        "folder",
+        "path",
+        "model_directory"
     ]),
     knownNodeIncludes: [
         "load3d",
@@ -292,6 +322,12 @@ const _MODEL3D_CFG = {
         "pointcloud",
         "meshloader",
         "modelloader",
+        "tripo3d",
+        "unique3d",
+        "multiimageloader",
+        "ltxdirector",
+        "ltxsequencer",
+        "ltxkeyframer"
     ],
     mediaTerms: ["model", "mesh", "geometry", "scene", "object", "point", "cloud", "splat"],
     extraTerms: [{ terms: ["asset", "resource"], score: 30 }],
@@ -312,4 +348,39 @@ export const pickBestMediaPathWidget = (node, payload, droppedExt) => {
                 ? _IMAGE_CFG
                 : _VIDEO_CFG;
     return _pickBestPathWidget(node, droppedExt, cfg);
+};
+
+export const getInputSlotUnderClientXY = (app, node, clientX, clientY) => {
+    if (!node || !node.inputs || !node.inputs.length) return null;
+    const canvasEl = app?.canvas?.canvas || document.querySelector("canvas");
+    const ds = app?.canvas?.ds;
+    if (!canvasEl || !ds) return null;
+
+    const rect = canvasEl.getBoundingClientRect();
+    const scale = Number(ds.scale) || 1;
+    const off = ds.offset || [0, 0];
+    const offX = Array.isArray(off) ? Number(off[0]) || 0 : Number(off?.x) || 0;
+    const offY = Array.isArray(off) ? Number(off[1]) || 0 : Number(off?.y) || 0;
+
+    const x = (clientX - rect.left) / scale - offX;
+    const y = (clientY - rect.top) / scale - offY;
+
+    const nodeX = node.pos[0];
+    const nodeY = node.pos[1];
+
+    const titleHeight = node.constructor.title_height || 30;
+    const slotHeight = 20;
+
+    for (let i = 0; i < node.inputs.length; i++) {
+        const input = node.inputs[i];
+        const slotY = nodeY + titleHeight + i * slotHeight + slotHeight / 2;
+
+        const dx = x - nodeX;
+        const dy = y - slotY;
+
+        if (Math.abs(dx) <= 18 && Math.abs(dy) <= 12) {
+            return { index: i, input };
+        }
+    }
+    return null;
 };

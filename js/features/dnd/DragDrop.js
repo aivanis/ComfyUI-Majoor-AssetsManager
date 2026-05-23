@@ -26,9 +26,14 @@ import {
     clearHighlight,
     getNodeUnderClientXY,
     pickBestMediaPathWidget,
+    getInputSlotUnderClientXY,
 } from "./targets/node.js";
 import { stageToInput, stageToInputDetailed } from "./staging/stageToInput.js";
-import { createCanvasLoaderNodes, writeMediaPathWidgetValue } from "./canvasLoaderNode.js";
+import {
+    createCanvasLoaderNodes,
+    writeMediaPathWidgetValue,
+    createLoaderAndConnect,
+} from "./canvasLoaderNode.js";
 
 const _resolveApp = () => {
     const app = getRawHostApp();
@@ -479,19 +484,24 @@ export function createDragDropRuntimeHandlers() {
         if (!isManagedPayload(payload)) return;
 
         const node = getNodeUnderClientXY(app, event.clientX, event.clientY);
+        const slotInfo = node ? getInputSlotUnderClientXY(app, node, event.clientX, event.clientY) : null;
         const droppedExt =
             String(payload?.filename || "")
                 .split(".")
                 .pop() || "";
-        const widget = node ? pickBestMediaPathWidget(node, payload, droppedExt) : null;
+        const widget = node && !slotInfo ? pickBestMediaPathWidget(node, payload, droppedExt) : null;
 
-        if (node && widget) {
+        if (node && (slotInfo || widget)) {
             event.preventDefault();
             event.stopImmediatePropagation?.();
             event.stopPropagation();
             applyHighlight(app, node, markCanvasDirty);
             event.dataTransfer.dropEffect = "copy";
-            dndLog("dragover", { node: node?.title, widget: widget?.name });
+            if (slotInfo) {
+                dndLog("dragover slot", { node: node?.title, slot: slotInfo.input?.name });
+            } else {
+                dndLog("dragover widget", { node: node?.title, widget: widget?.name });
+            }
             return;
         }
 
@@ -517,11 +527,47 @@ export function createDragDropRuntimeHandlers() {
         const payloads = forceLoaderNode ? _getDraggedMultiPayloads(event, payload) : [payload];
 
         const node = getNodeUnderClientXY(app, event.clientX, event.clientY);
+        const slotInfo = node ? getInputSlotUnderClientXY(app, node, event.clientX, event.clientY) : null;
         const droppedExt =
             String(payload?.filename || "")
                 .split(".")
                 .pop() || "";
-        const widget = node ? pickBestMediaPathWidget(node, payload, droppedExt) : null;
+        const widget = node && !slotInfo ? pickBestMediaPathWidget(node, payload, droppedExt) : null;
+
+        if (node && slotInfo) {
+            event.preventDefault();
+            event.stopImmediatePropagation?.();
+            event.stopPropagation();
+            clearHighlight(app, markCanvasDirty);
+
+            const relativePath = await stageToInput({
+                post,
+                endpoint: ENDPOINTS.STAGE_TO_INPUT,
+                payload,
+                index: false,
+            });
+            if (!relativePath) return;
+
+            if (
+                createLoaderAndConnect({
+                    app,
+                    payload,
+                    relativePath,
+                    targetNode: node,
+                    inputSlotIndex: slotInfo.index,
+                    event,
+                })
+            ) {
+                dndLog("drop slot created and connected loader", {
+                    node: node?.title,
+                    slot: slotInfo.input?.name,
+                    value: relativePath,
+                });
+                return;
+            }
+            comfyToast(`Staged to input: ${relativePath}`, "success", 4000);
+            return;
+        }
 
         if (!node || !widget) {
             clearHighlight(app, markCanvasDirty);
