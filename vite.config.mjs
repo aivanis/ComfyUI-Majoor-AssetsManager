@@ -33,7 +33,7 @@ function stripNodeEnvForBrowser() {
 }
 
 function emitStaticRuntimeAssets() {
-    const assets = ["audio-bg.png", "audio-thumbnails.png"];
+    const assets = [];
     return {
         name: "mjr-emit-static-runtime-assets",
         generateBundle() {

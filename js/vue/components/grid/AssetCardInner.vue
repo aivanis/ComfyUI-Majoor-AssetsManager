@@ -25,9 +25,6 @@ import RatingBadge from "../common/RatingBadge.vue";
 import TagsBadge from "../common/TagsBadge.vue";
 import GenTimeBadge from "../common/GenTimeBadge.vue";
 
-// ─── Audio thumbnail URL ─────────────────────────────────────────────────────
-
-const AUDIO_THUMB_URL = builtAssetUrl("audio-thumbnails.png");
 
 // Audio waveform bars SVG (same bars as Card.js)
 const AUDIO_BARS = [
@@ -558,9 +555,9 @@ function onFileBadgeClick(event) {
         <!-- Audio -->
         <template v-else-if="isAudio">
             <img
-                v-if="AUDIO_THUMB_URL"
+                v-if="posterUrl"
                 class="mjr-thumb-media"
-                :src="AUDIO_THUMB_URL"
+                :src="posterUrl"
                 :draggable="false"
                 alt=""
             />

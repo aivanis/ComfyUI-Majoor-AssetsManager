@@ -9,7 +9,6 @@ import {
 import { APP_CONFIG } from "../../app/config.js";
 import { builtAssetUrl } from "../../app/assetUrls.js";
 
-const AUDIO_BG_URL = builtAssetUrl("audio-bg.png");
 
 export function createViewerMediaFactory({
     overlay,
@@ -307,10 +306,7 @@ export function createViewerMediaFactory({
             gap: 12px;
             color: rgba(255,255,255,0.85);
             padding: 14px;
-            background-image: linear-gradient(rgba(0,0,0,0.42), rgba(0,0,0,0.42)), url('${AUDIO_BG_URL}');
-            background-size: cover;
-            background-position: center center;
-            background-repeat: no-repeat;
+            background: radial-gradient(circle at 50% 50%, rgba(95, 179, 255, 0.12), rgba(10, 13, 18, 0.98));
         `;
 
         if (!compare) {
