@@ -1,4 +1,4 @@
-const BUILT_ASSET_NAMES = new Set(["audio-bg.png", "audio-thumbnails.png"]);
+const BUILT_ASSET_NAMES = new Set([]);
 
 export function builtAssetUrl(name) {
     const safeName = String(name || "").trim();

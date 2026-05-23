@@ -20,7 +20,6 @@ const VIDEO_PLAY_MIN_RATIO = 0.45;
 const VIDEO_PREFETCH_MARGIN = "0px 240px 0px 240px";
 const VIDEO_RELEASE_DELAY_MS = 3500;
 
-const AUDIO_THUMB_URL = builtAssetUrl("audio-thumbnails.png");
 
 function _clearReleaseTimer(video) {
     try {
@@ -377,7 +376,7 @@ export function createFilmstrip({ state, buildAssetViewURL, onNavigate, onCompar
 
         if (kind === "audio") {
             const thumbUrl = String(
-                asset?.thumbnail_url || asset?.thumb_url || AUDIO_THUMB_URL || "",
+                asset?.thumbnail_url || asset?.thumb_url || "",
             ).trim();
             if (thumbUrl) {
                 const img = document.createElement("img");
