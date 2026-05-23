@@ -34,6 +34,13 @@ const _setWidgetValue = (widget, value) => {
     } catch (e) {
         console.debug?.(e);
     }
+    try {
+        if (typeof widget.onchange === "function") {
+            widget.onchange(value);
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
 };
 
 const _getCanvasCenterPos = (app) => {
@@ -127,3 +134,49 @@ export const createCanvasLoaderNodes = ({ app, items = [], event = null, gap = 9
 };
 
 export const writeMediaPathWidgetValue = _setWidgetValue;
+
+export const createLoaderAndConnect = ({
+    app,
+    payload,
+    relativePath,
+    targetNode,
+    inputSlotIndex,
+    event = null,
+}) => {
+    const graph = app?.graph ?? app?.canvas?.graph ?? null;
+    const LiteGraph = globalThis?.LiteGraph || globalThis?.window?.LiteGraph || null;
+    if (!graph || typeof graph.add !== "function" || !LiteGraph?.createNode || !targetNode) return false;
+
+    let loaderNode = null;
+    for (const nodeType of _getLoaderNodeCandidates(payload)) {
+        try {
+            loaderNode = LiteGraph.createNode(nodeType);
+            if (loaderNode) break;
+        } catch (e) {
+            console.debug?.(e);
+        }
+    }
+    if (!loaderNode) return false;
+
+    const targetX = Number(targetNode.pos[0]) || 0;
+    const targetY = Number(targetNode.pos[1]) || 0;
+    const sizeW = Array.isArray(loaderNode.size) ? Number(loaderNode.size[0]) || 220 : 220;
+    loaderNode.pos = [targetX - sizeW - 60, targetY + Number(inputSlotIndex) * 20];
+
+    graph.add(loaderNode);
+
+    const droppedExt = _getPayloadExt(payload);
+    const widget = pickBestMediaPathWidget(loaderNode, payload, droppedExt);
+    if (widget) {
+        _setWidgetValue(widget, relativePath);
+    }
+
+    try {
+        loaderNode.connect(0, targetNode, inputSlotIndex);
+    } catch (e) {
+        console.debug?.(e);
+    }
+
+    markCanvasDirty(app);
+    return true;
+};
