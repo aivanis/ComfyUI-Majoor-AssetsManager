@@ -8,7 +8,7 @@ import { getRawHostApp } from "../../app/hostAdapter.js";
 import { comfyToast } from "../../app/toast.js";
 import { pickRootId } from "../../utils/ids.js";
 
-import { DND_MIME, DND_MULTI_MIME } from "./utils/constants.js";
+import { COMFY_ASSET_INFO_MIME, DND_MIME, DND_MULTI_MIME } from "./utils/constants.js";
 import { dndLog } from "./utils/log.js";
 import { buildPayloadViewURL, getDraggedAsset, sanitizeDraggedPayload } from "./utils/payload.js";
 import { isManagedPayload } from "./utils/video.js";
@@ -75,6 +75,52 @@ const _assetToPayload = (asset) => {
         root_id: pickRootId(asset) || undefined,
         kind: String(asset.kind || "").toLowerCase(),
     };
+};
+
+const _setDataTransferData = (dt, mimeType, value) => {
+    if (!dt || !mimeType || value == null) return false;
+    const text = String(value);
+    try {
+        if (typeof dt.setData === "function") {
+            dt.setData(mimeType, text);
+            return true;
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    try {
+        if (typeof dt.items?.add === "function") {
+            dt.items.add(text, mimeType);
+            return true;
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return false;
+};
+
+const _setComfyNativeDragFallbacks = ({ dt, asset, payload, viewUrl }) => {
+    if (!dt || !asset || !payload) return;
+    const comfyKind = String(payload.kind || "").toLowerCase() === "model3d" ? "3D" : payload.kind;
+    const comfyAssetInfo = {
+        id: asset.id == null ? _payloadKey(payload) : String(asset.id),
+        name: asset.filename || payload.filename,
+        display_name: asset.filename || payload.filename,
+        filename: payload.filename,
+        subfolder: payload.subfolder || "",
+        type: payload.type || "output",
+        kind: comfyKind || undefined,
+        preview_url: viewUrl || undefined,
+        thumbnail_url: asset.thumbnail_url || asset.thumbnailUrl || asset.preview_url || undefined,
+        user_metadata: {
+            filename: payload.filename,
+            subfolder: payload.subfolder || "",
+            type: payload.type || "output",
+        },
+        tags: Array.isArray(asset.tags) ? asset.tags : [],
+    };
+    _setDataTransferData(dt, COMFY_ASSET_INFO_MIME, JSON.stringify(comfyAssetInfo));
+    if (viewUrl) _setDataTransferData(dt, "text/uri-list", viewUrl);
 };
 
 const _getDraggedPayloads = (payload) => {
@@ -384,15 +430,16 @@ export function createAssetDragStartHandler(containerEl) {
 
         try {
             const stripMetadata = _isStripMetadataDragRequested();
-            dt.setData(DND_MIME, JSON.stringify(payload));
+            _setDataTransferData(dt, DND_MIME, JSON.stringify(payload));
             const selectedPayloads = _getSelectedPayloadsForContainer(containerEl, payload);
             if (selectedPayloads.length > 1) {
-                dt.setData(DND_MULTI_MIME, JSON.stringify({ items: selectedPayloads }));
+                _setDataTransferData(dt, DND_MULTI_MIME, JSON.stringify({ items: selectedPayloads }));
             }
-            dt.setData("text/plain", String(asset.filename || ""));
+            _setDataTransferData(dt, "text/plain", String(asset.filename || ""));
             // Apply OS drag-out (DownloadURL + batch ZIP) for all asset kinds.
             // applyDragOutToOS handles single-file and multi-selection ZIP internally.
             const viewUrl = buildURL(payload);
+            _setComfyNativeDragFallbacks({ dt, asset, payload, viewUrl });
             applyDragOutToOS({ dt, asset, containerEl, card, viewUrl, stripMetadata });
         } catch (e) {
             console.debug?.(e);
@@ -476,6 +523,173 @@ export function createDragDropRuntimeHandlers() {
         _loadAssetDragKeyDown = false;
     };
 
+    // ── LTX Director timeline injection ────────────────────────────────────────
+    const _LTX_AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "flac", "m4a", "aac", "opus"]);
+
+    const _injectIntoLtxDirector = async (te, payload, droppedExt) => {
+        // Read ghost position set by LTXDirector's own dragover handler
+        let targetFrameStart = null;
+        if (te._ghostSegmentId && te._previewSegments) {
+            const ghost = te._previewSegments.find((s) => s.id === te._ghostSegmentId);
+            if (ghost) {
+                targetFrameStart =
+                    ghost.resolvedStart !== undefined ? ghost.resolvedStart : ghost.start;
+            }
+        }
+        // Clear ghost state — we are taking over the drop
+        te._ghostSegmentId = null;
+        te._ghostTrack = null;
+        te._ghostInitialTimeline = null;
+        te._previewSegments = null;
+        te.render?.();
+
+        const ext = String(droppedExt || "").toLowerCase();
+        const isAudio = _LTX_AUDIO_EXTS.has(ext);
+
+        // Stage the file
+        const staged = await stageToInputDetailed({
+            post,
+            endpoint: ENDPOINTS.STAGE_TO_INPUT,
+            payload,
+            index: false,
+        });
+        if (!staged?.name) {
+            comfyToast(`Failed to stage: "${payload?.filename}"`, "error");
+            return;
+        }
+
+        const { name, subfolder = "" } = staged;
+        const mediaFile = subfolder ? `${subfolder}/${name}` : name;
+        const mediaUrl = `/view?filename=${encodeURIComponent(name)}&type=input&subfolder=${encodeURIComponent(subfolder)}`;
+
+        // ── Audio ──────────────────────────────────────────────────────────────
+        if (isAudio) {
+            try {
+                const resp = await fetch(mediaUrl);
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const arrayBuffer = await resp.arrayBuffer();
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                const audioCtx = new AudioCtx();
+                const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+                const frameRate = typeof te.getFrameRate === "function" ? te.getFrameRate() : 25;
+                const clipFrames = Math.max(1, Math.ceil(audioBuffer.duration * frameRate));
+
+                // Build waveform peaks (200 samples, same as LTXDirector's own handler)
+                const channelData = audioBuffer.getChannelData(0);
+                const numPeaks = 200;
+                const step = Math.max(1, Math.floor(channelData.length / numPeaks));
+                const peaks = [];
+                for (let i = 0; i < numPeaks; i++) {
+                    let max = 0;
+                    for (let j = 0; j < step; j++) {
+                        const v = Math.abs(channelData[i * step + j] || 0);
+                        if (v > max) max = v;
+                    }
+                    peaks.push(max);
+                }
+
+                // Position
+                let start = targetFrameStart ?? 0;
+                if (targetFrameStart === null) {
+                    const audioSegs = Array.isArray(te.timeline?.audioSegments)
+                        ? [...te.timeline.audioSegments]
+                        : [];
+                    audioSegs.sort((a, b) => a.start - b.start);
+                    for (const s of audioSegs) {
+                        if (start + clipFrames <= s.start) break;
+                        start = Math.max(start, s.start + s.length);
+                    }
+                }
+
+                const segId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+                const seg = {
+                    id: segId,
+                    type: "audio",
+                    start,
+                    length: clipFrames,
+                    trimStart: 0,
+                    audioDurationFrames: clipFrames,
+                    audioFile: mediaFile,
+                    fileName: name,
+                    waveformPeaks: peaks,
+                };
+
+                if (!te.timeline?.audioSegments) {
+                    dndLog("ltxdirector inject: no audioSegments", {});
+                    return;
+                }
+
+                te.timeline.audioSegments.push(seg);
+                te.timeline.audioSegments.sort((a, b) => a.start - b.start);
+                te.selectionType = "audio";
+                te.selectedIndex = te.timeline.audioSegments.findIndex((s) => s.id === segId);
+                te.updateUIFromSelection?.();
+                te.commitChanges?.(true);
+                te.render?.();
+                comfyToast(`Added audio to LTX Director: ${name}`, "success", 3000);
+                dndLog("drop ltxdirector inject audio", { file: name, start });
+            } catch (err) {
+                console.error("[Majoor] LTX Director audio inject failed", err);
+                comfyToast(`Audio decode failed for: ${name}`, "error");
+            }
+            return;
+        }
+
+        // ── Image or Video → visual segment ───────────────────────────────────
+        const frameRate = typeof te.getFrameRate === "function" ? te.getFrameRate() : 25;
+        const segLength = frameRate; // 1 second default
+
+        let start = targetFrameStart ?? 0;
+        if (targetFrameStart === null) {
+            const segs = Array.isArray(te.timeline?.segments) ? [...te.timeline.segments] : [];
+            segs.sort((a, b) => a.start - b.start);
+            for (const s of segs) {
+                if (start + segLength <= s.start) break;
+                start = Math.max(start, s.start + s.length);
+            }
+        }
+
+        const segId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+        const seg = {
+            id: segId,
+            start,
+            length: segLength,
+            prompt: "",
+            type: "image",
+            imageFile: mediaFile,
+            imageB64: mediaUrl,
+        };
+
+        if (!te.timeline?.segments) {
+            dndLog("ltxdirector inject: no timeline", {});
+            return;
+        }
+
+        te.timeline.segments.push(seg);
+        te.timeline.segments.sort((a, b) => a.start - b.start);
+
+        // Async thumbnail load — works for images; silently skipped for video
+        const img = new Image();
+        img.onload = () => {
+            seg.imgObj = img;
+            te.render?.();
+        };
+        img.src = mediaUrl;
+
+        const idx = te.timeline.segments.findIndex((s) => s.id === segId);
+        if (idx >= 0) {
+            te.selectionType = "image";
+            te.selectedIndex = idx;
+            te.updateUIFromSelection?.();
+        }
+        te.commitChanges?.(true);
+        te.render?.();
+        comfyToast(`Added to LTX Director: ${name}`, "success", 3000);
+        dndLog("drop ltxdirector inject", { file: name, start, ext });
+    };
+    // ─────────────────────────────────────────────────────────────────────────
+
     const onDragOver = (event) => {
         const app = _resolveApp();
         const types = Array.from(event?.dataTransfer?.types || []);
@@ -490,15 +704,23 @@ export function createDragDropRuntimeHandlers() {
                 .split(".")
                 .pop() || "";
         const widget = node && !slotInfo ? pickBestMediaPathWidget(node, payload, droppedExt) : null;
+        // LTXDirector/LTXDirectorGuide expose _timelineEditor but have no path widget
+        const isLtxDirector = node && !slotInfo && !widget && !!node._timelineEditor;
 
-        if (node && (slotInfo || widget)) {
+        if (node && (slotInfo || widget || isLtxDirector)) {
             event.preventDefault();
-            event.stopImmediatePropagation?.();
-            event.stopPropagation();
+            // For LTXDirector: do NOT stopPropagation — allow the wrapper's own dragover
+            // handler to fire so it sets up the ghost segment position.
+            if (!isLtxDirector) {
+                event.stopImmediatePropagation?.();
+                event.stopPropagation();
+            }
             applyHighlight(app, node, markCanvasDirty);
             event.dataTransfer.dropEffect = "copy";
             if (slotInfo) {
                 dndLog("dragover slot", { node: node?.title, slot: slotInfo.input?.name });
+            } else if (isLtxDirector) {
+                dndLog("dragover ltxdirector", { node: node?.title });
             } else {
                 dndLog("dragover widget", { node: node?.title, widget: widget?.name });
             }
@@ -568,6 +790,17 @@ export function createDragDropRuntimeHandlers() {
             comfyToast(`Staged to input: ${relativePath}`, "success", 4000);
             return;
         }
+
+        // ── LTX Director timeline drop ──────────────────────────────────────────
+        if (node && !slotInfo && !widget && node._timelineEditor && !forceLoaderNode) {
+            event.preventDefault();
+            event.stopImmediatePropagation?.();
+            event.stopPropagation();
+            clearHighlight(app, markCanvasDirty);
+            await _injectIntoLtxDirector(node._timelineEditor, payload, droppedExt);
+            return;
+        }
+        // ─────────────────────────────────────────────────────────────────────
 
         if (!node || !widget) {
             clearHighlight(app, markCanvasDirty);

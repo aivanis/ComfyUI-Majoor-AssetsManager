@@ -90,6 +90,60 @@ describe("canvas drag/drop loader creation", () => {
         };
     }
 
+    function makeDragStartEvent(card, dataTransfer) {
+        return {
+            target: card,
+            dataTransfer,
+        };
+    }
+
+    it("publishes ComfyUI native asset drag fallbacks on dragstart", async () => {
+        const { createAssetDragStartHandler } = await import("../features/dnd/DragDrop.js");
+        const data = new Map();
+        const dataTransfer = {
+            setData: vi.fn((type, value) => data.set(type, value)),
+            items: { add: vi.fn((value, type) => data.set(type, value)) },
+            setDragImage: vi.fn(),
+        };
+        const card = {
+            _mjrAsset: {
+                id: "asset-1",
+                filename: "clip.mp4",
+                subfolder: "renders",
+                type: "output",
+                kind: "video",
+                tags: ["demo"],
+            },
+            closest: () => card,
+            querySelector: () => null,
+            addEventListener: vi.fn(),
+        };
+        const container = { _mjrGetSelectedAssets: () => [] };
+
+        createAssetDragStartHandler(container)(makeDragStartEvent(card, dataTransfer));
+
+        expect(JSON.parse(data.get("application/x-mjr-asset"))).toMatchObject({
+            filename: "clip.mp4",
+            subfolder: "renders",
+            type: "output",
+            kind: "video",
+        });
+        const comfyInfo = JSON.parse(data.get("application/x-comfy-asset-info"));
+        expect(comfyInfo).toMatchObject({
+            id: "asset-1",
+            filename: "clip.mp4",
+            subfolder: "renders",
+            type: "output",
+            kind: "video",
+            user_metadata: {
+                filename: "clip.mp4",
+                subfolder: "renders",
+                type: "output",
+            },
+        });
+        expect(data.get("text/uri-list")).toBe("/view");
+    });
+
     it("L+drop on empty canvas creates a loader node and skips workflow import", async () => {
         const createdNode = {
             type: "LoadImage",

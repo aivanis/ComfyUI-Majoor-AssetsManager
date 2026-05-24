@@ -223,7 +223,7 @@ async function we() {
 }
 var b = null, Te = null;
 async function Ee() {
-	if (!b) return Te ||= import("./NodeStreamController-wxyisEj5.js").then((e) => {
+	if (!b) return Te ||= import("./NodeStreamController-C2upT0oN.js").then((e) => {
 		b = e.setNodeStreamActive;
 	}), Te;
 }

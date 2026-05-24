@@ -17,6 +17,7 @@ import { VideoAdapter } from "./adapters/VideoAdapter.js";
 import { KnownNodesAdapter } from "./adapters/KnownNodesAdapter.js";
 import { NODE_STREAM_FEATURE_ENABLED } from "./nodeStreamFeatureFlag.js";
 import { extractImageOpsPreview } from "./imageOpsPreviewBridge.js";
+import { extractLtxDirectorPreview } from "./ltxDirectorPreviewBridge.js";
 
 // Bootstrap built-in adapters for compatibility with the public API exposed in
 // entry.js. Selection-only mode does not consume execution output updates, but
@@ -373,6 +374,7 @@ function _extractFromLoadWidget(node) {
 function _extractFromCanvasNode(node) {
     return (
         extractImageOpsPreview(node) ||
+        extractLtxDirectorPreview(node) ||
         _extractFromNodeImgs(node) ||
         _extractFromWidgetMedia(node) ||
         _extractFromLoadWidget(node)

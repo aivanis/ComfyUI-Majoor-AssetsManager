@@ -40,6 +40,13 @@ var t = new Set([
 	"MaskPreview+",
 	"TransitionMask+"
 ]), l = new Set([
+	"LTXVDrawTracks",
+	"LTXVHDRDecodePostprocess",
+	"LTXVTiledVAEDecode",
+	"LTXVSparseTrackEditor",
+	"LTXDirector",
+	"LTXDirectorGuide"
+]), u = new Set([
 	...t,
 	...n,
 	...r,
@@ -48,14 +55,15 @@ var t = new Set([
 new Set([
 	...o,
 	...s,
-	...c
+	...c,
+	...l
 ]);
-var u = e({
+var d = e({
 	name: "known-nodes",
 	priority: 5,
 	description: "Well-known output nodes from core ComfyUI, KJNodes, Essentials, LayerStyle",
 	canHandle(e, t) {
-		if (!l.has(e)) return !1;
+		if (!u.has(e)) return !1;
 		let n = t?.images;
 		return Array.isArray(n) && n.length > 0 && !!n[0]?.filename;
 	},
@@ -75,7 +83,7 @@ var u = e({
 		return i.length ? i : null;
 	}
 });
-function d() {
+function f() {
 	return {
 		comfyCore: [...t],
 		kjNodes: [...n],
@@ -85,9 +93,10 @@ function d() {
 		processing: {
 			layerStyle: [...o],
 			kjNodes: [...s],
-			essentials: [...c]
+			essentials: [...c],
+			ltxv: [...l]
 		}
 	};
 }
 //#endregion
-export { u as KnownNodesAdapter, d as getKnownNodeSets, e as t };
+export { d as KnownNodesAdapter, f as getKnownNodeSets, e as t };

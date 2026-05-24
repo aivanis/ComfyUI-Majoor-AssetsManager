@@ -1,5 +1,5 @@
 import { l as e } from "./hostAdapter-B599OfQC.js";
-import { t } from "./floatingViewerManager-D0toC6jI.js";
+import { t } from "./floatingViewerManager-ub10gjDE.js";
 import { r as n } from "./events-BAVTWdux.js";
 //#region js/features/viewer/LiveStreamTracker.js
 var r = !1, i = null, a = null, o = null, s = null, c = null, l = 0, u = 0, d = 400, f = new Set([
