@@ -258,6 +258,26 @@ const ESSENTIALS_PROCESSING = new Set([
     "TransitionMask+",
 ]);
 
+/**
+ * ComfyUI-LTXVideo (Lightricks) — processing nodes returning IMAGE tensors.
+ *
+ * - LTXVDrawTracks: renders sparse motion tracks as an IMAGE (io.Image.Output).
+ * - LTXVHDRDecodePostprocess: decompresses HDR-encoded frames → IMAGE tuple.
+ * - LTXVTiledVAEDecode: tiled VAE decode → IMAGE.
+ * - LTXVSparseTrackEditor: interactive spline director widget; live canvas
+ *   preview is handled separately by ltxDirectorPreviewBridge.js.
+ */
+const LTXV_PROCESSING = new Set([
+    "LTXVDrawTracks",
+    "LTXVHDRDecodePostprocess",
+    "LTXVTiledVAEDecode",
+    // Director widget (sparse tracks) — canvas at node._ed.canvas
+    "LTXVSparseTrackEditor",
+    // Director timeline nodes — canvas at node._timelineEditor.canvas
+    "LTXDirector",
+    "LTXDirectorGuide",
+]);
+
 /** Merge all image-output node sets (excluding VHS which uses gifs key) */
 const ALL_IMAGE_OUTPUT = new Set([
     ...COMFY_CORE_OUTPUT,
@@ -271,6 +291,7 @@ const ALL_PROCESSING = new Set([
     ...LAYERSTYLE_PROCESSING,
     ...KJNODES_PROCESSING,
     ...ESSENTIALS_PROCESSING,
+    ...LTXV_PROCESSING,
 ]);
 
 // ── Adapter ───────────────────────────────────────────────────────────────────
@@ -337,6 +358,7 @@ export function getKnownNodeSets() {
             layerStyle: [...LAYERSTYLE_PROCESSING],
             kjNodes: [...KJNODES_PROCESSING],
             essentials: [...ESSENTIALS_PROCESSING],
+            ltxv: [...LTXV_PROCESSING],
         },
     };
 }
