@@ -46,6 +46,7 @@ export const DEFAULT_SETTINGS = {
         showGenTime: APP_DEFAULTS.GRID_SHOW_DETAILS_GENTIME,
         showHoverInfo: APP_DEFAULTS.GRID_SHOW_HOVER_INFO,
         showWorkflowDot: APP_DEFAULTS.GRID_SHOW_WORKFLOW_DOT,
+        workflowGroupBy: APP_DEFAULTS.WORKFLOW_GRID_GROUP_BY,
         videoAutoplayMode: APP_DEFAULTS.GRID_VIDEO_AUTOPLAY_MODE,
         starColor: APP_DEFAULTS.BADGE_STAR_COLOR,
         badgeImageColor: APP_DEFAULTS.BADGE_IMAGE_COLOR,
@@ -368,6 +369,14 @@ export const applySettingsToConfig = (settings: Record<string, any>): void => {
     APP_CONFIG.GRID_SHOW_WORKFLOW_DOT = !!(
         settings.grid?.showWorkflowDot ?? APP_DEFAULTS.GRID_SHOW_WORKFLOW_DOT
     );
+    {
+        const mode = String(
+            settings.grid?.workflowGroupBy ?? APP_DEFAULTS.WORKFLOW_GRID_GROUP_BY,
+        ).toLowerCase();
+        APP_CONFIG.WORKFLOW_GRID_GROUP_BY = ["none", "task", "model", "category"].includes(mode)
+            ? mode
+            : APP_DEFAULTS.WORKFLOW_GRID_GROUP_BY;
+    }
 
     // Bottom feed card display
     APP_CONFIG.FEED_SHOW_INFO = !!(settings.feed?.showInfo ?? APP_DEFAULTS.FEED_SHOW_INFO);

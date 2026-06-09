@@ -1,12 +1,12 @@
-import { _t as e, a as t, n } from "./client-DTWulbWC.js";
-import { A as r, E as i, J as a, M as o, N as s, O as c, S as l, T as u, _ as d, g as f, k as p, l as m, p as h, rt as g, t as _, v } from "./config-eqarUfKd.js";
+import { Ot as e, i as t, s as n } from "./client-CXKc-lUD.js";
+import { A as r, E as i, F as a, M as o, O as s, P as c, S as l, T as u, Z as d, _ as f, g as p, l as m, ot as h, p as g, t as _, v } from "./config-CvC3JxWV.js";
 import { a as y, i as b, o as x, s as S } from "./graphTraversal-CjIZsRsP.js";
-import { a as C, c as w, i as T, n as E, o as D, r as O, v as k, y as A } from "./SidebarWorkflowSection-Caxdr0um.js";
+import { a as C, c as w, i as T, n as E, o as D, r as O, v as k, y as A } from "./SidebarWorkflowSection-BCe9uc4V.js";
 import { r as j } from "./events-BnkL6-b6.js";
-import { _ as M, c as N, f as ee, g as P, h as F, i as te, l as ne, n as re, r as ie, s as ae, t as oe, v as se, y as I } from "./openMajoorSettings-BJM-LLfo.js";
-import { a as L, n as ce, r as le } from "./model3dRenderer-CiJoT0gx.js";
+import { _ as M, c as N, f as ee, g as P, h as F, i as te, l as ne, n as re, r as ie, s as ae, t as oe, v as se, y as I } from "./openMajoorSettings-D_S_Crw_.js";
+import { a as L, n as ce, r as le } from "./model3dRenderer-Bdffg_pr.js";
 import { i as ue, o as R, r as de, t as fe } from "./geninfoParser-5vKgjqjD.js";
-import { t as pe } from "./genInfo-QaIaOrV9.js";
+import { t as pe } from "./genInfo-CKe6W_ea.js";
 //#region ui/features/viewer/floatingViewerConstants.ts
 var z = Object.freeze({
 	SIMPLE: "simple",
@@ -262,7 +262,7 @@ function B(e) {
 	return i === ".gif" ? "gif" : ke.has(i) ? "video" : Ae.has(i) ? "audio" : ce.has(i) ? "model3d" : "image";
 }
 function Me(e) {
-	return e ? e.url ? String(e.url) : e.filename && e.id == null ? g(e.filename, e.subfolder || "", e.type || "output") : e.filename && a(e) || "" : "";
+	return e ? e.url ? String(e.url) : e.filename && e.id == null ? h(e.filename, e.subfolder || "", e.type || "output") : e.filename && d(e) || "" : "";
 }
 function V(e = "No media  -  select assets in the grid") {
 	let t = document.createElement("div");
@@ -481,18 +481,18 @@ var Xe = class {
 				e.target?.closest?.("button") || this.setExpanded(!this._expanded);
 			}), n.title = this._expanded ? "Collapse node" : "Expand node";
 		}
-		let i = document.createElement("div");
-		i.className = "mjr-ws-node-title-wrap";
-		let a = document.createElement("span");
-		a.className = "mjr-ws-node-type";
-		let o = Je(e, { isSubgraph: this._isSubgraph });
-		a.textContent = o, i.appendChild(a);
-		let s = Ye(e, o, { isSubgraph: this._isSubgraph });
+		let r = document.createElement("div");
+		r.className = "mjr-ws-node-title-wrap";
+		let i = document.createElement("span");
+		i.className = "mjr-ws-node-type";
+		let a = Je(e, { isSubgraph: this._isSubgraph });
+		i.textContent = a, r.appendChild(i);
+		let s = Ye(e, a, { isSubgraph: this._isSubgraph });
 		if (s) {
 			let e = document.createElement("span");
-			e.className = "mjr-ws-node-title", e.textContent = s, i.appendChild(e);
+			e.className = "mjr-ws-node-title", e.textContent = s, r.appendChild(e);
 		}
-		if (n.appendChild(i), this._isSubgraph) {
+		if (n.appendChild(r), this._isSubgraph) {
 			let e = document.createElement("span");
 			e.className = "mjr-ws-node-kind", e.title = `${this._childCount} inner node${this._childCount === 1 ? "" : "s"}`;
 			let t = document.createElement("i");
@@ -500,7 +500,7 @@ var Xe = class {
 			let r = document.createElement("span");
 			r.textContent = "Subgraph", e.appendChild(r);
 			let i = document.createElement("span");
-			i.className = "mjr-ws-node-kind-count", i.textContent = String(this._childCount), e.appendChild(i), n.appendChild(e), this._subgraphHeaderTitle = `${o} | Subgraph | ${this._childCount} inner node${this._childCount === 1 ? "" : "s"}`, n.title = this._subgraphHeaderTitle;
+			i.className = "mjr-ws-node-kind-count", i.textContent = String(this._childCount), e.appendChild(i), n.appendChild(e), this._subgraphHeaderTitle = `${a} | Subgraph | ${this._childCount} inner node${this._childCount === 1 ? "" : "s"}`, n.title = this._subgraphHeaderTitle;
 		}
 		let c = document.createElement("button");
 		c.type = "button", c.className = "mjr-icon-btn mjr-ws-locate", c.title = "Locate on canvas", c.innerHTML = "<i class=\"pi pi-map-marker\" aria-hidden=\"true\"></i>", c.addEventListener("click", (e) => {
@@ -510,17 +510,17 @@ var Xe = class {
 		if (l.className = "mjr-ws-node-body", Be(e)) {
 			let n = document.createElement("textarea");
 			n.className = "mjr-ws-input mjr-ws-textarea mjr-ws-note-textarea", n.value = Ve(e), n.rows = 4;
-			let i = () => {
+			let r = () => {
 				n.style.height = "auto", n.style.height = n.scrollHeight + "px";
 			};
 			return n.addEventListener("input", () => {
 				He(e, n.value);
-				let t = e?.widgets?.[0], a = t?.inputEl ?? t?.element ?? t?.el ?? null;
-				a != null && "value" in a && a.value !== n.value && (a.value = n.value), i();
+				let t = e?.widgets?.[0], i = t?.inputEl ?? t?.element ?? t?.el ?? null;
+				i != null && "value" in i && i.value !== n.value && (i.value = n.value), r();
 				try {
-					r(e);
+					o(e);
 				} catch {}
-			}), n._mjrAutoFit = i, this._noteTextarea = n, this._autoFits.push(i), l.appendChild(n), this._body = l, t.appendChild(l), this._el = t, this._applyExpandedState(), requestAnimationFrame(i), t;
+			}), n._mjrAutoFit = r, this._noteTextarea = n, this._autoFits.push(r), l.appendChild(n), this._body = l, t.appendChild(l), this._el = t, this._applyExpandedState(), requestAnimationFrame(r), t;
 		}
 		let u = e.widgets ?? [], d = !1;
 		for (let t of u) {
@@ -565,7 +565,7 @@ var Xe = class {
 		}
 		let e = this._node;
 		if (e) try {
-			d(e, {
+			f(e, {
 				select: !1,
 				focusCanvas: !1
 			});
@@ -755,7 +755,7 @@ function it(e, t, n) {
 }
 function at(e) {
 	try {
-		d(e);
+		f(e);
 	} catch (e) {
 		console.debug?.("[MFV] _focusNode", e);
 	}
@@ -774,7 +774,7 @@ var st = /* @__PURE__ */ new Map(), ct = null;
 async function lt(e) {
 	let t = Array.from(new Set(dt(e).map((e) => G(e)).filter(Boolean)));
 	if (t.length && t.filter((e) => !st.has(e)).length) try {
-		ct ||= f("/object_info").then((e) => e?.ok ? e.json() : null).then((e) => {
+		ct ||= p("/object_info").then((e) => e?.ok ? e.json() : null).then((e) => {
 			if (e && typeof e == "object") for (let [t, n] of Object.entries(e)) st.set(String(t), n);
 			return e;
 		}).catch(() => null), await ct;
@@ -1250,7 +1250,7 @@ function Qt(e) {
 	}
 }
 function $t(e) {
-	return c(e);
+	return s(e);
 }
 function en(e) {
 	let t = l();
@@ -1264,7 +1264,7 @@ function en(e) {
 	if (!a) return !1;
 	try {
 		let t = typeof structuredClone == "function" ? structuredClone(e) : JSON.parse(JSON.stringify(e));
-		return on(t, e), delete t.id, Array.isArray(t.pos) && (t.pos = [Number(t.pos[0] || 0) + 32, Number(t.pos[1] || 0) + 32]), typeof a.configure == "function" ? a.configure(t) : Object.assign(a, t), h(a);
+		return on(t, e), delete t.id, Array.isArray(t.pos) && (t.pos = [Number(t.pos[0] || 0) + 32, Number(t.pos[1] || 0) + 32]), typeof a.configure == "function" ? a.configure(t) : Object.assign(a, t), g(a);
 	} catch (e) {
 		return console.debug?.("[MFV Graph Map] import node failed", e), !1;
 	}
@@ -1289,7 +1289,7 @@ function tn(e) {
 			index: t
 		});
 	});
-	let a = un(G(e)), o = un(t?.type || t?.comfyClass || t?.class_type), c = !!(a && o && a === o), l = /* @__PURE__ */ new Set(), u = 0;
+	let o = un(G(e)), s = un(t?.type || t?.comfyClass || t?.class_type), c = !!(o && s && o === s), l = /* @__PURE__ */ new Set(), u = 0;
 	for (let e of n) {
 		let n = ln(e.label), a = n ? i.get(n) : null;
 		if ((!a || l.has(a.index)) && c && Number.isInteger(e.index)) {
@@ -1301,7 +1301,7 @@ function tn(e) {
 		}
 		!a || l.has(a.index) || ie(a.widget, X(e.value), t) && (l.add(a.index), u += 1);
 	}
-	return s(), {
+	return a(), {
 		ok: u > 0,
 		count: u,
 		reason: u > 0 ? "ok" : "no-match",
@@ -1920,74 +1920,74 @@ function Nn() {
 	t.type = "button", t.className = "mjr-icon-btn mjr-mfv-run-btn";
 	let n = Mn("tooltip.queuePrompt", "Queue Prompt (Run)");
 	t.title = n, t.setAttribute("aria-label", n);
-	let r = document.createElement("i");
-	r.className = "pi pi-play", r.setAttribute("aria-hidden", "true"), t.appendChild(r);
-	let i = document.createElement("button");
-	i.type = "button", i.className = "mjr-icon-btn mjr-mfv-stop-btn";
-	let a = document.createElement("i");
-	a.className = "pi pi-stop", a.setAttribute("aria-hidden", "true"), i.appendChild(a), e.appendChild(t), e.appendChild(i);
-	let o = Q.IDLE, s = !1, c = !1, l = null;
-	function d() {
-		l != null && (clearTimeout(l), l = null);
+	let i = document.createElement("i");
+	i.className = "pi pi-play", i.setAttribute("aria-hidden", "true"), t.appendChild(i);
+	let a = document.createElement("button");
+	a.type = "button", a.className = "mjr-icon-btn mjr-mfv-stop-btn";
+	let o = document.createElement("i");
+	o.className = "pi pi-stop", o.setAttribute("aria-hidden", "true"), a.appendChild(o), e.appendChild(t), e.appendChild(a);
+	let s = Q.IDLE, c = !1, l = !1, d = null;
+	function f() {
+		d != null && (clearTimeout(d), d = null);
 	}
-	function f(e, { canStop: n = !1 } = {}) {
-		o = e, t.classList.toggle("running", o === Q.RUNNING), t.classList.toggle("stopping", o === Q.STOPPING), t.classList.toggle("error", o === Q.ERROR), t.disabled = o === Q.RUNNING || o === Q.STOPPING, i.disabled = !n || o === Q.STOPPING, i.classList.toggle("active", n && o !== Q.STOPPING), i.classList.toggle("stopping", o === Q.STOPPING), o === Q.RUNNING || o === Q.STOPPING ? r.className = "pi pi-spin pi-spinner" : r.className = "pi pi-play";
+	function p(e, { canStop: n = !1 } = {}) {
+		s = e, t.classList.toggle("running", s === Q.RUNNING), t.classList.toggle("stopping", s === Q.STOPPING), t.classList.toggle("error", s === Q.ERROR), t.disabled = s === Q.RUNNING || s === Q.STOPPING, a.disabled = !n || s === Q.STOPPING, a.classList.toggle("active", n && s !== Q.STOPPING), a.classList.toggle("stopping", s === Q.STOPPING), s === Q.RUNNING || s === Q.STOPPING ? i.className = "pi pi-spin pi-spinner" : i.className = "pi pi-play";
 	}
 	function m() {
 		let e = Mn("tooltip.queueStop", "Stop Generation");
-		i.title = e, i.setAttribute("aria-label", e);
+		a.title = e, a.setAttribute("aria-label", e);
 	}
 	function h(e = I.getSnapshot(), { authoritative: t = !1 } = {}) {
-		let n = Math.max(0, Number(e?.queue) || 0), r = e?.prompt || null, i = !!r?.currentlyExecuting, a = !!(r && (r.currentlyExecuting || r.errorDetails)), o = n > 0 || a, l = !!r?.errorDetails;
-		t && n === 0 && !r && (s = !1, c = !1);
-		let u = s || c || i || n > 0;
-		if ((i || o || n > 0) && (s = !1), l) {
-			c = !1, d(), f(Q.ERROR, { canStop: !1 });
+		let n = Math.max(0, Number(e?.queue) || 0), r = e?.prompt || null, i = !!r?.currentlyExecuting, a = !!(r && (r.currentlyExecuting || r.errorDetails)), o = n > 0 || a, s = !!r?.errorDetails;
+		t && n === 0 && !r && (c = !1, l = !1);
+		let u = c || l || i || n > 0;
+		if ((i || o || n > 0) && (c = !1), s) {
+			l = !1, f(), p(Q.ERROR, { canStop: !1 });
 			return;
 		}
-		if (c) {
+		if (l) {
 			if (!u) {
-				c = !1, h(e);
+				l = !1, h(e);
 				return;
 			}
-			f(Q.STOPPING, { canStop: !1 });
+			p(Q.STOPPING, { canStop: !1 });
 			return;
 		}
-		if (s || i || o || n > 0) {
-			d(), f(Q.RUNNING, { canStop: !0 });
+		if (c || i || o || n > 0) {
+			f(), p(Q.RUNNING, { canStop: !0 });
 			return;
 		}
-		d(), f(Q.IDLE, { canStop: !1 });
+		f(), p(Q.IDLE, { canStop: !1 });
 	}
 	function g() {
-		s = !1, c = !1, d(), f(Q.ERROR, { canStop: !1 }), l = setTimeout(() => {
-			l = null, h();
+		c = !1, l = !1, f(), p(Q.ERROR, { canStop: !1 }), d = setTimeout(() => {
+			d = null, h();
 		}, 1500);
 	}
 	async function _() {
-		return { tracked: await p(u()) };
+		return { tracked: await r(u()) };
 	}
 	async function v() {
-		if (!(o === Q.RUNNING || o === Q.STOPPING)) {
-			s = !0, c = !1, h();
+		if (!(s === Q.RUNNING || s === Q.STOPPING)) {
+			c = !0, l = !1, h();
 			try {
-				(await zn())?.tracked || (s = !1), h();
+				(await zn())?.tracked || (c = !1), h();
 			} catch (e) {
 				console.error?.("[MFV Run]", e), g();
 			}
 		}
 	}
 	async function y() {
-		if (o === Q.RUNNING) {
-			c = !0, h();
+		if (s === Q.RUNNING) {
+			l = !0, h();
 			try {
-				(await _())?.tracked || (c = !1, s = !1), h();
+				(await _())?.tracked || (l = !1, c = !1), h();
 			} catch (e) {
-				console.error?.("[MFV Stop]", e), c = !1, h();
+				console.error?.("[MFV Stop]", e), l = !1, h();
 			}
 		}
 	}
-	m(), i.disabled = !0, t.addEventListener("click", v), i.addEventListener("click", y);
+	m(), a.disabled = !0, t.addEventListener("click", v), a.addEventListener("click", y);
 	let b = (e) => {
 		h(e?.detail || I.getSnapshot(), { authoritative: !0 });
 	};
@@ -1996,7 +1996,7 @@ function Nn() {
 	}), h(), {
 		el: e,
 		dispose() {
-			d(), t.removeEventListener("click", v), i.removeEventListener("click", y), I.removeEventListener(jn, b);
+			f(), t.removeEventListener("click", v), a.removeEventListener("click", y), I.removeEventListener(jn, b);
 		}
 	};
 }
@@ -2039,7 +2039,7 @@ function Rn(e) {
 async function zn() {
 	let e = u();
 	if (!e) throw Error("ComfyUI app not available");
-	return { tracked: await o({
+	return { tracked: await c({
 		app: e,
 		forceNativeQueue: Rn(y(e)),
 		resolvePromptData(e) {
@@ -3475,8 +3475,8 @@ function qr(e, r, { autoMode: i = !1 } = {}) {
 		(async () => {
 			try {
 				let i = await pe(e._mediaA, {
-					getAssetMetadata: n,
-					getFileMetadataScoped: t
+					getAssetMetadata: t,
+					getFileMetadataScoped: n
 				});
 				if (e._refreshGen !== r) return;
 				i && typeof i == "object" && (e._mediaA = i, e._refresh());
@@ -3492,8 +3492,8 @@ function Jr(e, r, i) {
 		if (!e) return e;
 		try {
 			return await pe(e, {
-				getAssetMetadata: n,
-				getFileMetadataScoped: t
+				getAssetMetadata: t,
+				getFileMetadataScoped: n
 			}) || e;
 		} catch {
 			return e;
@@ -3510,8 +3510,8 @@ function Yr(e, r, i, a, o) {
 		if (!e) return e;
 		try {
 			return await pe(e, {
-				getAssetMetadata: n,
-				getFileMetadataScoped: t
+				getAssetMetadata: t,
+				getFileMetadataScoped: n
 			}) || e;
 		} catch {
 			return e;

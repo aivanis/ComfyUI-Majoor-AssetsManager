@@ -11,7 +11,8 @@
  *
  * Phase 2.5: replaces createFilterPopoverView() in HeaderSection.vue.
  */
-import { computed, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
+import { listWorkflowModelFamilies } from "../../../api/client.js";
 import { usePanelStore } from "../../../stores/usePanelStore.js";
 import { t } from "../../../app/i18n.js";
 
@@ -28,6 +29,8 @@ const maxHeightInputRef = ref(null);
 const agendaContainerRef = ref(null);
 const dateExactInputRef = ref(null);
 const workflowIdInputRef = ref(null);
+const workflowModelInputRef = ref(null);
+const workflowModelFamilyOptions = ref([{ label: t("filter.any", "Any"), value: "" }]);
 
 const resolveDomElement = (value) => value?.$el || value || null;
 const getInputValue = (inputRef) => resolveDomElement(inputRef.value)?.value || "";
@@ -63,6 +66,28 @@ const workflowTypeOptions = computed(() => [
     { label: "TTS (Text to Speech)", value: "TTS" },
     { label: "A2A (Audio to Audio)", value: "A2A" },
 ]);
+
+const workflowRunsOnOptions = computed(() => [
+    { label: t("filter.any", "Any"), value: "" },
+    { label: "Local", value: "local" },
+    { label: "API", value: "api" },
+    { label: "Cloud", value: "cloud" },
+    { label: "Unknown", value: "unknown" },
+]);
+
+const workflowModelFamilyMenuOptions = computed(() => {
+    const baseOptions = Array.isArray(workflowModelFamilyOptions.value)
+        ? workflowModelFamilyOptions.value.slice()
+        : [{ label: t("filter.any", "Any"), value: "" }];
+    if (!baseOptions.length || String(baseOptions[0]?.value || "") !== "") {
+        baseOptions.unshift({ label: t("filter.any", "Any"), value: "" });
+    }
+    const current = String(panelStore.workflowModelFilter || "").trim();
+    if (current && !baseOptions.some((option) => String(option?.value || "") === current)) {
+        baseOptions.splice(1, 0, { label: current, value: current });
+    }
+    return baseOptions;
+});
 
 const ratingOptions = computed(() => [
     { label: t("filter.anyRating"), value: "0" },
@@ -122,6 +147,28 @@ const dispatchFiltersChanged = () => {
     }
 };
 
+const refreshWorkflowModelFamilies = async () => {
+    try {
+        const result = await listWorkflowModelFamilies();
+        if (!result?.ok) return;
+        const families = Array.isArray(result.data?.model_families) ? result.data.model_families : [];
+        const options = families
+            .map((item) => ({
+                label: String(item?.label || item?.value || "").trim(),
+                value: String(item?.value || item?.label || "").trim(),
+            }))
+            .filter((item) => item.value)
+            .slice(0, 200);
+        workflowModelFamilyOptions.value = [{ label: t("filter.any", "Any"), value: "" }, ...options];
+    } catch (e) {
+        console.debug?.(e);
+    }
+};
+
+onMounted(() => {
+    void refreshWorkflowModelFamilies();
+});
+
 const applyKindValue = (value, { emit = true } = {}) => {
     panelStore.kindFilter = String(value || "");
     if (emit) dispatchFiltersChanged();
@@ -141,6 +188,18 @@ const applyWorkflowTypeValue = (value, { emit = true } = {}) => {
 
 const applyWorkflowIdValue = (value, { emit = true } = {}) => {
     panelStore.workflowId = String(value || "").trim();
+    if (emit) dispatchFiltersChanged();
+};
+
+const applyWorkflowModelValue = (value, { emit = true } = {}) => {
+    panelStore.workflowModelFilter = String(value || "").trim();
+    if (emit) dispatchFiltersChanged();
+};
+
+const applyWorkflowRunsOnValue = (value, { emit = true } = {}) => {
+    panelStore.workflowRunsOnFilter = String(value || "")
+        .trim()
+        .toLowerCase();
     if (emit) dispatchFiltersChanged();
 };
 
@@ -276,6 +335,14 @@ const workflowIdControl = createValueFacade({
     getValue: () => String(panelStore.workflowId || "").trim(),
     setValue: applyWorkflowIdValue,
 });
+const workflowModelControl = createValueFacade({
+    getValue: () => String(panelStore.workflowModelFilter || "").trim(),
+    setValue: applyWorkflowModelValue,
+});
+const workflowRunsOnControl = createValueFacade({
+    getValue: () => String(panelStore.workflowRunsOnFilter || "").trim().toLowerCase(),
+    setValue: applyWorkflowRunsOnValue,
+});
 const ratingSelectControl = createValueFacade({
     getValue: () => String(Number(panelStore.minRating || 0) || 0),
     setValue: applyRatingValue,
@@ -295,6 +362,8 @@ const activeFiltersCount = computed(() => {
     if (Boolean(panelStore.workflowOnly)) count += 1;
     if (String(panelStore.workflowType || "").trim()) count += 1;
     if (String(panelStore.workflowId || "").trim()) count += 1;
+    if (String(panelStore.workflowModelFilter || "").trim()) count += 1;
+    if (String(panelStore.workflowRunsOnFilter || "").trim()) count += 1;
     if ((Number(panelStore.minRating || 0) || 0) > 0) count += 1;
     if ((Number(panelStore.minSizeMB || 0) || 0) > 0 || (Number(panelStore.maxSizeMB || 0) || 0) > 0) {
         count += 1;
@@ -317,6 +386,8 @@ const clearAllFilters = () => {
     panelStore.workflowOnly = false;
     panelStore.workflowType = "";
     panelStore.workflowId = "";
+    panelStore.workflowModelFilter = "";
+    panelStore.workflowRunsOnFilter = "";
     panelStore.minRating = 0;
     panelStore.minSizeMB = 0;
     panelStore.maxSizeMB = 0;
@@ -335,6 +406,7 @@ const clearAllFilters = () => {
     setInputValue(maxHeightInputRef, "");
     setInputValue(dateExactInputRef, "");
     setInputValue(workflowIdInputRef, "");
+    setInputValue(workflowModelInputRef, "");
 
     dispatchFiltersChanged();
 };
@@ -344,6 +416,9 @@ defineExpose({
     get wfCheckbox()              { return workflowOnlyControl; },
     get workflowTypeSelect()      { return workflowTypeControl; },
     get workflowIdInput()         { return workflowIdControl; },
+    get workflowModelInput()      { return workflowModelControl; },
+    get workflowModelFamilyOptions() { return workflowModelFamilyMenuOptions.value; },
+    get workflowRunsOnSelect()    { return workflowRunsOnControl; },
     get ratingSelect()            { return ratingSelectControl; },
     get minSizeInput()            { return resolveDomElement(minSizeInputRef.value); },
     get maxSizeInput()            { return resolveDomElement(maxSizeInputRef.value); },
@@ -463,6 +538,44 @@ defineExpose({
                     :model-value="String(panelStore.workflowId || '')"
                     @update:model-value="applyWorkflowIdValue"
                     @change="applyWorkflowIdValue($event?.target?.value)"
+                />
+            </div>
+
+            <!-- Workflow model family -->
+            <div class="mjr-popover-row">
+                <div class="mjr-popover-label">{{ t("label.workflowModelFamily", "Model family") }}</div>
+                <div class="mjr-filter-stack">
+                    <MSelect
+                        class="mjr-select mjr-filter-select"
+                        panel-class="mjr-filter-select-panel"
+                        :model-value="String(panelStore.workflowModelFilter || '')"
+                        :options="workflowModelFamilyMenuOptions"
+                        option-label="label"
+                        option-value="value"
+                        @update:model-value="applyWorkflowModelValue"
+                    />
+                    <MInputText
+                        ref="workflowModelInputRef"
+                        class="mjr-input"
+                        :placeholder="t('placeholder.workflowModelFamily', 'Flux, Wan, SDXL...')"
+                        :model-value="String(panelStore.workflowModelFilter || '')"
+                        @update:model-value="applyWorkflowModelValue"
+                        @change="applyWorkflowModelValue($event?.target?.value)"
+                    />
+                </div>
+            </div>
+
+            <!-- Workflow runs on -->
+            <div class="mjr-popover-row">
+                <div class="mjr-popover-label">{{ t("label.workflowRunsOn", "Runs on") }}</div>
+                <MSelect
+                    class="mjr-select mjr-filter-select"
+                    panel-class="mjr-filter-select-panel"
+                    :model-value="String(panelStore.workflowRunsOnFilter || '').trim().toLowerCase()"
+                    :options="workflowRunsOnOptions"
+                    option-label="label"
+                    option-value="value"
+                    @update:model-value="applyWorkflowRunsOnValue"
                 />
             </div>
 
@@ -685,6 +798,12 @@ defineExpose({
     align-items: center;
     gap: 8px;
     flex: 0 0 auto;
+}
+
+.mjr-filter-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .mjr-filter-active-count {

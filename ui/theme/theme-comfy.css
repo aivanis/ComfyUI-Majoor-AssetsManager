@@ -2157,6 +2157,538 @@
     overflow: hidden;
 }
 
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    padding: 14px 12px;
+    background:
+        linear-gradient(135deg, rgba(47, 58, 76, 0.94), rgba(18, 23, 32, 0.98)),
+        radial-gradient(circle at 30% 25%, rgba(78, 184, 255, 0.22), transparent 42%);
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.72);
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-thumb.mjr-thumb-workflow,
+.mjr-assets-manager .mjr-card .mjr-thumb.mjr-thumb-workflow {
+    aspect-ratio: 1.08 / 1;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-card-actions,
+.mjr-assets-manager .mjr-card .mjr-workflow-card-actions {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    display: inline-flex;
+    gap: 4px;
+    z-index: 12;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-action-btn,
+.mjr-assets-manager .mjr-card .mjr-workflow-action-btn {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.34);
+    border-radius: 7px;
+    background: rgba(8, 12, 18, 0.58);
+    color: rgba(255, 255, 255, 0.92);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    line-height: 1;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-action-btn:hover,
+.mjr-assets-manager .mjr-card .mjr-workflow-action-btn:hover {
+    background: rgba(29, 40, 58, 0.78);
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-action-btn.is-active,
+.mjr-assets-manager .mjr-card .mjr-workflow-action-btn.is-active {
+    color: #ffd45a;
+    border-color: rgba(255, 212, 90, 0.7);
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb .pi,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb .pi {
+    font-size: 1.75rem;
+    opacity: 0.72;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb.has-thumbnail,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb.has-thumbnail {
+    justify-content: flex-end;
+    background:
+        linear-gradient(180deg, transparent 24%, rgba(0, 0, 0, 0.28) 58%, rgba(0, 0, 0, 0.78)),
+        linear-gradient(90deg, rgba(0, 0, 0, 0.34), transparent 34%, transparent 66%, rgba(0, 0, 0, 0.34));
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-thumb-media.mjr-workflow-graph-map-preview,
+.mjr-assets-manager .mjr-card .mjr-thumb-media.mjr-workflow-graph-map-preview {
+    object-fit: cover !important;
+    opacity: 0.46;
+    filter: saturate(0.75) contrast(0.82) brightness(0.7);
+    transform: scale(1.06);
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb.has-graph-map,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb.has-graph-map {
+    justify-content: center;
+    background:
+        linear-gradient(180deg, rgba(8, 10, 14, 0.3), rgba(8, 10, 14, 0.82)),
+        radial-gradient(circle at 50% 42%, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0.68) 72%);
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb.has-graph-map .mjr-workflow-thumb-title,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb.has-graph-map .mjr-workflow-thumb-title {
+    padding: 2px 7px;
+    border-radius: 5px;
+    background: rgba(0, 0, 0, 0.36);
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb.has-thumbnail .pi,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb.has-thumbnail .pi {
+    display: none;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb.has-graph-map .pi,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb.has-graph-map .pi {
+    display: inline-flex;
+    margin-bottom: 2px;
+    font-size: 1.15rem;
+    opacity: 0.55;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb-title,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb-title {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.84rem;
+    font-weight: 800;
+    line-height: 1.1;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb-meta,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb-meta {
+    display: flex;
+    max-width: 100%;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+    font-size: 0.68rem;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb-meta span,
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb-meta span,
+.mjr-assets-manager .mjr-asset-card .mjr-meta-workflow-task,
+.mjr-assets-manager .mjr-card .mjr-meta-workflow-task,
+.mjr-assets-manager .mjr-asset-card .mjr-meta-workflow-subgraphs,
+.mjr-assets-manager .mjr-card .mjr-meta-workflow-subgraphs {
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+    padding: 2px 5px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-thumb-meta span:nth-child(n + 4),
+.mjr-assets-manager .mjr-card .mjr-workflow-thumb-meta span:nth-child(n + 4) {
+    display: none;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-card-meta[data-mjr-kind="workflow"],
+.mjr-assets-manager .mjr-card .mjr-card-meta[data-mjr-kind="workflow"] {
+    padding: 7px 9px !important;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-card-meta[data-mjr-kind="workflow"] .mjr-card-filename,
+.mjr-assets-manager .mjr-card .mjr-card-meta[data-mjr-kind="workflow"] .mjr-card-filename {
+    margin-bottom: 3px !important;
+    font-size: 0.78rem !important;
+    line-height: 1.15 !important;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-card-meta[data-mjr-kind="workflow"] .mjr-card-meta-row,
+.mjr-assets-manager .mjr-card .mjr-card-meta[data-mjr-kind="workflow"] .mjr-card-meta-row {
+    font-size: 0.72rem !important;
+    opacity: 0.74 !important;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-card-meta[data-mjr-kind="workflow"] .mjr-card-meta-row .mjr-meta-workflow-task,
+.mjr-assets-manager .mjr-card .mjr-card-meta[data-mjr-kind="workflow"] .mjr-card-meta-row .mjr-meta-workflow-task {
+    display: none;
+}
+
+.mjr-assets-manager .mjr-asset-card .mjr-workflow-missing-chip,
+.mjr-assets-manager .mjr-card .mjr-workflow-missing-chip,
+.mjr-assets-manager .mjr-asset-card .mjr-meta-workflow-missing,
+.mjr-assets-manager .mjr-card .mjr-meta-workflow-missing {
+    background: rgba(255, 190, 66, 0.28);
+    color: rgba(255, 236, 180, 0.98);
+    border: 1px solid rgba(255, 206, 101, 0.45);
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator {
+    -webkit-appearance: none;
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 30px;
+    margin: 0 0 8px;
+    padding: 5px 9px;
+    border: 1px solid rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.42);
+    border-radius: 7px;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.22),
+            rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.08)
+        ),
+        color-mix(in srgb, var(--mjr-surface-2) 78%, transparent);
+    color: color-mix(in srgb, var(--content-fg, #fff) 92%, transparent);
+    cursor: pointer;
+    font: inherit;
+    line-height: 1;
+    text-align: left;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator:hover {
+    border-color: rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.66);
+    background:
+        linear-gradient(
+            135deg,
+            rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.3),
+            rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.12)
+        ),
+        color-mix(in srgb, var(--mjr-surface-2) 84%, transparent);
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator:focus-visible {
+    outline: 2px solid rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.55);
+    outline-offset: 2px;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-0 {
+    --mjr-workflow-group-accent-rgb: 95, 179, 255;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-1 {
+    --mjr-workflow-group-accent-rgb: 55, 211, 156;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-2 {
+    --mjr-workflow-group-accent-rgb: 246, 177, 75;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-3 {
+    --mjr-workflow-group-accent-rgb: 238, 104, 136;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-4 {
+    --mjr-workflow-group-accent-rgb: 157, 132, 238;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-5 {
+    --mjr-workflow-group-accent-rgb: 71, 197, 222;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-6 {
+    --mjr-workflow-group-accent-rgb: 149, 207, 81;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator--accent-7 {
+    --mjr-workflow-group-accent-rgb: 242, 130, 78;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    color: rgb(var(--mjr-workflow-group-accent-rgb, 95, 179, 255));
+    background: rgba(var(--mjr-workflow-group-accent-rgb, 95, 179, 255), 0.14);
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator-chevron > .pi {
+    font-size: 10px;
+    line-height: 1;
+}
+
+.mjr-assets-manager .mjr-grid .mjr-grid-group-separator-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.mjr-workflow-picker-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.58);
+    box-sizing: border-box;
+}
+
+.mjr-workflow-picker-dialog {
+    width: min(920px, 96vw);
+    max-height: min(760px, 92vh);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--mjr-surface-0, #111418) 96%, #000);
+    color: var(--content-fg, #f5f5f5);
+    box-shadow: 0 18px 60px rgba(0, 0, 0, 0.48);
+}
+
+.mjr-workflow-picker-header,
+.mjr-workflow-picker-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mjr-workflow-picker-footer {
+    justify-content: flex-end;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 0;
+}
+
+.mjr-workflow-picker-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 0;
+    font-size: 15px;
+    font-weight: 800;
+}
+
+.mjr-workflow-picker-icon-btn,
+.mjr-workflow-picker-btn {
+    appearance: none;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--mjr-surface-2, #25282d) 88%, transparent);
+    color: var(--content-fg, #f5f5f5);
+    cursor: pointer;
+}
+
+.mjr-workflow-picker-icon-btn {
+    width: 32px;
+    height: 32px;
+}
+
+.mjr-workflow-picker-btn {
+    min-height: 32px;
+    padding: 0 12px;
+    font-weight: 700;
+}
+
+.mjr-workflow-picker-btn.is-primary {
+    border-color: rgba(77, 171, 247, 0.7);
+    background: rgba(77, 171, 247, 0.22);
+}
+
+.mjr-workflow-picker-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.mjr-workflow-picker-source {
+    display: flex;
+    gap: 8px;
+    padding: 8px 14px;
+    color: var(--mjr-muted, #aeb3bd);
+    font-size: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mjr-workflow-picker-source strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--content-fg, #f5f5f5);
+}
+
+.mjr-workflow-picker-toolbar {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) repeat(3, minmax(110px, 150px));
+    gap: 8px;
+    padding: 12px 14px;
+}
+
+.mjr-workflow-picker-dialog.is-asset-mode .mjr-workflow-picker-toolbar {
+    grid-template-columns: minmax(180px, 1fr);
+}
+
+.mjr-workflow-picker-search,
+.mjr-workflow-picker-toolbar select {
+    min-height: 34px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 7px;
+    background: color-mix(in srgb, var(--mjr-surface-1, #171a1f) 92%, #000);
+    color: var(--content-fg, #f5f5f5);
+}
+
+.mjr-workflow-picker-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+}
+
+.mjr-workflow-picker-search input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: inherit;
+}
+
+.mjr-workflow-picker-toolbar select {
+    padding: 0 8px;
+}
+
+.mjr-workflow-picker-body {
+    flex: 1 1 auto;
+    min-height: 260px;
+    overflow: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    align-content: start;
+    gap: 10px;
+    padding: 0 14px 14px;
+}
+
+.mjr-workflow-picker-card {
+    appearance: none;
+    display: grid;
+    grid-template-columns: 68px minmax(0, 1fr);
+    gap: 10px;
+    min-height: 84px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    background: color-mix(in srgb, var(--mjr-surface-1, #171a1f) 92%, transparent);
+    color: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.mjr-workflow-picker-dialog.is-asset-mode .mjr-workflow-picker-card {
+    grid-template-columns: 76px minmax(0, 1fr);
+}
+
+.mjr-workflow-picker-card:hover,
+.mjr-workflow-picker-card.is-selected {
+    border-color: rgba(77, 171, 247, 0.72);
+    background: rgba(77, 171, 247, 0.12);
+}
+
+.mjr-workflow-picker-thumb {
+    width: 68px;
+    aspect-ratio: 1 / 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.mjr-workflow-picker-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.mjr-workflow-picker-card-info {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+}
+
+.mjr-workflow-picker-card-info strong,
+.mjr-workflow-picker-card-info span,
+.mjr-workflow-picker-card-info small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.mjr-workflow-picker-card-info strong {
+    font-size: 13px;
+}
+
+.mjr-workflow-picker-card-info span,
+.mjr-workflow-picker-card-info small {
+    color: var(--mjr-muted, #aeb3bd);
+    font-size: 11px;
+}
+
+.mjr-workflow-picker-empty {
+    grid-column: 1 / -1;
+    padding: 32px;
+    text-align: center;
+    color: var(--mjr-muted, #aeb3bd);
+}
+
+.mjr-workflow-picker-empty.is-error {
+    color: #ffb4b4;
+}
+
+@media (max-width: 720px) {
+    .mjr-workflow-picker-backdrop {
+        padding: 10px;
+    }
+
+    .mjr-workflow-picker-toolbar {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .mjr-workflow-picker-search {
+        grid-column: 1 / -1;
+    }
+}
+
 /* Keep generation-time badge pinned to the thumbnail corner across grid/feed variants.
    The !important overrides are intentional: GenTimeBadge.vue uses <style scoped> whose
    hashed class has the same specificity as global selectors. Without !important, a
