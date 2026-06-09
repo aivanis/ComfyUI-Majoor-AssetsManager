@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { drawWorkflowMinimap, synthesizeWorkflowFromPromptGraph } from "../../../../components/sidebar/utils/minimap.js";
+import { getWorkflowContent, moveWorkflow } from "../../../../api/client.js";
 import { loadMajoorSettings, saveMajoorSettings } from "../../../../app/settings.js";
 import { MINIMAP_LEGACY_SETTINGS_KEY } from "../../../../app/settingsStore.js";
 import { t } from "../../../../app/i18n.js";
+import { comfyToast } from "../../../../app/toast.js";
 import { centerGraphCanvasOnWorldPoint } from "../../../../app/hostAdapter.js";
 
 const props = defineProps({
@@ -39,6 +41,10 @@ const SIZE_OPTIONS = Object.freeze([
 ]);
 
 const canvasRef = ref(null);
+const categoryDraft = ref("");
+const savingCategory = ref(false);
+const loadingWorkflowPayload = ref(false);
+const lazyWorkflowPayload = ref(null);
 const showTools = ref(false);
 const rawJsonOpen = ref(false);
 const minimapSettings = ref(loadWorkflowMinimapSettings());
@@ -189,15 +195,52 @@ function persistWorkflowMinimapSettings(nextSettings) {
 }
 
 const workflow = computed(() => {
-    const rawWorkflow = coerceWorkflow(props.asset);
-    const promptGraph = coercePromptGraph(props.asset);
+    const rawWorkflow = coerceWorkflow(props.asset) || coerceWorkflow(lazyWorkflowPayload.value);
+    const promptGraph = coercePromptGraph(props.asset) || coercePromptGraph(lazyWorkflowPayload.value);
     if (!rawWorkflow && !promptGraph) return null;
     return rawWorkflow || synthesizeWorkflowFromPromptGraph(promptGraph);
 });
 
+const workflowFilepath = computed(() =>
+    String(props.asset?.filepath || props.asset?.path || props.asset?.file_info?.filepath || "").trim(),
+);
+
+async function ensureWorkflowPayload() {
+    if (workflow.value) return;
+    const filepath = workflowFilepath.value;
+    if (!filepath) return;
+    if (loadingWorkflowPayload.value) return;
+
+    loadingWorkflowPayload.value = true;
+    try {
+        const result = await getWorkflowContent(filepath, { timeoutMs: 25_000 });
+        if (!result?.ok) return;
+        const workflowFromApi = result?.data?.workflow || result?.workflow || null;
+        const promptFromApi = result?.data?.prompt || result?.prompt || null;
+        if (!workflowFromApi && !promptFromApi) return;
+        lazyWorkflowPayload.value = {
+            workflow: workflowFromApi,
+            prompt: promptFromApi,
+        };
+    } catch (e) {
+        console.debug?.(e);
+    } finally {
+        loadingWorkflowPayload.value = false;
+    }
+}
+
 const statusLabel = computed(() => (props.asset?.has_generation_data ? "Complete" : "Partial"));
 const rawWorkflowJson = computed(() =>
     workflow.value ? JSON.stringify(workflow.value, null, 2) : "",
+);
+
+const currentCategory = computed(() => {
+    const raw = String(props.asset?.category || props.asset?.subfolder || props.asset?.folder || "").trim();
+    return raw.replace(/^\/+|\/+$/g, "");
+});
+
+const categorySegments = computed(() =>
+    currentCategory.value ? currentCategory.value.split(/[\\/]+/).filter(Boolean) : [],
 );
 
 function workflowNodeLabel(node, index) {
@@ -214,6 +257,35 @@ function workflowNodeLabel(node, index) {
 
 function workflowNodeType(node) {
     return String(node?.type || node?.class_type || node?.name || "").trim();
+}
+
+function syncCategoryDraft() {
+    categoryDraft.value = currentCategory.value;
+}
+
+async function saveWorkflowCategory() {
+    const filepath = String(props.asset?.filepath || props.asset?.path || props.asset?.file_info?.filepath || "").trim();
+    if (!filepath) {
+        comfyToast(t("toast.workflowMissingPath", "Workflow file path is missing."), "error");
+        return;
+    }
+    const nextCategory = String(categoryDraft.value || "").trim();
+    if (nextCategory === currentCategory.value) return;
+
+    savingCategory.value = true;
+    try {
+        const result = await moveWorkflow({ filepath, category: nextCategory }, { timeoutMs: 30_000 });
+        if (!result?.ok) {
+            comfyToast(result?.error || t("toast.workflowMoveFailed", "Failed to move workflow."), "error");
+            return;
+        }
+        categoryDraft.value = String(result?.data?.workflow?.category || nextCategory || "").trim();
+        comfyToast(t("toast.workflowCategoryUpdated", "Workflow category updated"), "success", 1800);
+    } catch (error) {
+        comfyToast(t("toast.workflowMoveFailed", "Failed to move workflow."), "error");
+    } finally {
+        savingCategory.value = false;
+    }
 }
 
 const workflowTreeNodes = computed(() => {
@@ -472,6 +544,8 @@ onMounted(() => {
         resizeObserver = new ResizeObserver(() => renderCanvas());
         resizeObserver.observe(canvasRef.value);
     }
+    syncCategoryDraft();
+    ensureWorkflowPayload();
     renderCanvas();
 });
 
@@ -479,6 +553,19 @@ watch(workflow, () => {
     resetMinimapView();
     renderCanvas();
 }, { flush: "post" });
+
+watch(
+    workflowFilepath,
+    () => {
+        lazyWorkflowPayload.value = null;
+        ensureWorkflowPayload();
+    },
+    { immediate: true },
+);
+
+watch(currentCategory, () => {
+    syncCategoryDraft();
+});
 
 watch(minimapSettings, () => {
     renderCanvas();
@@ -539,6 +626,58 @@ onBeforeUnmount(() => {
             <div style="padding:8px 10px;border-radius:10px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.10)">
                 <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.4px">Groups</div>
                 <div style="font-size:18px;font-weight:700;color:rgba(255,255,255,0.94);margin-top:2px">{{ workflowStats.groups }}</div>
+            </div>
+        </div>
+
+        <div style="margin-bottom:12px;padding:10px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.10)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px">
+                <div>
+                    <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,0.55);text-transform:uppercase;letter-spacing:0.4px">Category</div>
+                    <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-top:2px">
+                        {{ currentCategory || 'Root' }}
+                    </div>
+                </div>
+                <div
+                    v-if="categorySegments.length"
+                    style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end"
+                >
+                    <span
+                        v-for="segment in categorySegments"
+                        :key="segment"
+                        style="padding:3px 7px;border-radius:999px;background:rgba(33,150,243,0.12);border:1px solid rgba(33,150,243,0.22);font-size:10px;font-weight:700;color:#90CAF9;text-transform:uppercase;letter-spacing:0.3px"
+                    >
+                        {{ segment }}
+                    </span>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+                <input
+                    v-model="categoryDraft"
+                    type="text"
+                    :placeholder="t('dialog.workflowCategory', 'Workflow category')"
+                    style="flex:1;min-width:0;padding:9px 10px;border-radius:8px;border:1px solid rgba(255,255,255,0.12);background:rgba(0,0,0,0.22);color:rgba(255,255,255,0.92);font-size:12px"
+                />
+                <MButton
+                    type="button"
+                    severity="secondary"
+                    text
+                    rounded
+                    :disabled="savingCategory"
+                    :style="{
+                        padding: '8px 12px',
+                        borderRadius: '8px',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        background: savingCategory ? 'rgba(255,255,255,0.06)' : 'rgba(33,150,243,0.16)',
+                        color: 'rgba(255,255,255,0.92)',
+                        cursor: savingCategory ? 'wait' : 'pointer',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        whiteSpace: 'nowrap',
+                    }"
+                    @click="saveWorkflowCategory"
+                >
+                    {{ savingCategory ? 'Saving...' : 'Move' }}
+                </MButton>
             </div>
         </div>
 

@@ -10,8 +10,9 @@
  * That function synchronizes transient counts into Pinia and updates the Vue
  * view without changing the existing controller wiring.
  */
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { createContextPillsView } from "../../../features/panel/views/contextPillsView.js";
+import { t } from "../../../app/i18n.js";
 import { usePanelStore } from "../../../stores/usePanelStore.js";
 import { buildSummaryBarState } from "./summaryBarState.js";
 
@@ -30,6 +31,33 @@ const breadcrumbItems = ref([]);
 
 const pillsView = createContextPillsView();
 
+const normalizedKindFilter = computed(() => String(panelStore.kindFilter || "").trim().toLowerCase());
+const mediaShortcuts = computed(() => {
+    const typeLabel = t("label.type", "Type");
+    return [
+        {
+            kind: "image",
+            icon: "pi pi-image",
+            title: `${typeLabel}: ${t("filter.images", "Images")}`,
+        },
+        {
+            kind: "video",
+            icon: "pi pi-video",
+            title: `${typeLabel}: ${t("filter.videos", "Videos")}`,
+        },
+        {
+            kind: "audio",
+            icon: "pi pi-volume-up",
+            title: `${typeLabel}: ${t("filter.audio", "Audio")}`,
+        },
+        {
+            kind: "model3d",
+            icon: "pi pi-box",
+            title: `${typeLabel}: 3D`,
+        },
+    ];
+});
+
 let duplicateAlertAction = null;
 
 function handleDuplicateAlertClick() {
@@ -38,6 +66,25 @@ function handleDuplicateAlertClick() {
     } catch (e) {
         console.debug?.(e);
     }
+}
+
+function isKindShortcutActive(kind) {
+    return normalizedKindFilter.value === String(kind || "").trim().toLowerCase();
+}
+
+function notifyFiltersChanged() {
+    try {
+        window.dispatchEvent(new CustomEvent("mjr:filters-changed"));
+    } catch (e) {
+        console.debug?.(e);
+    }
+}
+
+function toggleKindShortcut(kind) {
+    const normalized = String(kind || "").trim().toLowerCase();
+    if (!normalized) return;
+    panelStore.kindFilter = isKindShortcutActive(normalized) ? "" : normalized;
+    notifyFiltersChanged();
 }
 
 function updateSummaryBar({ state, gridContainer, context = null, actions = null } = {}) {
@@ -165,6 +212,24 @@ defineExpose({ summaryBar, updateSummaryBar, folderBreadcrumb, setFolderBreadcru
             <div class="mjr-am-summary-text">{{ summaryText }}</div>
         </div>
         <div class="mjr-am-summary-right">
+            <div class="mjr-media-shortcuts" :aria-label="t('label.type', 'Type')" role="group">
+                <MButton
+                    v-for="shortcut in mediaShortcuts"
+                    :key="shortcut.kind"
+                    type="button"
+                    class="mjr-icon-btn mjr-media-shortcut-btn"
+                    severity="secondary"
+                    text
+                    rounded
+                    :title="shortcut.title"
+                    :aria-label="shortcut.title"
+                    :aria-pressed="String(isKindShortcutActive(shortcut.kind))"
+                    :class="{ 'mjr-context-active': isKindShortcutActive(shortcut.kind) }"
+                    @click="toggleKindShortcut(shortcut.kind)"
+                >
+                    <i :class="shortcut.icon" aria-hidden="true" />
+                </MButton>
+            </div>
             <MButton
                 v-if="showDuplicateAlert"
                 type="button"
@@ -258,5 +323,21 @@ defineExpose({ summaryBar, updateSummaryBar, folderBreadcrumb, setFolderBreadcru
 .mjr-folder-breadcrumb-separator {
     color: color-mix(in srgb, var(--mjr-breadcrumb-accent) 58%, var(--mjr-muted, rgba(255, 255, 255, 0.62)));
     opacity: 0.9;
+}
+
+.mjr-media-shortcuts {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.mjr-media-shortcut-btn {
+    width: 24px;
+    height: 24px;
+}
+
+.mjr-media-shortcut-btn .pi {
+    font-size: 11px;
 }
 </style>

@@ -1,5 +1,5 @@
-import { _t as e, r as t } from "./client-DTWulbWC.js";
-import { j as n, t as r } from "./config-eqarUfKd.js";
+import { Ot as e, a as t } from "./client-CXKc-lUD.js";
+import { N as n, t as r } from "./config-CvC3JxWV.js";
 import { r as i } from "./events-BnkL6-b6.js";
 //#region ui/utils/logging.ts
 function a(e, ...t) {
@@ -219,7 +219,7 @@ function ye() {
 //#region ui/features/viewer/floatingViewerManager.ts
 var S = null, be = null;
 async function xe() {
-	return S || (be ||= import("./FloatingViewer-DADBol7-.js").then((e) => (S = e.FloatingViewer, S)), be);
+	return S || (be ||= import("./FloatingViewer-B-Fwj6zc.js").then((e) => (S = e.FloatingViewer, S)), be);
 }
 var C = null, Se = null;
 async function Ce() {
@@ -410,7 +410,7 @@ function H() {
 	}
 }
 function ke(e) {
-	if (!T?.isVisible) return;
+	if (!T?.isVisible || T._mode === w.GRAPH) return;
 	let t = Array.isArray(e?.detail?.selectedAssets) ? e.detail.selectedAssets : [], n = new Set(t.filter((e) => String(e?.kind || "").toLowerCase() === "folder").map((e) => String(e?.id || "")).filter(Boolean)), r = Array.isArray(e?.detail?.selectedIds) ? e.detail.selectedIds.map(String).filter((e) => !!e && !n.has(e)) : [];
 	if (r.length) {
 		V(r);
@@ -478,6 +478,9 @@ function Pe() {
 	}
 }
 var Y = {
+	isGraphModeVisible() {
+		return !!(T?.isVisible && T?._mode === w.GRAPH);
+	},
 	async openAssets({ assets: e = [], asset: t = null, index: n = 0, mode: r = "" } = {}) {
 		let i = Array.isArray(e) ? e.filter(Boolean) : t ? [t] : [];
 		if (!i.length) return !1;

@@ -32,6 +32,7 @@ export const APP_DEFAULTS = Object.freeze({
     GRID_SHOW_DETAILS_GENTIME: true,
     GRID_SHOW_HOVER_INFO: true,
     GRID_SHOW_WORKFLOW_DOT: true,
+    WORKFLOW_GRID_GROUP_BY: "task", // "none" | "task" | "model" | "category"
     GRID_VIDEO_AUTOPLAY_MODE: "hover", // "off" | "hover" | "always"
 
     // Bottom feed card display

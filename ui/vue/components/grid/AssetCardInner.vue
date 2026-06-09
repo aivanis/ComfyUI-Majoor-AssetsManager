@@ -233,10 +233,12 @@ const props = defineProps({
     /** shallowReactive asset object from createVueCard() in GridView_impl.js */
     asset: { type: Object, required: true },
 });
+const emit = defineEmits(["workflow-action"]);
 
 // --- Computed from asset -----------------------------------------------------
 
 const kind = computed(() => String(props.asset.kind || "image").toLowerCase());
+const isWorkflow = computed(() => kind.value === "workflow");
 const isImage = computed(() => kind.value === "image");
 const isVideo = computed(() => kind.value === "video");
 const isAudio = computed(() => kind.value === "audio");
@@ -244,7 +246,21 @@ const isModel3D = computed(() => kind.value === "model3d");
 
 const viewUrl = computed(() => buildAssetViewURL(props.asset) || "");
 const explicitThumbnailUrl = computed(() =>
-    String(props.asset.thumbnail_url || props.asset.thumb_url || props.asset.poster || "").trim(),
+    String(
+        props.asset.thumbnail_url ||
+        props.asset.graph_map_thumbnail_url ||
+        props.asset.thumb_url ||
+        props.asset.poster ||
+        "",
+    ).trim(),
+);
+const hasPrimaryWorkflowThumbnail = computed(() =>
+    Boolean(String(props.asset.thumbnail_url || props.asset.thumb_url || props.asset.poster || "").trim()),
+);
+const hasGraphMapWorkflowThumbnail = computed(() =>
+    isWorkflow.value &&
+    !hasPrimaryWorkflowThumbnail.value &&
+    Boolean(String(props.asset.graph_map_thumbnail_url || "").trim()),
 );
 const explicitPreviewUrl = computed(() =>
     String(props.asset.preview_url || props.asset.previewUrl || props.asset.url || "").trim(),
@@ -311,6 +327,36 @@ const resolution = computed(() => {
 const durationStr = computed(() =>
     props.asset.duration ? formatDuration(props.asset.duration) : "",
 );
+const workflowTask = computed(() =>
+    String(props.asset.task || props.asset.workflow_task || "").trim(),
+);
+const workflowModel = computed(() =>
+    String(props.asset.model_family || props.asset.modelFamily || "").trim(),
+);
+const workflowRunsOn = computed(() =>
+    String(props.asset.runs_on || props.asset.runsOn || "").trim(),
+);
+const workflowNodeCount = computed(() => Number(props.asset.node_count || props.asset.nodeCount || 0) || 0);
+const workflowFavorite = computed(() => Boolean(props.asset.favorite));
+const workflowSubgraphCount = computed(() =>
+    Number(props.asset.subgraph_count || props.asset.subgraphCount || 0) || 0,
+);
+const workflowMissingNodesCount = computed(() =>
+    Number(props.asset.missing_nodes_count || props.asset.missingNodesCount || 0) || 0,
+);
+const workflowMissingModelsCount = computed(() =>
+    Number(props.asset.missing_models_count || props.asset.missingModelsCount || 0) || 0,
+);
+const workflowHasMissingDeps = computed(
+    () => workflowMissingNodesCount.value > 0 || workflowMissingModelsCount.value > 0,
+);
+const workflowMissingLabel = computed(() => {
+    if (!workflowHasMissingDeps.value) return "";
+    const parts = [];
+    if (workflowMissingNodesCount.value > 0) parts.push(`${workflowMissingNodesCount.value} node`);
+    if (workflowMissingModelsCount.value > 0) parts.push(`${workflowMissingModelsCount.value} model`);
+    return `Missing: ${parts.join(" / ")}`;
+});
 
 const timestamp = computed(
     () =>
@@ -548,19 +594,78 @@ function onFileBadgeClick(event) {
         }),
     );
 }
+
+function emitWorkflowAction(action, event) {
+    try {
+        event?.preventDefault?.();
+        event?.stopPropagation?.();
+    } catch (e) {
+        console.debug?.(e);
+    }
+    emit("workflow-action", {
+        type: String(action || "").trim().toLowerCase(),
+        event,
+        asset: props.asset,
+    });
+}
 </script>
 
 <template>
     <!-- -- THUMBNAIL -------------------------------------------------------- -->
-    <div class="mjr-thumb" ref="thumbRef">
+    <div class="mjr-thumb" :class="{ 'mjr-thumb-workflow': isWorkflow }" ref="thumbRef">
         <div
             v-if="isLivePlaceholder"
             class="mjr-live-placeholder-wash"
             aria-hidden="true"
         />
 
+        <!-- Workflow -->
+        <template v-if="isWorkflow">
+            <div class="mjr-workflow-card-actions" @click.stop @dblclick.stop>
+                <button
+                    type="button"
+                    class="mjr-workflow-action-btn"
+                    :class="{ 'is-active': workflowFavorite }"
+                    :title="workflowFavorite ? 'Remove favorite' : 'Add favorite'"
+                    :aria-label="workflowFavorite ? 'Remove favorite' : 'Add favorite'"
+                    @click="emitWorkflowAction('favorite', $event)"
+                ><i :class="workflowFavorite ? 'pi pi-star-fill' : 'pi pi-star'" /></button>
+            </div>
+            <img
+                v-if="explicitThumbnailUrl && !imgError"
+                ref="imgRef"
+                :class="[
+                    'mjr-thumb-media',
+                    {
+                        'mjr-workflow-graph-map-preview': hasGraphMapWorkflowThumbnail,
+                    },
+                ]"
+                :alt="filename"
+                decoding="async"
+                loading="lazy"
+                :src="cachedImageSrc || explicitThumbnailUrl"
+                @error="onImgError"
+            />
+            <div
+                class="mjr-workflow-thumb"
+                :class="{
+                    'has-thumbnail': explicitThumbnailUrl && !imgError,
+                    'has-graph-map': hasGraphMapWorkflowThumbnail && !imgError,
+                }"
+            >
+                <i class="pi pi-sitemap" />
+                <div class="mjr-workflow-thumb-title">{{ workflowTask || "Workflow" }}</div>
+                <div class="mjr-workflow-thumb-meta">
+                    <span v-if="workflowModel">{{ workflowModel }}</span>
+                    <span v-if="workflowRunsOn">{{ workflowRunsOn }}</span>
+                    <span v-if="workflowNodeCount">{{ workflowNodeCount }} nodes</span>
+                    <span v-if="workflowHasMissingDeps" class="mjr-workflow-missing-chip">{{ workflowMissingLabel }}</span>
+                </div>
+            </div>
+        </template>
+
         <!-- Image -->
-        <template v-if="isImage">
+        <template v-else-if="isImage">
             <img
                 v-if="!imgError"
                 ref="imgRef"
@@ -691,7 +796,11 @@ function onFileBadgeClick(event) {
     </div>
 
     <!-- -- META ------------------------------------------------------------ -->
-    <div class="mjr-card-info mjr-card-meta" style="position:relative;padding:6px 8px;min-width:0">
+    <div
+        class="mjr-card-info mjr-card-meta"
+        :data-mjr-kind="isWorkflow ? 'workflow' : undefined"
+        style="position:relative;padding:6px 8px;min-width:0"
+    >
         <div
             class="mjr-card-filename"
             :title="cardTitle"
@@ -702,6 +811,19 @@ function onFileBadgeClick(event) {
             class="mjr-card-meta-row"
             style="font-size:0.85em;opacity:0.7;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:16px"
         >
+            <template v-if="isWorkflow">
+                <span v-if="workflowTask" class="mjr-meta-workflow-task" :title="`Task: ${workflowTask}`">{{ workflowTask }}</span>
+                <span
+                    v-if="workflowSubgraphCount"
+                    class="mjr-meta-workflow-subgraphs"
+                    :title="`${workflowSubgraphCount} subgraph${workflowSubgraphCount > 1 ? 's' : ''}`"
+                >{{ workflowSubgraphCount }} sub</span>
+                <span
+                    v-if="workflowHasMissingDeps"
+                    class="mjr-meta-workflow-missing"
+                    :title="workflowMissingLabel"
+                >{{ workflowMissingLabel }}</span>
+            </template>
             <template v-for="(item, index) in metaItems" :key="item.key">
                 <span
                     v-if="index > 0"

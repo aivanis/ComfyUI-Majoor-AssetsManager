@@ -13,9 +13,12 @@
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { usePanelStore } from "../../../stores/usePanelStore.js";
-import { get } from "../../../api/client.js";
+import { get, saveWorkflow } from "../../../api/client.js";
 import { ENDPOINTS } from "../../../api/endpoints.js";
+import { comfyPrompt } from "../../../app/dialogs.js";
+import { serializeCurrentHostWorkflow } from "../../../app/hostAdapter.js";
 import { t } from "../../../app/i18n.js";
+import { comfyToast } from "../../../app/toast.js";
 import { VERSION_UPDATE_EVENT, getStoredVersionUpdateState } from "../../../app/versionCheck.js";
 import { EVENTS } from "../../../app/events.js";
 import { openMajoorSettings } from "../../../app/openMajoorSettings.js";
@@ -99,6 +102,7 @@ const collectionsBtnRef = ref(null);
 const pinnedFoldersBtnRef = ref(null);
 const mfvBtnRef = ref(null);
 const messageBtnRef = ref(null);
+const saveWorkflowBtnRef = ref(null);
 const searchBarRef = ref(null);
 const sortPopoverRef         = ref(null);  // <SortPopover>
 const filterPopoverRef       = ref(null);  // <FilterPopover>
@@ -111,6 +115,7 @@ const tabAllRef = ref(null);
 const tabInputsRef = ref(null);
 const tabOutputsRef = ref(null);
 const tabCustomRef = ref(null);
+const tabWorkflowRef = ref(null);
 const tabSimilarRef = ref(null);
 
 const resolveDomElement = (value) => value?.$el || value || null;
@@ -153,6 +158,7 @@ const tabButtons = {
     get tabInputs() { return resolveDomElement(tabInputsRef.value); },
     get tabOutputs(){ return resolveDomElement(tabOutputsRef.value); },
     get tabCustom() { return resolveDomElement(tabCustomRef.value); },
+    get tabWorkflow() { return resolveDomElement(tabWorkflowRef.value); },
     get tabSimilar(){ return resolveDomElement(tabSimilarRef.value); },
 };
 
@@ -185,6 +191,33 @@ const mfvIconClass = computed(() => "pi pi-eye");
 const majoorSettingsTitle = computed(() =>
     t("tooltip.openMajoorSettings", "Open Majoor Assets Manager settings"),
 );
+
+async function onSaveCurrentWorkflow() {
+    const workflow = serializeCurrentHostWorkflow();
+    if (!workflow || typeof workflow !== "object") {
+        comfyToast(t("toast.workflowSerializeFailed", "Could not read the current ComfyUI workflow."), "error");
+        return;
+    }
+    const defaultName = String(workflow?.name || workflow?.title || "workflow").trim();
+    const name = await comfyPrompt(
+        t("dialog.workflowSaveName", "Workflow name"),
+        defaultName,
+        t("tab.workflow", "Workflow"),
+    );
+    const safeName = String(name || "").trim();
+    if (!safeName) return;
+    const result = await saveWorkflow({ workflow, name: safeName }, { timeoutMs: 30_000 });
+    if (!result?.ok) {
+        comfyToast(result?.error || t("toast.workflowSaveFailed", "Failed to save workflow."), "error");
+        return;
+    }
+    comfyToast(t("toast.workflowSaved", "Workflow saved"), "success", 1800);
+    try {
+        window.dispatchEvent(new CustomEvent("mjr:reload-grid", { detail: { reason: "workflow-save" } }));
+    } catch (e) {
+        console.debug?.(e);
+    }
+}
 
 // ── version badge helpers ──────────────────────────────────────────────────────
 
@@ -348,6 +381,8 @@ defineExpose({
     get wfCheckbox()             { return filterPopoverRef.value?.wfCheckbox ?? null; },
     get workflowTypeSelect()     { return filterPopoverRef.value?.workflowTypeSelect ?? null; },
     get workflowIdInput()        { return filterPopoverRef.value?.workflowIdInput ?? null; },
+    get workflowModelInput()     { return filterPopoverRef.value?.workflowModelInput ?? null; },
+    get workflowRunsOnSelect()   { return filterPopoverRef.value?.workflowRunsOnSelect ?? null; },
     get ratingSelect()           { return filterPopoverRef.value?.ratingSelect ?? null; },
     get minSizeInput()           { return filterPopoverRef.value?.minSizeInput ?? null; },
     get maxSizeInput()           { return filterPopoverRef.value?.maxSizeInput ?? null; },
@@ -475,6 +510,17 @@ defineExpose({
                     >{{ t("tab.custom") }}</MButton>
 
                     <MButton
+                        ref="tabWorkflowRef"
+                        type="button"
+                        class="mjr-tab"
+                        severity="secondary"
+                        text
+                        data-scope="workflow"
+                        :class="{ 'is-active': activeScope === 'workflow' }"
+                        :title="t('tooltip.tab.workflow', 'Browse saved workflows')"
+                    >{{ t("tab.workflow", "Workflow") }}</MButton>
+
+                    <MButton
                         ref="tabSimilarRef"
                         type="button"
                         class="mjr-tab"
@@ -488,6 +534,21 @@ defineExpose({
                 </div>
 
                 <div class="mjr-am-header-tools">
+                    <MButton
+                        v-if="activeScope === 'workflow'"
+                        ref="saveWorkflowBtnRef"
+                        type="button"
+                        class="mjr-icon-btn mjr-save-workflow-btn"
+                        severity="secondary"
+                        text
+                        rounded
+                        :title="t('tooltip.saveCurrentWorkflow', 'Save current workflow')"
+                        :aria-label="t('tooltip.saveCurrentWorkflow', 'Save current workflow')"
+                        @click="onSaveCurrentWorkflow"
+                    >
+                        <i class="pi pi-save" aria-hidden="true" />
+                    </MButton>
+
                     <div class="mjr-popover-anchor" style="display: none;">
                         <MButton
                             ref="customMenuBtnRef"
