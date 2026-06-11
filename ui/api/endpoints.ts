@@ -73,6 +73,7 @@ export const ENDPOINTS = {
     TOOLS_STATUS: "/mjr/am/tools/status",
     SETTINGS_OUTPUT_DIRECTORY: "/mjr/am/settings/output-directory",
     SETTINGS_INDEX_DIRECTORY: "/mjr/am/settings/index-directory",
+    SETTINGS_WORKFLOW_ROOTS: "/mjr/am/settings/workflow-roots",
     SETTINGS_METADATA_FALLBACK: "/mjr/am/settings/metadata-fallback",
     SETTINGS_VECTOR_SEARCH: "/mjr/am/settings/vector-search",
     SETTINGS_EXECUTION_GROUPING: "/mjr/am/settings/execution-grouping",
@@ -167,6 +168,7 @@ export const ENDPOINTS = {
     WORKFLOWS_MODEL_FAMILIES: "/mjr/am/workflows/model-families",
     WORKFLOWS_TAGS: "/mjr/am/workflows/tags",
     WORKFLOWS_THUMBNAIL_SET: "/mjr/am/workflows/thumbnail/set",
+    WORKFLOWS_OPEN_ROOT: "/mjr/am/workflows/open-root",
 };
 
 export function appendAssetFilterQueryParams(url: string, filters: AssetFilterParams = {}): string {

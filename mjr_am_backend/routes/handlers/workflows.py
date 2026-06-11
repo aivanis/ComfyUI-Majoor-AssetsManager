@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from aiohttp import web
@@ -12,6 +16,7 @@ from mjr_am_backend.features.workflows import (
     is_workflow_thumbnail_path,
     list_workflow_model_families,
     list_workflow_thumbnail_candidates,
+    managed_workflow_root,
     mark_workflow_loaded,
     move_or_rename_workflow,
     read_workflow_content,
@@ -21,6 +26,7 @@ from mjr_am_backend.features.workflows import (
     set_workflow_tags,
     set_workflow_thumbnail,
     workflow_graph_map_svg,
+    workflow_roots,
 )
 from mjr_am_backend.shared import Result
 from mjr_am_shared import get_logger
@@ -68,6 +74,37 @@ def _check_workflow_write_rate_limit(request: web.Request, endpoint: str) -> Res
         "Rate limit exceeded. Please wait before retrying.",
         retry_after=retry_after,
     )
+
+
+def _open_folder_path(path: Path) -> Result[dict]:
+    try:
+        resolved = path.resolve(strict=True)
+    except Exception:
+        return Result.Err("NOT_FOUND", "Workflow root does not exist")
+    if not resolved.is_dir():
+        return Result.Err("INVALID_INPUT", "Workflow root is not a directory")
+
+    def _execute(command: list[str]) -> None:
+        if not shutil.which(command[0]):
+            raise FileNotFoundError(command[0])
+        subprocess.Popen(
+            command,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            shell=False,
+        )
+
+    if sys.platform == "darwin":
+        command = ["open", str(resolved)]
+    elif os.name == "nt":
+        command = ["explorer.exe", str(resolved)]
+    else:
+        command = ["xdg-open", str(resolved)]
+    try:
+        _execute(command)
+    except Exception as exc:
+        return Result.Err("DEGRADED", f"Failed to open workflow root: {exc.__class__.__name__}")
+    return Result.Ok({"opened": True, "path": str(resolved)})
 
 
 async def _audit_workflow_write(
@@ -318,6 +355,31 @@ def register_workflow_routes(routes: web.RouteTableDef) -> None:
     async def workflow_model_families(request: web.Request):
         return _json_response(list_workflow_model_families())
 
+    @routes.post("/mjr/am/workflows/open-root")
+    async def workflow_open_root(request: web.Request):
+        csrf = _csrf_error(request)
+        if csrf:
+            return _json_response(Result.Err("CSRF", csrf))
+        auth = _require_write_access(request)
+        if not auth.ok:
+            return _json_response(auth)
+        rate = _check_workflow_write_rate_limit(request, "workflow_open_root")
+        if not rate.ok:
+            return _json_response(rate)
+        roots = workflow_roots()
+        root = managed_workflow_root(create=True)
+        target = root or (roots[0] if roots else None)
+        if target is None:
+            return _json_response(Result.Err("WORKFLOW_ROOT_UNAVAILABLE", "Workflow root is unavailable"))
+        result = _open_folder_path(target)
+        await _audit_workflow_write(
+            request,
+            operation="workflow.open_root",
+            target=str(target),
+            result=result,
+        )
+        return _json_response(result)
+
     @routes.post("/mjr/am/workflows/thumbnail/set")
     async def workflow_set_thumbnail(request: web.Request):
         rate = _check_workflow_write_rate_limit(request, "workflow_thumbnail")
@@ -356,6 +418,8 @@ def register_workflow_routes(routes: web.RouteTableDef) -> None:
         if not safe_path_res.ok:
             return _json_response(safe_path_res)
         resolved = safe_path_res.data
+        if resolved is None:
+            return _json_response(Result.Err("NOT_FOUND", "Thumbnail not found"))
         try:
             resp = web.FileResponse(path=str(resolved))
             resp.headers["Content-Type"] = _guess_content_type_for_file(resolved)

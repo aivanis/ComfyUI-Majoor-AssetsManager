@@ -39,12 +39,51 @@ SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
 def _env_path(raw: Any = "") -> Path | None:
     try:
-        value = raw if str(raw or "").strip() else os.getenv("MJR_AM_WORKFLOW_DIRECTORY", "")
+        value = raw if str(raw or "").strip() else (
+            os.getenv("MJR_AM_WORKFLOW_DIRECTORY", "")
+            or os.getenv("MAJOOR_WORKFLOW_DIRECTORY", "")
+            or ""
+        )
         if not str(value or "").strip():
             return None
         return Path(value).expanduser().resolve(strict=False)
     except Exception:
         return None
+
+
+def _env_paths(raw: Any = "") -> list[Path]:
+    try:
+        value = raw if str(raw or "").strip() else (
+            os.getenv("MJR_AM_WORKFLOW_DIRECTORIES", "")
+            or os.getenv("MAJOOR_WORKFLOW_DIRECTORIES", "")
+            or ""
+        )
+    except Exception:
+        value = ""
+    paths: list[Path] = []
+    text = str(value or "").strip()
+    if text:
+        parts: list[str] = []
+        for line in text.replace(";", "\n").splitlines():
+            parts.extend(part for part in line.split(os.pathsep) if part)
+        for part in parts:
+            try:
+                path = Path(part).expanduser().resolve(strict=False)
+            except Exception:
+                continue
+            paths.append(path)
+    legacy = _env_path()
+    if legacy is not None:
+        paths.insert(0, legacy)
+    out: list[Path] = []
+    seen: set[str] = set()
+    for path in paths:
+        key = str(path).lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(path)
+    return out
 
 
 def _detect_comfy_root() -> Path | None:
@@ -69,9 +108,7 @@ def _detect_comfy_root() -> Path | None:
 
 def workflow_roots() -> list[Path]:
     roots: list[Path] = []
-    env = _env_path()
-    if env is not None:
-        roots.append(env)
+    roots.extend(_env_paths())
     comfy_root = _detect_comfy_root()
     if comfy_root is not None:
         roots.extend(
@@ -107,9 +144,9 @@ def workflow_roots() -> list[Path]:
 
 
 def managed_workflow_root(*, create: bool = False) -> Path | None:
-    env = _env_path()
-    if env is not None:
-        root = env
+    env_roots = _env_paths()
+    if env_roots:
+        root = env_roots[0]
     else:
         comfy_root = _detect_comfy_root()
         root = (

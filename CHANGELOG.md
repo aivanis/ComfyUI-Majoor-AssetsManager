@@ -11,7 +11,12 @@ All notable changes to this project are documented in this file.
 - **Drag and Drop Features**: Improved drag-and-drop behavior, node compatibility handling, and clean export workflow. See [docs/DRAG_DROP.md](docs/DRAG_DROP.md).
 
 ### 🎉 New Features
+- **Configurable Workflow Roots**: Added a Settings option for Workflow tab roots and a Workflow-tab toolbar button to pick the saved workflow root directly beside the save/import actions. See [docs/WORKFLOWS.md](docs/WORKFLOWS.md) and [docs/SETTINGS_CONFIGURATION.md](docs/SETTINGS_CONFIGURATION.md).
+- **Workflow Tab Library**: Added a dedicated Workflow tab guide and documented the full workflow library behavior: save/import current workflows, load them back into ComfyUI, inspect them in Graph Map, organize categories, set thumbnails, and edit workflow metadata. See [docs/WORKFLOWS.md](docs/WORKFLOWS.md).
 - **Majoor GenInfo Override Node**: Added a new `Majoor GenInfo Override` node to inject custom/manual GenInfo data through Majoor Save nodes. See [docs/CUSTOM_NODES.md](docs/CUSTOM_NODES.md).
+
+### Message Center
+- **Workflow Tab Guide Announcement**: Added a built-in Message Center entry linking directly to the Workflow tab guide.
 
 ### 🔧 Refactoring, Code Quality & Fixes
 - **Frontend TypeScript Refactor**: Continued major UI code refactoring to TypeScript to align with ComfyUI frontend evolution. See [docs/MIGRATION_TS_TRACKER.md](docs/MIGRATION_TS_TRACKER.md).

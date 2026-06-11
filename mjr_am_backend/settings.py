@@ -37,6 +37,7 @@ logger = get_logger(__name__)
 
 _PROBE_BACKEND_KEY = "media_probe_backend"
 _OUTPUT_DIRECTORY_KEY = "output_directory_override"
+_WORKFLOW_ROOTS_KEY = "workflow_roots"
 _METADATA_FALLBACK_IMAGE_KEY = "metadata_fallback_image"
 _METADATA_FALLBACK_MEDIA_KEY = "metadata_fallback_media"
 _VECTOR_SEARCH_ENABLED_KEY = "vector_search_enabled"
@@ -1334,6 +1335,95 @@ class AppSettings:
                 return str(Path(raw).expanduser().resolve())
             except Exception:
                 return raw
+
+    async def get_workflow_roots(self) -> list[str]:
+        """Return persisted workflow roots, or an empty list when unset."""
+        async with self._lock:
+            raw = await self._read_setting(_WORKFLOW_ROOTS_KEY)
+            return self._normalize_workflow_roots(raw)
+
+    async def set_workflow_roots(self, roots: Any) -> Result[list[str]]:
+        """Persist workflow library roots and apply runtime env vars."""
+        normalized = self._normalize_workflow_roots(roots)
+        async with self._lock:
+            if not normalized:
+                result = await self._delete_setting(_WORKFLOW_ROOTS_KEY)
+                if not result.ok:
+                    return Result.Err("DB_ERROR", result.error or "Failed to clear workflow roots")
+                self._clear_workflow_roots_env_vars()
+                await self._warn_if_bump_fails("Failed to bump settings version")
+                return Result.Ok([])
+            serialized = "\n".join(normalized)
+            result = await self._write_setting(_WORKFLOW_ROOTS_KEY, serialized)
+            if not result.ok:
+                return Result.Err("DB_ERROR", result.error or "Failed to persist workflow roots")
+            self._set_workflow_roots_env_vars(normalized)
+            await self._warn_if_bump_fails("Failed to bump settings version")
+            return Result.Ok(normalized)
+
+    def _normalize_workflow_roots(self, roots: Any) -> list[str]:
+        if roots is None:
+            values: list[str] = []
+        elif isinstance(roots, (list, tuple, set)):
+            values = [str(item or "") for item in roots]
+        else:
+            raw = str(roots or "")
+            values = []
+            for line in raw.replace(";", "\n").splitlines():
+                values.extend(part for part in line.split(os.pathsep) if part)
+        out: list[str] = []
+        seen: set[str] = set()
+        for value in values:
+            text = str(value or "").strip()
+            if not text:
+                continue
+            try:
+                from pathlib import Path
+
+                path = Path(text).expanduser().resolve(strict=False)
+            except Exception:
+                continue
+            key = str(path).lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(str(path))
+        return out
+
+    def _set_workflow_roots_env_vars(self, roots: list[str]) -> None:
+        joined = os.pathsep.join(str(root) for root in roots if str(root or "").strip())
+        try:
+            if joined:
+                os.environ["MJR_AM_WORKFLOW_DIRECTORIES"] = joined
+                os.environ["MAJOOR_WORKFLOW_DIRECTORIES"] = joined
+            else:
+                self._clear_workflow_roots_env_vars()
+        except Exception:
+            return
+
+    def _clear_workflow_roots_env_vars(self) -> None:
+        try:
+            os.environ.pop("MJR_AM_WORKFLOW_DIRECTORIES", None)
+            os.environ.pop("MAJOOR_WORKFLOW_DIRECTORIES", None)
+        except Exception:
+            return
+
+    async def apply_workflow_roots_on_startup(self) -> None:
+        """Restore persisted workflow roots into environment on startup."""
+        try:
+            async with self._lock:
+                raw = await self._read_setting(_WORKFLOW_ROOTS_KEY)
+                roots = self._normalize_workflow_roots(raw)
+                if not roots:
+                    return
+                self._set_workflow_roots_env_vars(roots)
+                startup_log_info(
+                    logger,
+                    "Restored workflow roots on startup: %s",
+                    os.pathsep.join(roots),
+                )
+        except Exception as exc:
+            logger.warning("Failed to restore workflow roots on startup: %s", exc)
 
     async def set_output_directory(self, path: str) -> Result[str]:
         """Persist output directory override and bump settings version."""

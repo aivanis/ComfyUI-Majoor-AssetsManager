@@ -279,6 +279,9 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "setting.ai.vector.enabled.name": "Enable AI semantic search",
         "setting.ai.vector.enabled.desc":
             "Enable CLIP-based semantic search. Disable to use keyword-only search.",
+        "setting.ai.vector.captionOnIndex.name": "Generate AI captions during indexing",
+        "setting.ai.vector.captionOnIndex.desc":
+            "Allow automatic vector indexing and backfill to run Florence-2 captions for image assets. This is slower and can use significant VRAM/CPU; leave it off for faster grid startup.",
 
         // --- Settings: Security ---
         "setting.sec.safe.name": "Majoor: Safe Mode",
@@ -1249,6 +1252,26 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "summary.duplicates": "duplicates",
         "summary.similar": "similar",
 
+        // --- Commands / Tooltips ---
+        "command.openFloatingViewer": "Open floating viewer",
+        "command.openGeneratedFeed": "Open generated feed",
+        "command.openSettings": "Open Majoor settings",
+        "command.openNodeContext": "Show assets from selected node",
+        "tooltip.openAssetsManager": "Open Majoor Assets Manager",
+        "tooltip.openFloatingViewer": "Open Majoor floating viewer",
+        "tooltip.openGeneratedFeed": "Open the Majoor generated feed panel",
+        "tooltip.openNodeContext": "Show the latest indexed assets produced by this node",
+        "tooltip.openMajoorSettings": "Open Majoor Assets Manager settings",
+
+        // --- Filters / Status ---
+        "label.refineResults": "Refine your results",
+        "label.workflowModelFamily": "Model family",
+        "placeholder.workflowModelFamily": "Flux, Wan, SDXL...",
+        "label.workflowRunsOn": "Runs on",
+        "action.clearAll": "Clear all",
+        "status.cached": "Last known status",
+        "status.toast.workflow": "Index status: workflow scope",
+
         // --- Hotkeys ---
         "hotkey.scan": "Scan (S)",
         "hotkey.search": "Search (Ctrl+F)",
@@ -1310,6 +1333,11 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "tooltip.noAssetsDay": "Aucun asset ce jour",
         "tooltip.assetsDaySingular": "{count} asset",
         "tooltip.assetsDayPlural": "{count} assets",
+        "tooltip.openAssetsManager": "Ouvrir Majoor Assets Manager",
+        "tooltip.openFloatingViewer": "Ouvrir le floating viewer Majoor",
+        "tooltip.openGeneratedFeed": "Ouvrir le panneau du flux genere Majoor",
+        "tooltip.openNodeContext": "Afficher les derniers assets indexes produits par ce noeud",
+        "tooltip.openMajoorSettings": "Ouvrir les parametres de Majoor Assets Manager",
         "tooltip.previewStreamOff":
             "Preview KSampler : OFF - cliquer pour afficher les images de denoising pendant l'execution",
         "tooltip.previewStreamOn":
@@ -1350,12 +1378,23 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "action.generate": "Generer",
         "action.clickToCopy": "Cliquer pour copier",
         "action.clear": "Effacer",
+        "action.clearAll": "Tout effacer",
         "action.refresh": "Rafraichir",
+        "command.openFloatingViewer": "Ouvrir le floating viewer",
+        "command.openGeneratedFeed": "Ouvrir le flux genere",
+        "command.openSettings": "Ouvrir les parametres Majoor",
+        "command.openNodeContext": "Afficher les assets du noeud selectionne",
+        "label.refineResults": "Affiner les resultats",
+        "label.workflowModelFamily": "Famille de modele",
+        "label.workflowRunsOn": "Execute sur",
+        "placeholder.workflowModelFamily": "Flux, Wan, SDXL...",
         "status.loading": "Chargement",
         "status.disabled": "Desactive",
         "status.na": "N/A",
         "status.generating": "Generation...",
         "status.unavailable": "Indisponible",
+        "status.cached": "Dernier statut connu",
+        "status.toast.workflow": "Statut index : scope workflow",
         "state.on": "on",
         "state.off": "off",
         "viewer.copySuccessShort": "Copie !",
@@ -1575,6 +1614,10 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "setting.ai.vector.enabled.name": "Activer la recherche semantique IA",
         "setting.ai.vector.enabled.desc":
             "Active la recherche semantique basee sur CLIP. Desactivez pour une recherche par mots-cles uniquement.",
+        "setting.ai.vector.captionOnIndex.name":
+            "Generer les captions IA pendant l'indexation",
+        "setting.ai.vector.captionOnIndex.desc":
+            "Autorise l'indexation vectorielle automatique et le backfill a executer les captions Florence-2 pour les images. C'est plus lent et peut utiliser beaucoup de VRAM/CPU ; laissez desactive pour demarrer la grille plus vite.",
         "setting.viewer.pauseExecution.name":
             "Majoor : Pause du viewer principal pendant l'execution",
         "setting.viewer.pauseExecution.desc":

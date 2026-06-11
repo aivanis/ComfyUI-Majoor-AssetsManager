@@ -144,6 +144,7 @@ export const DEFAULT_SETTINGS = {
     paths: {
         outputDirectory: "",
         indexDirectory: "",
+        workflowRoots: "",
     },
     db: {
         timeoutMs: 5000,

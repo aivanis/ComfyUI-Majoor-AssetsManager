@@ -37,6 +37,7 @@ Majoor Assets Manager helps you **browse**, **inspect**, and **reuse** ComfyUI a
 Useful first links:
 - User guide: [`user_guide.html`](user_guide.html)
 - Documentation index: [`docs/DOCUMENTATION_INDEX.md`](docs/DOCUMENTATION_INDEX.md)
+- Workflow tab guide: [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md)
 - MFV guide: [`docs/MFV_GUIDE.md`](docs/MFV_GUIDE.md)
 - Graph Map guide: [`docs/GRAPH_MAP.md`](docs/GRAPH_MAP.md)
 - Changelog: [`CHANGELOG.md`](CHANGELOG.md)
@@ -51,6 +52,7 @@ Useful first links:
 - [Basic Usage](#basic-usage)
 - [Majoor Floating Viewer (MFV)](#majoor-floating-viewer-mfv)
 - [Graph Map](#graph-map)
+- [Workflow Tab](#workflow-tab)
 - [Custom Nodes](#custom-nodes)
 - [Hotkeys & Shortcuts](#hotkeys--shortcuts)
 - [Advanced Features](#advanced-features)
@@ -85,6 +87,7 @@ Move useful assets and workflow context back into ComfyUI:
 - drag assets to compatible loader nodes or the canvas
 - use **Load Asset** to create loader nodes from selected media
 - stage files into the ComfyUI input directory
+- save, import, categorize, thumbnail, and reload workflow JSON files from the Workflow tab
 - import or inspect embedded workflows without losing the current review flow
 - export originals, clean metadata-stripped files, or selected files as a ZIP
 
@@ -338,6 +341,14 @@ For the full walkthrough and the second screenshot focused on the node detail pa
 - **Resize**: Drag panel edges
 - **Close**: ESC or close button
 - **Focused Player Shortcuts**: Click once on the inline player, then use **Space** to play/pause and **Left/Right** to step frame by frame
+
+---
+
+## Workflow Tab
+
+The Workflow tab is a reusable workflow library for ComfyUI `.json` files. It can save the current canvas, import workflow JSON files, load saved workflows back into ComfyUI, inspect them in Graph Map, and organize them with categories, tags, thumbnails, notes, favorites, usage metadata, and detected task/model/provider fields.
+
+See [`docs/WORKFLOWS.md`](docs/WORKFLOWS.md) for the full Workflow tab guide.
 
 ---
 
