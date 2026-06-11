@@ -1055,6 +1055,20 @@ def _save_animated(
     return out_file
 
 
+def _build_video_ui(
+    video_file: str,
+    subfolder: str,
+    output_type: str,
+    preview_file: str | None = None,
+) -> dict[str, Any]:
+    """Return ComfyUI's native animated preview payload for saved videos."""
+    video_entry = {"filename": video_file, "subfolder": subfolder, "type": output_type}
+    ui: dict[str, Any] = {"images": [video_entry], "animated": (True,), "videos": [video_entry]}
+    if preview_file:
+        ui["preview_images"] = [{"filename": preview_file, "subfolder": subfolder, "type": output_type}]
+    return {"ui": ui}
+
+
 def _build_container_metadata(
     prompt: Any | None,
     extra_pnginfo: dict | None,
@@ -1318,6 +1332,7 @@ class MajoorSaveVideo:
         # --- PNG sidecar with full metadata ---
         png_metadata = _build_metadata(prompt, extra_pnginfo, gen_time, geninfo_override, unique_id)
 
+        sidecar_file: str | None = None
         if save_first_frame:
             sidecar_file = f"{filename}_{counter:05}.png"
             Image.fromarray(_tensor_to_bytes(resolved_images[0])).save(
@@ -1332,7 +1347,7 @@ class MajoorSaveVideo:
                 resolved_images, format, resolved_fps, loop_count,
                 full_output_folder, filename, counter,
             )
-            return {"ui": {"videos": [{"filename": out_file, "subfolder": subfolder, "type": self.type}]}}
+            return _build_video_ui(out_file, subfolder, self.type, out_file)
 
         # --- MP4 via PyAV ---
         container_meta = _build_container_metadata(prompt, extra_pnginfo, gen_time, geninfo_override, unique_id)
@@ -1341,7 +1356,7 @@ class MajoorSaveVideo:
 
         _encode_mp4(out_path, resolved_images, resolved_fps, crf, container_meta, resolved_audio, num_frames)
 
-        return {"ui": {"videos": [{"filename": out_file, "subfolder": subfolder, "type": self.type}]}}
+        return _build_video_ui(out_file, subfolder, self.type, sidecar_file)
 
 # ---------------------------------------------------------------------------
 # Registration helpers

@@ -13,11 +13,12 @@
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import { usePanelStore } from "../../../stores/usePanelStore.js";
-import { get, saveWorkflow } from "../../../api/client.js";
+import { get, post, saveWorkflow, setWorkflowRootsSetting } from "../../../api/client.js";
 import { ENDPOINTS } from "../../../api/endpoints.js";
 import { comfyPrompt } from "../../../app/dialogs.js";
 import { serializeCurrentHostWorkflow } from "../../../app/hostAdapter.js";
 import { t } from "../../../app/i18n.js";
+import { loadMajoorSettings, saveMajoorSettings } from "../../../app/settings.js";
 import { comfyToast } from "../../../app/toast.js";
 import { VERSION_UPDATE_EVENT, getStoredVersionUpdateState } from "../../../app/versionCheck.js";
 import { EVENTS } from "../../../app/events.js";
@@ -103,6 +104,7 @@ const pinnedFoldersBtnRef = ref(null);
 const mfvBtnRef = ref(null);
 const messageBtnRef = ref(null);
 const saveWorkflowBtnRef = ref(null);
+const pickWorkflowRootBtnRef = ref(null);
 const importWorkflowInputRef = ref(null);
 const searchBarRef = ref(null);
 const sortPopoverRef         = ref(null);  // <SortPopover>
@@ -218,6 +220,52 @@ async function onSaveCurrentWorkflow() {
     } catch (e) {
         console.debug?.(e);
     }
+}
+
+async function onPickWorkflowRoot() {
+    let pickedPath = "";
+    try {
+        const browseRes = await post(ENDPOINTS.BROWSE_FOLDER, {});
+        if (browseRes?.ok) {
+            pickedPath = String(browseRes?.data?.path || "").trim();
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    if (!pickedPath) {
+        const manual = await comfyPrompt(
+            t("dialog.enterWorkflowRootPath", "Workflow root folder"),
+            "",
+            t("tab.workflow", "Workflow"),
+        );
+        pickedPath = String(manual || "").trim();
+    }
+    if (!pickedPath) return;
+
+    const result = await setWorkflowRootsSetting(pickedPath, { timeoutMs: 30_000 });
+    if (!result?.ok) {
+        comfyToast(
+            result?.error || t("toast.failedSetWorkflowRoots", "Failed to set workflow roots"),
+            "error",
+        );
+        return;
+    }
+
+    try {
+        const settings = loadMajoorSettings();
+        settings.paths = settings.paths || {};
+        settings.paths.workflowRoots = String(result?.data?.workflow_roots_text || pickedPath).trim();
+        saveMajoorSettings(settings);
+        window.dispatchEvent(
+            new CustomEvent("mjr-settings-changed", {
+                detail: { key: "paths.workflowRoots", value: pickedPath },
+            }),
+        );
+        window.dispatchEvent(new CustomEvent("mjr:reload-grid", { detail: { reason: "workflow-root-pick" } }));
+    } catch (e) {
+        console.debug?.(e);
+    }
+    comfyToast(t("toast.workflowRootsSaved", "Workflow roots saved"), "success", 1800);
 }
 
 function triggerImportWorkflow() {
@@ -618,6 +666,20 @@ defineExpose({
                         @click="onSaveCurrentWorkflow"
                     >
                         <i class="pi pi-save" aria-hidden="true" />
+                    </MButton>
+                    <MButton
+                        v-if="activeScope === 'workflow'"
+                        ref="pickWorkflowRootBtnRef"
+                        type="button"
+                        class="mjr-icon-btn mjr-pick-workflow-root-btn"
+                        severity="secondary"
+                        text
+                        rounded
+                        :title="t('tooltip.pickWorkflowRoot', 'Pick saved workflow root')"
+                        :aria-label="t('tooltip.pickWorkflowRoot', 'Pick saved workflow root')"
+                        @click="onPickWorkflowRoot"
+                    >
+                        <i class="pi pi-folder-plus" aria-hidden="true" />
                     </MButton>
                     <MButton
                         v-if="activeScope === 'workflow'"

@@ -168,6 +168,21 @@ Use that line as the quickest confirmation that the current browser session can 
 
 ## File System Settings
 
+### Workflow Roots
+
+- **UI location**: Settings -> Majoor Assets Manager -> Advanced -> Paths / Workflows
+- **Purpose**: Sets the folders scanned by the Workflow tab and the first folder used when saving/importing workflow JSON files from the tab.
+- **Multiple folders**: Use one folder per line, or separate folders with semicolons.
+- **Quick picker**: In the Workflow tab, use the folder button beside **Save current workflow** to pick and save the workflow root directly.
+- **Default behavior**: Leave empty to use ComfyUI workflow defaults and the legacy `MJR_AM_WORKFLOW_DIRECTORY` environment variable.
+
+Environment variables:
+
+```bash
+MJR_AM_WORKFLOW_DIRECTORIES=/path/to/workflows:/path/to/other/workflows
+MJR_AM_WORKFLOW_DIRECTORY=/path/to/workflows
+```
+
 ### Index Directory
 
 - **Purpose**: Override where the SQLite index database and related index files are stored.

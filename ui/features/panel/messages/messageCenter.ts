@@ -13,6 +13,18 @@ let _loaded = false;
 let _messages: any[] = [];
 const BUILTIN_PANEL_MESSAGES = Object.freeze([
     {
+        id: "whats-new-2026-06-11-workflow-tab-guide",
+        title: "Workflow Tab Guide",
+        emoji: "Info",
+        category: "Information",
+        categoryKey: "msg.category.information",
+        level: "info",
+        createdAt: Date.parse("2026-06-11T10:00:00Z"),
+        body: "The Workflow tab now has a dedicated guide. It explains how saved ComfyUI workflow JSON files are discovered, saved, imported, loaded back into ComfyUI, inspected in Graph Map, categorized, tagged, and assigned thumbnails.",
+        actionLabel: "Workflow Guide",
+        actionUrl: "docs/WORKFLOWS.md",
+    },
+    {
         id: "whats-new-2026-06-08-global-release-update",
         title: "What's New - Global Update",
         emoji: "Info",

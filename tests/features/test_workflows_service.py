@@ -48,6 +48,32 @@ def test_list_workflows_discovers_env_directory(monkeypatch, tmp_path):
     assert assets[0]["source"] == "workflow"
 
 
+def test_list_workflows_discovers_multiple_env_directories(monkeypatch, tmp_path):
+    workflow_dir_a = tmp_path / "workflows-a"
+    workflow_dir_b = tmp_path / "workflows-b"
+    workflow_dir_a.mkdir()
+    workflow_dir_b.mkdir()
+    (workflow_dir_a / "alpha.json").write_text(
+        json.dumps({"name": "Alpha", "nodes": [{"id": 1, "type": "KSampler"}]}),
+        encoding="utf-8",
+    )
+    (workflow_dir_b / "beta.json").write_text(
+        json.dumps({"name": "Beta", "nodes": [{"id": 1, "type": "LoadImage"}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("MJR_AM_WORKFLOW_DIRECTORY", raising=False)
+    monkeypatch.setenv(
+        "MJR_AM_WORKFLOW_DIRECTORIES",
+        f"{workflow_dir_a}{workflows_service.os.pathsep}{workflow_dir_b}",
+    )
+
+    result = list_workflows(query="*", limit=10)
+
+    assert result.ok
+    names = {asset["display_name"] for asset in result.data["assets"]}
+    assert {"Alpha", "Beta"}.issubset(names)
+
+
 def test_read_workflow_content_rejects_paths_outside_workflow_roots(monkeypatch, tmp_path):
     workflow_dir = tmp_path / "workflows"
     workflow_dir.mkdir()

@@ -111,6 +111,21 @@ export async function setIndexDirectorySetting(indexDirectory: any, options: Rec
     return post(ENDPOINTS.SETTINGS_INDEX_DIRECTORY, { index_directory: value }, options);
 }
 
+export async function getWorkflowRootsSetting(options: Record<string, any> = {}) {
+    return get(ENDPOINTS.SETTINGS_WORKFLOW_ROOTS, options);
+}
+
+export async function setWorkflowRootsSetting(workflowRoots: any, options: Record<string, any> = {}) {
+    const value = Array.isArray(workflowRoots)
+        ? workflowRoots.map((item) => String(item ?? "").trim()).filter(Boolean)
+        : String(workflowRoots ?? "").trim();
+    return post(ENDPOINTS.SETTINGS_WORKFLOW_ROOTS, { workflow_roots: value }, options);
+}
+
+export async function openWorkflowRoot(options: Record<string, any> = {}) {
+    return post(ENDPOINTS.WORKFLOWS_OPEN_ROOT, {}, options);
+}
+
 export async function getSecuritySettings() {
     return get("/mjr/am/settings/security");
 }
