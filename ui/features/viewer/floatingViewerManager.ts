@@ -778,6 +778,34 @@ const _onSettingsChanged = (event: any) => {
         _syncToggleDefaultsFromConfig();
     }
 };
+
+function _isMfvPlayerShortcut(event: any) {
+    const key = String(event?.key || "");
+    return key === " " || key === "Spacebar" || key === "ArrowLeft" || key === "ArrowRight";
+}
+
+function _handleMfvPlayerShortcut(event: any) {
+    if (!_instance?.isVisible || !_isMfvPlayerShortcut(event)) return false;
+    try {
+        const target = event?.target;
+        const targetPlayer = target?.closest?.(".mjr-mfv-simple-player") || null;
+        const instanceEl = _instance?.element || null;
+        const targetInsideViewer = Boolean(instanceEl?.contains?.(target));
+        const player =
+            targetPlayer ||
+            (targetInsideViewer || target == null
+                ? instanceEl?.querySelector?.(".mjr-mfv-simple-player")
+                : null);
+        const handler = player?._mjrSimplePlayerHandleKeydown;
+        if (typeof handler !== "function") return false;
+        handler(event);
+        return Boolean(event?.defaultPrevented);
+    } catch (e: any) {
+        console.debug?.(e);
+        return false;
+    }
+}
+
 const _onGlobalKeydown = (event: any) => {
     if (!_instance?.isVisible) return;
     if (isHotkeysSuspended()) return;
@@ -787,7 +815,10 @@ const _onGlobalKeydown = (event: any) => {
     const isTypingTarget =
         event?.target?.isContentEditable ||
         event?.target?.closest?.("input, textarea, select, [contenteditable='true']");
+    if (isTypingTarget && _handleMfvPlayerShortcut(event)) return;
     if (isTypingTarget) return;
+
+    if (_handleMfvPlayerShortcut(event)) return;
 
     const consume = () => {
         event.preventDefault?.();

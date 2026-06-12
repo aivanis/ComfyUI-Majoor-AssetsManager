@@ -65,6 +65,8 @@ const cardFilenameKeys = new WeakMap();
 let measureRaf = 0;
 let lastScrollSampleTop = 0;
 let lastScrollSampleAt = 0;
+const pendingStackMemberLoads = new Map();
+const STACK_GROUP_FETCH_LIMIT = 501;
 
 // ─── Stack service (provide/inject for AssetCardInner Vue buttons) ────────────
 
@@ -86,7 +88,16 @@ provide("mjrStackService", {
         if (!gc._mjrStackMembersCache) gc._mjrStackMembersCache = new Map();
         let members = gc._mjrStackMembersCache.get(groupKey);
         if (!Array.isArray(members)) {
-            const res = await get(buildStackMembersURL(stackId), { timeoutMs: 30_000 });
+            let pending = pendingStackMemberLoads.get(groupKey);
+            if (!pending) {
+                pending = get(buildStackMembersURL(stackId, { limit: STACK_GROUP_FETCH_LIMIT }), {
+                    timeoutMs: 30_000,
+                }).finally(() => {
+                    pendingStackMemberLoads.delete(groupKey);
+                });
+                pendingStackMemberLoads.set(groupKey, pending);
+            }
+            const res = await pending;
             if (res?.ok && Array.isArray(res?.data)) {
                 members = res.data;
                 gc._mjrStackMembersCache.set(groupKey, members);
@@ -789,36 +800,28 @@ const skeletonCards = computed(() =>
     Array.from({ length: Number(skeletonCardCount.value || 12) }, (_, index) => index),
 );
 
-const skeletonRows = computed(() => {
-    const cols = Math.max(1, Number(columnCount.value || 1));
-    const cards = skeletonCards.value;
-    const rowsList = [];
-    for (let index = 0; index < cards.length; index += cols) {
-        rowsList.push(cards.slice(index, index + cols));
-    }
-    return rowsList;
-});
-
 const skeletonMetaHeight = computed(() => {
     const cardHeight = Math.max(80, Number(estimateRowHeight.value || 0) - Number(gapPx.value || 0));
     const thumb = Math.max(80, Number(itemWidth.value || 0));
     return Math.max(0, cardHeight - thumb);
 });
 
-const skeletonRowStyle = computed(() => ({
-    display: "flex",
+const skeletonLayoutStyle = computed(() => ({
+    display: "grid",
+    gridTemplateColumns: `repeat(${Math.max(1, Number(columnCount.value || 1))}, minmax(0, ${Math.max(
+        80,
+        Number(itemWidth.value || 0),
+    )}px))`,
     gap: `${gapPx.value}px`,
-    paddingBottom: `${gapPx.value}px`,
+    justifyContent: "start",
     boxSizing: "border-box",
 }));
 
 const skeletonCardStyle = computed(() => {
-    const width = Math.max(80, Number(itemWidth.value || 0));
     const cardHeight = Math.max(80, Number(estimateRowHeight.value || 0) - Number(gapPx.value || 0));
     return {
-        width: `${width}px`,
-        flex: `0 0 ${width}px`,
-        minWidth: `${width}px`,
+        width: "100%",
+        minWidth: "0",
         height: `${cardHeight}px`,
         borderRadius: "12px",
         border: "1px solid rgba(255,255,255,0.22)",
@@ -1763,32 +1766,27 @@ defineExpose({
             <div style="width:100%;">
                 <div
                     class="mjr-grid-skeleton-layout"
+                    :style="skeletonLayoutStyle"
                 >
                     <div
-                        v-for="(row, rowIndex) in skeletonRows"
-                        :key="`skr-${rowIndex}`"
-                        :style="skeletonRowStyle"
+                        v-for="idx in skeletonCards"
+                        :key="`sk-${idx}`"
+                        class="mjr-grid-skeleton-card"
+                        :style="skeletonCardStyle"
                     >
                         <div
-                            v-for="idx in row"
-                            :key="`sk-${idx}`"
-                            class="mjr-grid-skeleton-card"
-                            :style="skeletonCardStyle"
-                        >
+                            class="mjr-grid-skeleton-thumb mjr-grid-skeleton-shimmer"
+                            :style="skeletonThumbStyle"
+                        />
+                        <div :style="skeletonInfoStyle">
                             <div
-                                class="mjr-grid-skeleton-thumb mjr-grid-skeleton-shimmer"
-                                :style="skeletonThumbStyle"
+                                class="mjr-grid-skeleton-line mjr-grid-skeleton-line--title mjr-grid-skeleton-shimmer"
+                                :style="skeletonLineTitleStyle"
                             />
-                            <div :style="skeletonInfoStyle">
-                                <div
-                                    class="mjr-grid-skeleton-line mjr-grid-skeleton-line--title mjr-grid-skeleton-shimmer"
-                                    :style="skeletonLineTitleStyle"
-                                />
-                                <div
-                                    class="mjr-grid-skeleton-line mjr-grid-skeleton-line--meta mjr-grid-skeleton-shimmer"
-                                    :style="skeletonLineMetaStyle"
-                                />
-                            </div>
+                            <div
+                                class="mjr-grid-skeleton-line mjr-grid-skeleton-line--meta mjr-grid-skeleton-shimmer"
+                                :style="skeletonLineMetaStyle"
+                            />
                         </div>
                     </div>
                 </div>

@@ -450,24 +450,34 @@ const stackCount = computed(() =>
 
 const hasDupStack = computed(() => !!props.asset._mjrDupStack && Number(props.asset._mjrDupCount || 0) >= 2);
 const dupCount = computed(() => Number(props.asset._mjrDupCount || 0) || 0);
+const stackOpening = ref(false);
+const dupOpening = ref(false);
 
 async function onStackGroupClick(event) {
     event.preventDefault();
     event.stopPropagation();
+    if (stackOpening.value) return;
+    stackOpening.value = true;
     try {
         await stackService?.openStackGroup?.(props.asset);
     } catch (err) {
         console.debug?.(err);
+    } finally {
+        stackOpening.value = false;
     }
 }
 
 function onDupStackClick(event) {
     event.preventDefault();
     event.stopPropagation();
+    if (dupOpening.value) return;
+    dupOpening.value = true;
     try {
         stackService?.openDupGroup?.(props.asset);
     } catch (err) {
         console.debug?.(err);
+    } finally {
+        dupOpening.value = false;
     }
 }
 
@@ -881,6 +891,8 @@ function emitWorkflowAction(action, event) {
         severity="secondary"
         text
         rounded
+        :disabled="stackOpening"
+        :aria-busy="stackOpening ? 'true' : 'false'"
         :aria-label="`Open generation group in grid (${stackCount} assets)`"
         :title="`Open generation group in grid (${stackCount} assets)`"
         @click="onStackGroupClick"
@@ -903,6 +915,8 @@ function emitWorkflowAction(action, event) {
         severity="secondary"
         text
         rounded
+        :disabled="dupOpening"
+        :aria-busy="dupOpening ? 'true' : 'false'"
         :aria-label="`${dupCount} duplicate${dupCount > 1 ? 's' : ''} - click to compare all copies`"
         :title="`${dupCount} duplicate${dupCount > 1 ? 's' : ''} - click to compare all copies`"
         @click="onDupStackClick"

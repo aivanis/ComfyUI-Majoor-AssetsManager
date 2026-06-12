@@ -1,5 +1,5 @@
-import { $ as e, At as t, Bt as n, Dt as r, Et as i, Ft as a, Lt as o, Mt as s, Nt as c, Ot as l, P as u, Pt as d, Tt as f, U as p, Ut as m, Vt as h, Wt as g, X as _, Xt as v, Yt as y, Zt as b, an as x, at as S, ct as ee, dt as C, et as te, ft as w, in as T, it as ne, j as re, jt as ie, k as ae, kt as oe, nt as E, ot as se, pt as ce, qt as D, rt as le, st as ue, t as de, tt as fe, ut as pe, wt as me, z as he, zt as ge } from "./floatingViewerManager-DaiZV4az.js";
-import { C as _e, D as ve, T as ye, W as be, a as O, c as xe, d as Se, f as Ce, j as we, k as Te, l as Ee, m as De, o as k, p as A, s as Oe, u as ke, ut as Ae, v as je } from "./events-BZGevJ-5.js";
+import { $ as e, At as t, Bt as n, Dt as r, Et as i, Ft as a, Lt as o, Mt as s, Nt as c, Ot as l, P as u, Pt as d, Tt as f, U as p, Ut as m, Vt as h, Wt as g, X as _, Xt as v, Yt as y, Zt as b, an as x, at as S, ct as ee, dt as C, et as te, ft as w, in as T, it as ne, j as re, jt as ie, k as ae, kt as oe, nt as E, ot as se, pt as ce, qt as D, rt as le, st as ue, t as de, tt as fe, ut as pe, wt as me, z as he, zt as ge } from "./floatingViewerManager-DwwPSNFX.js";
+import { A as _e, E as ve, G as ye, M as be, O as xe, a as O, c as Se, d as Ce, dt as we, f as Te, l as Ee, m as De, o as k, p as A, s as Oe, u as ke, v as Ae, w as je } from "./events-C6W1gWsG.js";
 import { $ as j, C as M, D as N, E as P, F as Me, G as Ne, H as Pe, L as F, O as Fe, P as Ie, Q as Le, T as Re, V as ze, W as Be, a as Ve, at as I, b as He, c as Ue, ct as L, d as We, f as Ge, g as Ke, h as qe, i as Je, k as Ye, l as Xe, m as Ze, n as Qe, o as $e, ot as et, p as tt, r as nt, s as rt, st as R, t as it, u as at, v as ot, w as z, x as B, y as st, z as V } from "./mjr-primevue-CJ2E0Gsv.js";
 import { n as ct, r as lt, t as ut } from "./mjr-vue-vendor-DRftM6R3.js";
 import { a as dt, i as ft, n as pt, o as mt, r as ht, t as gt } from "./geninfoParser-5vKgjqjD.js";
@@ -390,14 +390,14 @@ var H = (e, t) => {
 	});
 }, At = () => {
 	try {
-		return Te()?.ui || null;
+		return _e()?.ui || null;
 	} catch {
 		return null;
 	}
 }, jt = () => {
 	let e = (e) => !!e && (typeof e.alert == "function" || typeof e.confirm == "function" || typeof e.prompt == "function");
 	try {
-		let t = ye();
+		let t = ve();
 		if (e(t)) return t;
 	} catch (e) {
 		console.debug?.(e);
@@ -405,7 +405,7 @@ var H = (e, t) => {
 	return null;
 }, Mt = () => {
 	try {
-		let e = ve();
+		let e = xe();
 		if (e && typeof e.add == "function") return e;
 	} catch (e) {
 		console.debug?.(e);
@@ -2156,7 +2156,7 @@ function Bn(e, n, a, c) {
 	} catch (e) {
 		console.debug?.(e);
 	}
-	let E = xe().map((e) => e.code), se = ["auto", ...E];
+	let E = Se().map((e) => e.code), se = ["auto", ...E];
 	e({
 		id: `${X}.Language`,
 		category: l(A("cat.advanced"), A("setting.language.name", "Language")),
@@ -2170,7 +2170,7 @@ function Bn(e, n, a, c) {
 				n.i18n.followComfyLanguage = !0, ke(!0), Ee(c), q(n), a("language");
 				return;
 			}
-			E.includes(e) && (n.i18n.followComfyLanguage = !1, ke(!1), Se(e), q(n), a("language"));
+			E.includes(e) && (n.i18n.followComfyLanguage = !1, ke(!1), Ce(e), q(n), a("language"));
 		}
 	}), e({
 		id: `${X}.ProbeBackend.Mode`,
@@ -2768,7 +2768,7 @@ function or(e, t, n) {
 	if (!r || ir.has(r)) return !1;
 	ir.add(r);
 	try {
-		return be(e, r, n);
+		return ye(e, r, n);
 	} finally {
 		ir.delete(r);
 	}
@@ -2816,7 +2816,7 @@ function pr(e, t, n) {
 	String(e?.id || "").trim() && (or(n, e, t), typeof e?.onChange == "function" && e.onChange(t));
 }
 function mr(e, t, n, r) {
-	let i = !ur(we(r, t.id, t.defaultValue), n);
+	let i = !ur(be(r, t.id, t.defaultValue), n);
 	e.disabled = !i, e.style.opacity = i ? "1" : "0.45";
 }
 function hr() {
@@ -2912,7 +2912,7 @@ function _r(e, t, { initRuntime: n = !1 } = {}) {
 	}
 	if (n && !rr) {
 		let t = e || nr.app, n = nr.settings;
-		Ee(t), J(n), Ce(t), Gt(), Kt(), qt(), n?.watcher && typeof n.watcher.enabled == "boolean" && ge(!!n.watcher.enabled).catch(() => {}), on(), rr = !0;
+		Ee(t), J(n), Te(t), Gt(), Kt(), qt(), n?.watcher && typeof n.watcher.enabled == "boolean" && ge(!!n.watcher.enabled).catch(() => {}), on(), rr = !0;
 	}
 	return nr;
 }
@@ -3697,7 +3697,7 @@ function hi(e) {
 function gi(e) {
 	try {
 		let t = e, n = t.metadata_raw || {}, r = (n.raw_ffprobe || {}).video_stream || {};
-		return hi(t.fps) ?? hi(n.fps) ?? hi(n.frame_rate) ?? hi(r.avg_frame_rate) ?? hi(r.r_frame_rate);
+		return hi(r.avg_frame_rate) ?? hi(r.r_frame_rate) ?? hi(n.fps_raw) ?? hi(n.fps) ?? hi(n.frame_rate) ?? hi(t.fps);
 	} catch {
 		return null;
 	}
@@ -4055,7 +4055,7 @@ function Yi(e) {
 	if (!t) return [];
 	let n = String(e?.subfolder || "").trim(), r = String(e?.folder_type || "input").trim().toLowerCase(), i = [], a = (e) => {
 		if (!e) return;
-		let r = Ae(t, n, e);
+		let r = we(t, n, e);
 		r && !i.includes(r) && i.push(r);
 	};
 	return (r === "input" || r === "output") && a(r), a("input"), a("output"), i;
@@ -5848,10 +5848,10 @@ function Ho(e, t, n = null) {
 		targetId: e.target_id ?? e.targetId ?? e.to ?? null,
 		targetSlot: Number(e.target_slot ?? e.targetSlot ?? e.toSlot ?? 0) || 0,
 		type: e.type
-	} : null, ve = (e) => {
+	} : null, _e = (e) => {
 		let t = String(e || "").toUpperCase();
 		return t.includes("IMAGE") ? "rgba(145,198,99,0.38)" : t.includes("LATENT") ? "rgba(89,178,118,0.38)" : t.includes("MODEL") ? "rgba(112,155,255,0.38)" : t.includes("CONDITIONING") ? "rgba(191,123,226,0.38)" : t.includes("CLIP") ? "rgba(220,178,77,0.38)" : t.includes("VAE") ? "rgba(72,184,214,0.38)" : t.includes("MASK") ? "rgba(190,190,190,0.36)" : "rgba(255,255,255,0.2)";
-	}, ye = () => {
+	}, ve = () => {
 		if (i.showLinks && !(!c || c.length === 0)) {
 			r.save(), r.globalAlpha = 1, r.lineWidth = 1;
 			for (let e of c) {
@@ -5866,11 +5866,11 @@ function Ho(e, t, n = null) {
 					x: c.x,
 					y: he(o, t?.targetSlot ?? 0, "input")
 				}, d = Math.max(12, Math.min(80, Math.abs(u.x - l.x) * .35));
-				r.strokeStyle = ve(t?.type), r.beginPath(), r.moveTo(l.x, l.y), r.bezierCurveTo(l.x + d, l.y, u.x - d, u.y, u.x, u.y), r.stroke();
+				r.strokeStyle = _e(t?.type), r.beginPath(), r.moveTo(l.x, l.y), r.bezierCurveTo(l.x + d, l.y, u.x - d, u.y, u.x, u.y), r.stroke();
 			}
 			r.restore();
 		}
-	}, be = (e) => {
+	}, ye = (e) => {
 		let { x: t, y: n, w: a, h: o } = pe(e), s = e.kind === "node", c = e.kind === "group", l = !!e.bypassed, u = !!e.errored, f = c ? .18 : l && i.renderBypassState ? .14 : .62, p = c ? .55 : l && i.renderBypassState ? .32 : .8, m = d(e.fill, f), h = d(e.stroke, p), g = s && i.showNodeLabels && a >= Io && o >= Lo, _ = Math.max(2, Math.min(g ? 7 : 8, Math.floor(Math.min(a, o) * .08))), v = s ? me(o) : 0;
 		if (r.save(), r.globalAlpha = 1, typeof m == "string" && (m.startsWith("#") || m.startsWith("rgb") || m.startsWith("hsl")) ? (r.fillStyle = m, r.globalAlpha = f) : (r.fillStyle = typeof m == "string" ? m : "rgba(82,88,96,0.72)", r.globalAlpha = f), typeof r.roundRect == "function" ? (r.beginPath(), r.roundRect(t, n, a, o, _), r.fill()) : r.fillRect(t, n, a, o), r.restore(), s && (r.save(), r.fillStyle = d(e.stroke || e.fill, l ? .34 : .9), typeof r.roundRect == "function" ? (r.beginPath(), r.roundRect(t, n, a, v, [
 			_,
@@ -5950,11 +5950,11 @@ function Ho(e, t, n = null) {
 			r.restore();
 		}
 	};
-	for (let e of m.filter((e) => e.kind === "group")) be(e);
-	ye();
-	for (let e of m.filter((e) => e.kind === "node")) be(e);
+	for (let e of m.filter((e) => e.kind === "group")) ye(e);
+	ve();
+	for (let e of m.filter((e) => e.kind === "node")) ye(e);
 	if (i.showViewport) try {
-		let e = _e();
+		let e = je();
 		if (e) {
 			let t = de(e.x0, e.y0), n = de(e.x1, e.y1), i = Math.min(t.x, n.x), a = Math.min(t.y, n.y), o = Math.abs(n.x - t.x), s = Math.abs(n.y - t.y);
 			r.save(), r.globalAlpha = 1, r.strokeStyle = "rgba(255,255,255,0.9)", r.lineWidth = 1, r.strokeRect(i, a, o, s), r.restore();
@@ -6657,25 +6657,25 @@ var $o = {
 			t.asset?.detected_task ? `detected: ${t.asset.detected_task}` : "",
 			t.asset?.detected_model_family ? t.asset.detected_model_family : "",
 			t.asset?.detected_provider ? t.asset.detected_provider : ""
-		].filter(Boolean).join(" · ")), _e = M(() => O(t.asset?.missing_nodes || t.asset?.missingNodes)), ve = M(() => O(t.asset?.missing_models || t.asset?.missingModels)), ye = M(() => {
+		].filter(Boolean).join(" · ")), _e = M(() => xe(t.asset?.missing_nodes || t.asset?.missingNodes)), ve = M(() => xe(t.asset?.missing_models || t.asset?.missingModels)), ye = M(() => {
 			let e = Number(t.asset?.usage_count || t.asset?.usageCount || 0);
 			return !Number.isFinite(e) || e <= 0 ? "" : `${Math.floor(e)} use${e === 1 ? "" : "s"}`;
-		}), be = M(() => xe(t.asset?.mtime || t.asset?.modified_at || t.asset?.updated_at));
-		function O(e) {
+		}), be = M(() => O(t.asset?.mtime || t.asset?.modified_at || t.asset?.updated_at));
+		function xe(e) {
 			if (Array.isArray(e)) return e.map((e) => String(e || "").trim()).filter(Boolean);
 			if (typeof e == "string") {
 				let t = e.trim();
 				if (!t) return [];
 				try {
 					let e = JSON.parse(t);
-					if (Array.isArray(e)) return O(e);
+					if (Array.isArray(e)) return xe(e);
 				} catch {
 					return t.split(/[,\n]/).map((e) => e.trim()).filter(Boolean);
 				}
 			}
 			return [];
 		}
-		function xe(e) {
+		function O(e) {
 			let t = Number(e);
 			if (!Number.isFinite(t) || t <= 0) return "";
 			let n = t > 1e10 ? t : t * 1e3;
@@ -6743,7 +6743,7 @@ var $o = {
 				}
 			}
 		}
-		async function Ae() {
+		async function je() {
 			let e = se.value;
 			if (!e) {
 				v(A("toast.workflowMissingPath", "Workflow file path is missing."), "error");
@@ -6873,7 +6873,7 @@ var $o = {
 			}) || null, S(y?.resolvedView);
 		}
 		function Je(e) {
-			je(e);
+			Ae(e);
 		}
 		function Xe(e) {
 			let t = a.value;
@@ -7102,7 +7102,7 @@ var $o = {
 						"justify-content": "center",
 						gap: "7px"
 					},
-					onClick: Ae
+					onClick: je
 				}, {
 					default: Be(() => [t[8] ||= z("i", { class: "pi pi-image" }, null, -1), z("span", null, L(I(A)("ctx.setWorkflowThumbnail", "Set workflow thumbnail")), 1)]),
 					_: 1

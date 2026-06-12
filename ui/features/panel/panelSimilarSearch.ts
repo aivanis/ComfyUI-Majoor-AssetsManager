@@ -4,6 +4,8 @@ import { buildNodeContextMembersURL } from "../../api/endpoints.js";
 import { comfyToast } from "../../app/toast.js";
 import { t } from "../../app/i18n.js";
 
+const STACK_GROUP_RENDER_LIMIT = 500;
+
 function isNodeContextRouteMissing(res: any) {
     return (
         Number(res?.status || 0) === 404 &&
@@ -11,6 +13,19 @@ function isNodeContextRouteMissing(res: any) {
             .toLowerCase()
             .includes("non-json")
     );
+}
+
+function limitStackGroupMembers(list: any[], title = "") {
+    const items = Array.isArray(list) ? list : [];
+    if (items.length <= STACK_GROUP_RENDER_LIMIT) {
+        return { list: items, title, truncated: false, total: items.length };
+    }
+    return {
+        list: items.slice(0, STACK_GROUP_RENDER_LIMIT),
+        title: `${String(title || "").trim() || "Generation group"} - showing first ${STACK_GROUP_RENDER_LIMIT}/${items.length}`,
+        truncated: true,
+        total: items.length,
+    };
 }
 
 /**
@@ -190,14 +205,23 @@ export function bindSimilarSearch({
         async (event: any) => {
             try {
                 const detail = event?.detail || {};
-                const list = Array.isArray(detail?.members) ? detail.members : [];
-                writePanelValue("similarResults", list);
-                writePanelValue("similarSourceAssetId", String(detail?.asset?.id || ""));
-                writePanelValue(
-                    "similarTitle",
-                    String(detail?.title || "").trim() ||
-                        `Generation group (${list.length} assets)`,
+                const rawList = Array.isArray(detail?.members) ? detail.members : [];
+                const fallbackTitle = `Generation group (${rawList.length} assets)`;
+                const limited = limitStackGroupMembers(
+                    rawList,
+                    String(detail?.title || "").trim() || fallbackTitle,
                 );
+                if (limited.truncated) {
+                    comfyToast(
+                        `Large stack truncated to ${STACK_GROUP_RENDER_LIMIT}/${limited.total} assets to keep the grid responsive.`,
+                        "warn",
+                        5000,
+                    );
+                }
+                writePanelValue("similarResults", limited.list);
+                writePanelValue("similarSourceAssetId", String(detail?.asset?.id || ""));
+                writePanelValue("similarTitle", limited.title || fallbackTitle);
+                await Promise.resolve();
                 await scopeController?.setScope?.("similar");
             } catch (err) {
                 console.debug?.(err);
