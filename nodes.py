@@ -31,9 +31,13 @@ import folder_paths  # type: ignore[import-untyped]
 import numpy as np
 import torch
 from comfy.cli_args import args  # type: ignore[import-untyped]
-from mjr_am_backend.video_ui import build_video_ui as _build_video_ui
 from PIL import Image
 from PIL.PngImagePlugin import PngInfo
+
+try:
+    from .mjr_am_backend.video_ui import build_video_ui as _build_video_ui
+except ImportError:
+    from mjr_am_backend.video_ui import build_video_ui as _build_video_ui
 
 _log = logging.getLogger("majoor_assets_manager.nodes")
 
