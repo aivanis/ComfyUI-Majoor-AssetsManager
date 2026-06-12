@@ -40,9 +40,11 @@ class _DB:
 
 @pytest.mark.asyncio
 async def test_duplicates_alerts_and_merge_tags():
-    svc = DuplicatesService(_DB())
+    svc = DuplicatesService(_DB())  # type: ignore[arg-type]
     alerts = await svc.get_alerts(roots=[], max_groups=5, max_pairs=5, phash_distance=4)
-    assert alerts.ok and alerts.data["exact_groups"] and alerts.data["similar_pairs"]
+    assert alerts.ok
+    assert alerts.data is not None
+    assert alerts.data["exact_groups"] and alerts.data["similar_pairs"]
 
     merged = await svc.merge_tags_for_group(1, [2, 3, 0])
     assert merged.ok and "a" in merged.data["tags"] and "b" in merged.data["tags"]
@@ -66,7 +68,7 @@ async def test_duplicates_background_analysis(monkeypatch, tmp_path: Path):
             "hash_state": "",
         }
     ]
-    svc = DuplicatesService(db)
+    svc = DuplicatesService(db)  # type: ignore[arg-type]
 
     monkeypatch.setattr(
         "mjr_am_backend.features.duplicates.service._compute_file_hash_with_algo",
@@ -87,7 +89,7 @@ async def test_duplicates_background_analysis(monkeypatch, tmp_path: Path):
 @pytest.mark.asyncio
 async def test_duplicates_background_query_selects_filename() -> None:
     db = _DB()
-    svc = DuplicatesService(db)
+    svc = DuplicatesService(db)  # type: ignore[arg-type]
 
     await svc._fetch_analysis_rows(10)
 
@@ -105,6 +107,6 @@ def test_duplicates_root_filter_is_path_boundary_safe(tmp_path: Path):
 
 
 def test_duplicates_merge_ids_ignore_invalid_values() -> None:
-    svc = DuplicatesService(_DB())
+    svc = DuplicatesService(_DB())  # type: ignore[arg-type]
 
-    assert svc._normalize_merge_ids(1, [2, "3", "x", None, 1, -4]) == [2, 3]
+    assert svc._normalize_merge_ids(1, [2, "3", "x", None, 1, -4]) == [2, 3]  # type: ignore[list-item]
