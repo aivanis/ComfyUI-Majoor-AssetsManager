@@ -95,4 +95,45 @@ describe("floatingViewerSimplePlayer keyboard shortcuts", () => {
         );
         expect(currentTime).toBeCloseTo(1, 5);
     });
+
+    it("exposes the same keyboard handler for MFV global routing from child controls", async () => {
+        const { mountFloatingViewerSimplePlayer } =
+            await import("../features/viewer/floatingViewerSimplePlayer.js");
+
+        const video = document.createElement("video");
+        let currentTime = 1;
+        Object.defineProperty(video, "currentTime", {
+            configurable: true,
+            get: () => currentTime,
+            set: (value) => {
+                currentTime = Number(value);
+            },
+        });
+        Object.defineProperty(video, "duration", {
+            configurable: true,
+            get: () => 10,
+        });
+        video.play = vi.fn(() => Promise.resolve());
+        video.pause = vi.fn();
+
+        const root = mountFloatingViewerSimplePlayer(
+            video,
+            { filename: "clip.mp4" },
+            { kind: "video" },
+        );
+        document.body.appendChild(root);
+        const seek = root.querySelector(".mjr-mfv-simple-player-seek");
+        const event = new KeyboardEvent("keydown", {
+            key: "ArrowLeft",
+            bubbles: true,
+            cancelable: true,
+        });
+        Object.defineProperty(event, "target", { configurable: true, value: seek });
+
+        root._mjrSimplePlayerHandleKeydown(event);
+
+        expect(video.pause).toHaveBeenCalledTimes(1);
+        expect(currentTime).toBeCloseTo(23 / 24, 5);
+        expect(event.defaultPrevented).toBe(true);
+    });
 });

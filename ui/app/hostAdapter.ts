@@ -776,6 +776,40 @@ export function addNodeToHostGraph(node: any, app: any = null): boolean {
     }
 }
 
+function _getHostLiteGraph(app: any = null): any {
+    try {
+        const runtimeApp = app || _app || getComfyApp();
+        const root = globalThis as typeof globalThis & {
+            LiteGraph?: any;
+            window?: { LiteGraph?: any };
+        };
+        return (
+            runtimeApp?.LiteGraph ||
+            runtimeApp?.ui?.LiteGraph ||
+            runtimeApp?.canvas?.LiteGraph ||
+            root?.LiteGraph ||
+            root?.window?.LiteGraph ||
+            null
+        );
+    } catch (e) {
+        console.debug?.(e);
+        return null;
+    }
+}
+
+export function createHostNode(nodeType: any, app: any = null): any {
+    const type = String(nodeType || "").trim();
+    if (!type) return null;
+    try {
+        const LiteGraph = _getHostLiteGraph(app);
+        if (!LiteGraph || typeof LiteGraph.createNode !== "function") return null;
+        return LiteGraph.createNode(type) || null;
+    } catch (e) {
+        console.debug?.(e);
+        return null;
+    }
+}
+
 export function importWorkflowIntoHostCanvas(workflow: any, app: any = null): boolean {
     const runtimeApp = app || _app || getComfyApp();
     if (!workflow || typeof workflow !== "object") return false;
@@ -1183,6 +1217,7 @@ export const hostAdapter = {
     isHostWorkflowDirty,
     serializeCurrentHostWorkflow,
     addNodeToHostGraph,
+    createHostNode,
     focusHostCanvasNode,
     centerHostCanvasNodeById,
     centerGraphCanvasOnWorldPoint,

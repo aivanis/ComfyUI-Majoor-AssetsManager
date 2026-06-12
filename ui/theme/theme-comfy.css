@@ -4884,6 +4884,16 @@
     border-color: rgba(255, 255, 255, 0.38);
 }
 
+.mjr-video-num--fps.is-overridden {
+    border-color: rgba(245, 158, 11, 0.82);
+    color: #fbbf24;
+    background: rgba(245, 158, 11, 0.14);
+}
+
+.mjr-video-num--fps.is-overridden:focus {
+    border-color: rgba(251, 191, 36, 0.96);
+}
+
 .mjr-video-num--speed {
     color-scheme: dark;
     background: rgba(0, 0, 0, 0.62);

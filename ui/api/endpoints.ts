@@ -368,8 +368,13 @@ export function buildStackURL(stackId: any): string {
     return `${ENDPOINTS.STACKS}/${encodeURIComponent(String(stackId || ""))}`;
 }
 
-export function buildStackMembersURL(stackId: any): string {
-    return `${buildStackURL(stackId)}/members`;
+export function buildStackMembersURL(stackId: any, options: { limit?: number } = {}): string {
+    let url = `${buildStackURL(stackId)}/members`;
+    const limit = Number(options?.limit || 0);
+    if (Number.isFinite(limit) && limit > 0) {
+        url += `?limit=${encodeURIComponent(String(Math.floor(limit)))}`;
+    }
+    return url;
 }
 
 export function buildStackByJobURL(jobId: any): string {

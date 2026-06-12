@@ -6,6 +6,7 @@ import { normalizeVideoFps } from "../utils/mediaFps.js";
 const MAX_MINOR_TICKS = 400;
 const SEEK_RANGE_MAX = 1000;
 const STEP_FLASH_MS = 220;
+const FPS_OVERRIDE_EPSILON = 0.001;
 
 function chooseNiceTimeStep(seconds: any, targetTicks: any) {
     const duration = Number(seconds);
@@ -143,6 +144,12 @@ function _resolveInitialFps(opts: any) {
     } catch {
         return null;
     }
+}
+
+function _isSameFps(a: unknown, b: unknown) {
+    const na = Number(a);
+    const nb = Number(b);
+    return Number.isFinite(na) && Number.isFinite(nb) && Math.abs(na - nb) <= FPS_OVERRIDE_EPSILON;
 }
 
 function _mountPreviewControls(video: any, hostEl: any) {
@@ -801,6 +808,38 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
             _ppRafId: null,
             _userInteracted: false,
         };
+        state.nativeFps = initialFps ? normalizeVideoFps(initialFps, 30) : null;
+        state.fps = state.nativeFps || normalizeVideoFps(fpsInput.value, 30);
+
+        const isFpsOverridden = () => {
+            const nativeFps = Number(state.nativeFps);
+            const fps = Number(state.fps);
+            return Number.isFinite(nativeFps) && nativeFps > 0 && !_isSameFps(fps, nativeFps);
+        };
+
+        const updateFpsInputState = (updateValue = false) => {
+            try {
+                if (!fpsInput || isAudioMedia) return;
+                const nativeFps = Number(state.nativeFps);
+                const overridden = isFpsOverridden();
+                const baseTitle = t("video.fpsStepping", "FPS (used for frame stepping)");
+                fpsInput.classList.toggle("is-overridden", overridden);
+                if (Number.isFinite(nativeFps) && nativeFps > 0) {
+                    fpsInput.dataset.defaultFps = String(nativeFps);
+                    fpsInput.title = `${baseTitle} - Source FPS: ${nativeFps}`;
+                    if (overridden) fpsInput.title += " - Modified";
+                } else {
+                    delete fpsInput.dataset.defaultFps;
+                    fpsInput.title = baseTitle;
+                }
+                if (updateValue && !fpsInput.matches?.(":focus")) {
+                    fpsInput.value = String(normalizeVideoFps(state.fps, state.nativeFps || 30));
+                }
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+        };
+        updateFpsInputState(true);
 
         // Auto-unmute once the user interacts with the video controls.
         // This bypasses autoplay restrictions: most browsers allow unmuted playback after a user gesture.
@@ -1743,6 +1782,7 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
                     try {
                         state.fps = normalizeVideoFps(fpsInput.value, 30);
                         fpsInput.value = String(state.fps);
+                        updateFpsInputState(false);
                         normalizeRange();
                     } catch (e: any) {
                         console.debug?.(e);
@@ -2089,7 +2129,8 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
 
         // Initial sync
         try {
-            state.fps = normalizeVideoFps(fpsInput.value, 30);
+            state.fps = normalizeVideoFps(fpsInput.value, state.nativeFps || 30);
+            updateFpsInputState(true);
             state.step = Math.max(1, Math.floor(Number(stepInput.value) || 1));
             normalizeRange();
             applyLoopOnceUI();
@@ -2123,9 +2164,13 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
             try {
                 const fps = Number(info?.fps);
                 if (Number.isFinite(fps) && fps > 0) {
-                    state.fps = normalizeVideoFps(fps, state.fps || 30);
+                    const fpsSource = String(info?.fpsSource || info?.source || "");
+                    if (fpsSource === "rvfc" && Number(state.nativeFps) > 0) return;
+                    const wasOverridden = isFpsOverridden();
+                    state.nativeFps = normalizeVideoFps(fps, state.nativeFps || 30);
+                    if (!wasOverridden) state.fps = state.nativeFps;
                     try {
-                        if (!fpsInput?.matches?.(":focus")) fpsInput.value = String(state.fps);
+                        updateFpsInputState(true);
                     } catch (e: any) {
                         console.debug?.(e);
                     }

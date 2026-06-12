@@ -381,6 +381,12 @@ export function mountFloatingViewerSimplePlayer(mediaEl: any, fileData: any = nu
         }
     };
 
+    try {
+        (root as any)._mjrSimplePlayerHandleKeydown = onPlayerKeydown;
+    } catch (e: any) {
+        console.debug?.(e);
+    }
+
     playPauseBtn.addEventListener("click", onPlayPause);
     stepBackBtn.addEventListener("click", (e: any) => onStep(-1, e));
     stepForwardBtn.addEventListener("click", (e: any) => onStep(1, e));

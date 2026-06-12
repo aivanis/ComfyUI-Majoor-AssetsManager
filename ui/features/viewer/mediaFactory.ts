@@ -8,6 +8,7 @@ import {
 } from "../../utils/safeCall.js";
 import { APP_CONFIG } from "../../app/config.js";
 import { builtAssetUrl } from "../../app/assetUrls.js";
+import { readAssetFps } from "../../utils/mediaFps.js";
 
 
 export function createViewerMediaFactory({
@@ -168,40 +169,9 @@ export function createViewerMediaFactory({
         }
     };
 
-    const _parseFps = (v: any) => {
-        try {
-            const n = Number(v);
-            if (Number.isFinite(n) && n > 0) return n;
-            const s = String(v || "").trim();
-            if (!s) return null;
-            if (s.includes("/")) {
-                const [a, b] = s.split("/");
-                const na = Number(a);
-                const nb = Number(b);
-                if (Number.isFinite(na) && Number.isFinite(nb) && nb !== 0) return na / nb;
-            }
-            const f = Number.parseFloat(s);
-            if (Number.isFinite(f) && f > 0) return f;
-        } catch (e: any) {
-            console.debug?.(e);
-        }
-        return null;
-    };
-
     const _fpsFromAssetMeta = (asset: any) => {
         try {
-            const raw = asset?.metadata_raw;
-            const rawObj = raw && typeof raw === "object" ? raw : null;
-            const ff = rawObj?.raw_ffprobe || {};
-            const vs = ff?.video_stream || {};
-            // Priority: raw.fps -> raw.frame_rate (gen_info) -> asset.fps -> ffprobe streams
-            return _parseFps(
-                rawObj?.fps ??
-                    rawObj?.frame_rate ??
-                    asset?.fps ??
-                    vs?.avg_frame_rate ??
-                    vs?.r_frame_rate,
-            );
+            return readAssetFps(asset);
         } catch {
             return null;
         }
@@ -212,9 +182,12 @@ export function createViewerMediaFactory({
             const n = Number(fps);
             if (!Number.isFinite(n) || n <= 0) return;
             const rounded = Math.round(n * 1000) / 1000;
+            const lastSource = String(video?._mjrDetectedFpsSource || "");
+            if (source === "rvfc" && lastSource && lastSource !== "rvfc") return;
             const last = Number(video?._mjrDetectedFps || 0) || 0;
             if (last > 0 && Math.abs(last - rounded) < 0.01) return;
             video._mjrDetectedFps = rounded;
+            video._mjrDetectedFpsSource = String(source || "metadata");
             window.dispatchEvent(
                 new CustomEvent("mjr:viewer-fps-detected", {
                     detail: {
@@ -230,9 +203,13 @@ export function createViewerMediaFactory({
     };
 
     const _attachFpsDetection = (video: any, asset: any) => {
+        let hasMetadataFps = false;
         try {
             const fromMeta = _fpsFromAssetMeta(asset);
-            if (fromMeta) _emitDetectedFps(video, asset, fromMeta, "asset-metadata");
+            if (fromMeta) {
+                hasMetadataFps = true;
+                _emitDetectedFps(video, asset, fromMeta, "asset-metadata");
+            }
         } catch (e: any) {
             console.debug?.(e);
         }
@@ -243,7 +220,10 @@ export function createViewerMediaFactory({
                 () => {
                     try {
                         const fromMeta = _fpsFromAssetMeta(asset);
-                        if (fromMeta) _emitDetectedFps(video, asset, fromMeta, "loadedmetadata");
+                        if (fromMeta) {
+                            hasMetadataFps = true;
+                            _emitDetectedFps(video, asset, fromMeta, "loadedmetadata");
+                        }
                     } catch (e: any) {
                         console.debug?.(e);
                     }
@@ -256,13 +236,16 @@ export function createViewerMediaFactory({
 
         // Runtime estimate via media timestamps (best effort, modern browsers only).
         try {
+            if (hasMetadataFps) return;
             if (typeof video?.requestVideoFrameCallback !== "function") return;
             let prevMediaTime: any = null;
             let samples = 0;
             let acc = 0;
             const maxSamples = 10;
+            let emitted = false;
             const onFrame = (_now: any, meta: any) => {
                 try {
+                    if (hasMetadataFps || emitted) return;
                     const mt = Number(meta?.mediaTime);
                     if (Number.isFinite(mt) && mt >= 0) {
                         if (prevMediaTime != null) {
@@ -274,14 +257,15 @@ export function createViewerMediaFactory({
                         }
                         prevMediaTime = mt;
                     }
-                    if (samples >= 3) {
+                    if (samples >= maxSamples) {
                         const avg = acc / Math.max(1, samples);
                         const fps = avg > 0 ? 1 / avg : 0;
                         if (Number.isFinite(fps) && fps > 1) {
+                            emitted = true;
                             _emitDetectedFps(video, asset, fps, "rvfc");
                         }
                     }
-                    if (samples < maxSamples) {
+                    if (samples < maxSamples && !emitted) {
                         video.requestVideoFrameCallback(onFrame);
                     }
                 } catch (e: any) {

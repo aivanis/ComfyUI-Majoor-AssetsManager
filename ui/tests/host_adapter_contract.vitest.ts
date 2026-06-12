@@ -198,6 +198,22 @@ describe("hostAdapter contract", () => {
         expect(graph.add).toHaveBeenCalledWith(newNode);
     });
 
+    it("creates host nodes through the adapter LiteGraph boundary", async () => {
+        const mod = await import("../app/hostAdapter.js");
+
+        const created = { type: "LoadImage" };
+        const app = {
+            LiteGraph: {
+                createNode: vi.fn((type: string) => (type === "LoadImage" ? created : null)),
+            },
+        };
+        mod.init(app);
+
+        expect(mod.createHostNode("LoadImage", app)).toBe(created);
+        expect(app.LiteGraph.createNode).toHaveBeenCalledWith("LoadImage");
+        expect(mod.createHostNode("", app)).toBeNull();
+    });
+
     it("queues prompt through api.queuePrompt path with widget cycle", async () => {
         const mod = await import("../app/hostAdapter.js");
 
