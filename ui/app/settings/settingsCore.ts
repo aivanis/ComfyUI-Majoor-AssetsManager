@@ -130,6 +130,7 @@ export const DEFAULT_SETTINGS = {
         position: "right",
         showPreviewThumb: true,
         widthPx: 360,
+        assetBadgeEnabled: APP_DEFAULTS.SIDEBAR_ASSET_BADGE_ENABLED,
     },
     probeBackend: {
         mode: "auto",
@@ -636,6 +637,9 @@ export const applySettingsToConfig = (settings: Record<string, any>): void => {
         500,
         Math.min(10000, Math.round(_safeNum(settings.db?.queryTimeoutMs, 1000))),
     );
+    APP_CONFIG.SIDEBAR_ASSET_BADGE_ENABLED = !!(
+        settings.sidebar?.assetBadgeEnabled ?? APP_DEFAULTS.SIDEBAR_ASSET_BADGE_ENABLED
+    );
     // Search request limit (client-side); backend still enforces MAJOOR_SEARCH_MAX_LIMIT
     APP_CONFIG.SEARCH_REQUEST_LIMIT = Math.max(
         10,
@@ -733,6 +737,18 @@ export async function syncBackendVectorSearchSettings(): Promise<void> {
         settings.ai.vectorCaptionOnIndex = _safeBool(
             prefs.caption_on_index ?? prefs.captionOnIndex,
             settings.ai.vectorCaptionOnIndex ?? false,
+        );
+        settings.ai.vectorIndexOnScan = _safeBool(
+            prefs.index_on_scan ?? prefs.indexOnScan,
+            settings.ai.vectorIndexOnScan ?? false,
+        );
+        settings.ai.vectorUnloadAfterUse = _safeBool(
+            prefs.unload_after_use ?? prefs.unloadAfterUse,
+            settings.ai.vectorUnloadAfterUse ?? false,
+        );
+        settings.ai.vectorConcurrency = Math.max(
+            1,
+            Math.min(16, Math.floor(Number(prefs.concurrency ?? settings.ai.vectorConcurrency ?? 1) || 1)),
         );
         saveMajoorSettings(settings);
         applySettingsToConfig(settings);

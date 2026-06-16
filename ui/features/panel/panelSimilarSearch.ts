@@ -28,6 +28,14 @@ function limitStackGroupMembers(list: any[], title = "") {
     };
 }
 
+function buildGroupSourceId(detail: Record<string, any> = {}) {
+    const stackId = String(detail?.stackId || detail?.stack_id || "").trim();
+    if (stackId) return `stack:${stackId}`;
+    const assetId = String(detail?.asset?.id || "").trim();
+    if (detail?.isDupGroup) return assetId ? `duplicates:${assetId}` : "duplicates";
+    return assetId ? `group:${assetId}` : "group";
+}
+
 /**
  * Binds the "Find Similar" button and the stack-group open event.
  *
@@ -219,7 +227,7 @@ export function bindSimilarSearch({
                     );
                 }
                 writePanelValue("similarResults", limited.list);
-                writePanelValue("similarSourceAssetId", String(detail?.asset?.id || ""));
+                writePanelValue("similarSourceAssetId", buildGroupSourceId(detail));
                 writePanelValue("similarTitle", limited.title || fallbackTitle);
                 await Promise.resolve();
                 await scopeController?.setScope?.("similar");

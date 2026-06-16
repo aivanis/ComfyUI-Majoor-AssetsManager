@@ -355,6 +355,8 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "btn.resetting": "Resetting...",
         "btn.deleteDb": "Delete DB",
         "btn.deletingDb": "Deleting DB...",
+        "btn.memoryPurge": "Memory purge",
+        "btn.memoryPurging": "Purging...",
         "btn.retryServices": "Retry services",
         "btn.retrying": "Retrying...",
         "btn.loadWorkflow": "Load Workflow",
@@ -460,6 +462,8 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "tooltip.markMessagesRead": "Mark all messages as read",
         "tooltip.noUnreadMessages": "No unread messages",
         "tooltip.deleteDb": "Force-delete database and rebuild from scratch",
+        "tooltip.memoryPurge":
+            "Unload Majoor AI models, ask ComfyUI to unload loaded models, and clear torch cache when idle.",
         "tooltip.workflowMultiOutput": "Multiple outputs with different prompts",
         "tooltip.generationInputs": "Input files used in generation",
         "tooltip.videoFile": "Video file",
@@ -564,6 +568,7 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "status.errorGetConfig": "Error: Failed to get config",
         "status.discoveringTools": "Capabilities: discovering tools...",
         "status.indexStatus": "Index Status",
+        "status.memoryPurgeStarted": "Memory purge started...",
         "status.toolStatusChecking": "Tool status: checking...",
         "status.resetIndexHint": "Reset index cache (requires allowResetIndex in settings).",
         "status.scanningHint": "This may take a while",
@@ -1119,6 +1124,10 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "toast.dbDeleteTriggered": "Deleting database and rebuilding...",
         "toast.dbDeleteSuccess": "Database deleted and rebuilt. Files are being reindexed.",
         "toast.dbDeleteFailed": "Failed to delete database",
+        "toast.memoryPurgeComplete":
+            "Memory purge complete. Majoor AI and ComfyUI model caches were released.",
+        "toast.memoryPurgeCompleteMajoorOnly":
+            "Memory purge complete. Majoor AI caches were released.",
         "toast.deleted": "File deleted",
         "toast.renamed": "File renamed",
         "toast.addedToCollection": "Added to collection",
@@ -1395,8 +1404,17 @@ const DICTIONARY: Record<string, Record<string, string>> = {
         "status.unavailable": "Indisponible",
         "status.cached": "Dernier statut connu",
         "status.toast.workflow": "Statut index : scope workflow",
+        "status.memoryPurgeStarted": "Purge memoire demarree...",
         "state.on": "on",
         "state.off": "off",
+        "btn.memoryPurge": "Purge memoire",
+        "btn.memoryPurging": "Purge...",
+        "tooltip.memoryPurge":
+            "Decharge les modeles IA Majoor, demande a ComfyUI de decharger les modeles charges, puis vide le cache torch si ComfyUI est idle.",
+        "toast.memoryPurgeComplete":
+            "Purge memoire terminee. Les caches des modeles IA Majoor et ComfyUI ont ete liberes.",
+        "toast.memoryPurgeCompleteMajoorOnly":
+            "Purge memoire terminee. Les caches IA Majoor ont ete liberes.",
         "viewer.copySuccessShort": "Copie !",
         "viewer.loadingGenerationData": "Chargement des donnees de generation...",
         "viewer.errorLoadingMetadata": "Erreur de chargement des metadonnees",

@@ -215,6 +215,8 @@ export function mountFloatingViewerSimplePlayer(mediaEl: any, fileData: any = nu
     const animatedSrc = animatedImage ? String(mediaEl?.src || "") : "";
     let animatedPaused = false;
     let animatedSnapshot = "";
+    let syncRafId: any = null;
+    let syncRvfcId: any = null;
 
     const updatePlayPauseIcon = () => {
         if (timelineSupported) {
@@ -268,6 +270,58 @@ export function mountFloatingViewerSimplePlayer(mediaEl: any, fileData: any = nu
             timeLabel.textContent = `${formatDuration(currentTime)} / 0:00`;
         }
         updateSeekProgressPaint();
+    };
+
+    const cancelPlaybackUiSync = () => {
+        try {
+            if (syncRvfcId != null && typeof mediaEl?.cancelVideoFrameCallback === "function") {
+                mediaEl.cancelVideoFrameCallback(syncRvfcId);
+            }
+        } catch (err: any) {
+            console.debug?.(err);
+        }
+        syncRvfcId = null;
+        try {
+            if (syncRafId != null && typeof cancelAnimationFrame === "function") {
+                cancelAnimationFrame(syncRafId);
+            }
+        } catch (err: any) {
+            console.debug?.(err);
+        }
+        syncRafId = null;
+    };
+
+    const tickPlaybackUiSync = () => {
+        syncRafId = null;
+        syncRvfcId = null;
+        try {
+            updateFrameLabel();
+            updateTimeAndSeek();
+        } catch (err: any) {
+            console.debug?.(err);
+        }
+        if (!timelineSupported || mediaEl?.paused) return;
+        try {
+            if (typeof mediaEl?.requestVideoFrameCallback === "function") {
+                syncRvfcId = mediaEl.requestVideoFrameCallback(tickPlaybackUiSync);
+                return;
+            }
+        } catch (err: any) {
+            console.debug?.(err);
+        }
+        try {
+            if (typeof requestAnimationFrame === "function") {
+                syncRafId = requestAnimationFrame(tickPlaybackUiSync);
+            }
+        } catch (err: any) {
+            console.debug?.(err);
+        }
+    };
+
+    const startPlaybackUiSync = () => {
+        cancelPlaybackUiSync();
+        if (!timelineSupported || mediaEl?.paused) return;
+        tickPlaybackUiSync();
     };
 
     const stopEvent = (e: any) => {
@@ -400,8 +454,34 @@ export function mountFloatingViewerSimplePlayer(mediaEl: any, fileData: any = nu
     root.addEventListener("keydown", onPlayerKeydown);
 
     if (mediaEl instanceof HTMLMediaElement) {
-        mediaEl.addEventListener("play", updatePlayPauseIcon, { passive: true });
-        mediaEl.addEventListener("pause", updatePlayPauseIcon, { passive: true });
+        mediaEl.addEventListener(
+            "play",
+            () => {
+                updatePlayPauseIcon();
+                startPlaybackUiSync();
+            },
+            { passive: true },
+        );
+        mediaEl.addEventListener(
+            "pause",
+            () => {
+                cancelPlaybackUiSync();
+                updatePlayPauseIcon();
+                updateFrameLabel();
+                updateTimeAndSeek();
+            },
+            { passive: true },
+        );
+        mediaEl.addEventListener(
+            "ended",
+            () => {
+                cancelPlaybackUiSync();
+                updatePlayPauseIcon();
+                updateFrameLabel();
+                updateTimeAndSeek();
+            },
+            { passive: true },
+        );
         mediaEl.addEventListener(
             "timeupdate",
             () => {
@@ -433,6 +513,14 @@ export function mountFloatingViewerSimplePlayer(mediaEl: any, fileData: any = nu
     updateMuteIcon();
     updateFrameLabel();
     updateTimeAndSeek();
+    startPlaybackUiSync();
+
+    try {
+        (root as any)._mjrSimplePlayerDestroy = cancelPlaybackUiSync;
+        (root as any)._mjrMediaControlsHandle = { destroy: cancelPlaybackUiSync };
+    } catch (e: any) {
+        console.debug?.(e);
+    }
 
     return root;
 }

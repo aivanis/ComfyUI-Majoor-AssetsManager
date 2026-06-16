@@ -414,6 +414,9 @@ class _Settings:
         self.ai_verbose_logs = False
         self.vector_search_enabled = True
         self.vector_caption_on_index = False
+        self.vector_index_on_scan = False
+        self.vector_concurrency = 1
+        self.vector_unload_after_use = False
         self.workflow_roots = []
 
     async def get_output_directory(self):
@@ -467,6 +470,27 @@ class _Settings:
     async def set_vector_caption_on_index_enabled(self, enabled):
         self.vector_caption_on_index = bool(enabled)
         return Result.Ok(self.vector_caption_on_index)
+
+    async def get_vector_index_on_scan_enabled(self):
+        return bool(self.vector_index_on_scan)
+
+    async def set_vector_index_on_scan_enabled(self, enabled):
+        self.vector_index_on_scan = bool(enabled)
+        return Result.Ok(self.vector_index_on_scan)
+
+    async def get_vector_concurrency(self):
+        return int(self.vector_concurrency)
+
+    async def set_vector_concurrency(self, value):
+        self.vector_concurrency = max(1, int(value or 1))
+        return Result.Ok(self.vector_concurrency)
+
+    async def get_vector_unload_after_use_enabled(self):
+        return bool(self.vector_unload_after_use)
+
+    async def set_vector_unload_after_use_enabled(self, enabled):
+        self.vector_unload_after_use = bool(enabled)
+        return Result.Ok(self.vector_unload_after_use)
 
     async def get_security_prefs(self, include_secret=False):
         _ = include_secret

@@ -513,6 +513,25 @@ export function registerGridSettings(safeAddSetting: (def: any) => void, setting
     });
 
     safeAddSetting({
+        id: `${SETTINGS_PREFIX}.Sidebar.AssetBadgeEnabled`,
+        category: cat(t("cat.grid"), "Sidebar asset notification badge"),
+        name: "Show new asset badge on sidebar icon",
+        tooltip:
+            "Display a small counter on the Majoor sidebar icon only when a new asset is indexed by Assets Manager.",
+        type: "boolean",
+        defaultValue: !!(
+            settings.sidebar?.assetBadgeEnabled ?? APP_DEFAULTS.SIDEBAR_ASSET_BADGE_ENABLED
+        ),
+        onChange: (value: any) => {
+            settings.sidebar = settings.sidebar || {};
+            settings.sidebar.assetBadgeEnabled = !!value;
+            saveMajoorSettings(settings);
+            applySettingsToConfig(settings);
+            notifyApplied("sidebar.assetBadgeEnabled");
+        },
+    });
+
+    safeAddSetting({
         id: `${SETTINGS_PREFIX}.Sidebar.WidthPx`,
         category: cat(t("cat.grid"), "Sidebar width"),
         name: "Sidebar width (px)",

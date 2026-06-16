@@ -23,6 +23,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import datetime as dt
+import gc
 import hashlib
 import io
 import logging
@@ -58,6 +59,37 @@ logger = get_logger(__name__)
 
 _MODEL_CACHE: dict[tuple[str, str], Any] = {}
 _MODEL_CACHE_LOCK = threading.Lock()
+
+
+def _empty_torch_device_cache() -> None:
+    try:
+        import torch
+    except Exception:
+        return
+    try:
+        cuda = getattr(torch, "cuda", None)
+        if cuda is not None and callable(getattr(cuda, "empty_cache", None)):
+            cuda.empty_cache()
+        if cuda is not None and callable(getattr(cuda, "ipc_collect", None)):
+            cuda.ipc_collect()
+    except Exception:
+        pass
+    try:
+        mps = getattr(getattr(torch, "mps", None), "empty_cache", None)
+        if callable(mps):
+            mps()
+    except Exception:
+        pass
+
+
+def unload_global_model_cache() -> dict[str, int]:
+    """Drop process-wide vector model references and ask torch to release cached VRAM."""
+    with _MODEL_CACHE_LOCK:
+        model_count = len(_MODEL_CACHE)
+        _MODEL_CACHE.clear()
+    gc.collect()
+    _empty_torch_device_cache()
+    return {"global_models": model_count}
 
 
 def _ai_verbose_logs_enabled() -> bool:
@@ -769,6 +801,25 @@ class VectorService:
         self._error_count: int = 0
         self._truncation_log_window_start: float = 0.0
         self._truncation_log_count: int = 0
+
+    def unload_models(self) -> dict[str, int]:
+        """Release Majoor AI model references held by this service."""
+        released = {
+            "sentence_model": int(self._model is not None),
+            "siglip_model": int(self._siglip_model is not None),
+            "video_model": int(self._video_model is not None),
+            "prompt_model": int(self._prompt_model is not None),
+        }
+        self._model = None
+        self._siglip_model = None
+        self._siglip_processor = None
+        self._video_model = None
+        self._video_processor = None
+        self._prompt_model = None
+        self._prompt_processor = None
+        self._cached_tokenizer = None
+        released.update(unload_global_model_cache())
+        return released
 
     # ── Model lifecycle ────────────────────────────────────────────────
 

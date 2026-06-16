@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../app/config.js", () => ({
     APP_CONFIG: { DEBUG_VIEWER: false },
@@ -55,6 +55,12 @@ describe("video sync", () => {
         document.body.innerHTML = "";
     });
 
+    afterEach(() => {
+        vi.restoreAllMocks();
+        delete globalThis.requestAnimationFrame;
+        delete globalThis.cancelAnimationFrame;
+    });
+
     it("lets a follower become the source for play, seek, and rate changes", async () => {
         const { installFollowerVideoSync } = await import("../features/viewer/videoSync.js");
         const leader = makeMedia({ currentTime: 0, paused: true, playbackRate: 1 });
@@ -89,5 +95,28 @@ describe("video sync", () => {
 
         expect(follower.pause).toHaveBeenCalledTimes(1);
         expect(leader.pause).toHaveBeenCalledTimes(1);
+    });
+
+    it("keeps followers aligned continuously during playback", async () => {
+        let rafCallback = null;
+        globalThis.requestAnimationFrame = vi.fn((cb) => {
+            rafCallback = cb;
+            return 22;
+        });
+        globalThis.cancelAnimationFrame = vi.fn();
+
+        const { installFollowerVideoSync } = await import("../features/viewer/videoSync.js");
+        const leader = makeMedia({ currentTime: 0, paused: false });
+        const follower = makeMedia({ currentTime: 0, paused: false });
+
+        const ac = installFollowerVideoSync(leader, [follower], { threshold: 0.01 });
+        leader.currentTime = 1.25;
+        rafCallback?.();
+
+        expect(follower.currentTime).toBeCloseTo(1.25, 5);
+        expect(globalThis.requestAnimationFrame).toHaveBeenCalled();
+
+        ac.abort();
+        expect(globalThis.cancelAnimationFrame).toHaveBeenCalled();
     });
 });

@@ -1015,6 +1015,27 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
             }
         };
 
+        const getSeekRangeMax = () => {
+            try {
+                if (!advanced || isAudioMedia) return SEEK_RANGE_MAX;
+                const frames = durationFrames();
+                if (Number.isFinite(frames) && frames > SEEK_RANGE_MAX) {
+                    return Math.max(SEEK_RANGE_MAX, Math.floor(frames));
+                }
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+            return SEEK_RANGE_MAX;
+        };
+
+        const syncSeekRangeMax = () => {
+            try {
+                seek.max = String(getSeekRangeMax());
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+        };
+
         const setPlayLabel = () => {
             try {
                 const isPlaying = !video?.paused || state._ppReverse;
@@ -1054,7 +1075,8 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
 
                 if (durationOk) {
                     const p = clamp01((t || 0) / d);
-                    const v = Math.round(p * 1000);
+                    syncSeekRangeMax();
+                    const v = Math.round(p * getSeekRangeMax());
                     if (!Number.isNaN(v) && !state._seeking && !seek.matches?.(":active")) {
                         seek.value = String(v);
                     }
@@ -1596,7 +1618,8 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
                 const p = clamp01(x / width);
                 const nextTime = p * d;
                 video.currentTime = nextTime;
-                seek.value = String(Math.round(p * SEEK_RANGE_MAX));
+                syncSeekRangeMax();
+                seek.value = String(Math.round(p * getSeekRangeMax()));
                 updateTimeUI(nextTime);
                 return true;
             } catch (e: any) {
@@ -1705,7 +1728,7 @@ export function mountVideoControls(video: any, opts: Record<string, any> = {}) {
                     const d = Number(video?.duration);
                     if (!Number.isFinite(d) || d <= 0) return;
                     const v = Number(seek.value);
-                    const p = clamp01((Number.isFinite(v) ? v : 0) / 1000);
+                    const p = clamp01((Number.isFinite(v) ? v : 0) / getSeekRangeMax());
                     video.currentTime = p * d;
                 } catch (e: any) {
                     console.debug?.(e);

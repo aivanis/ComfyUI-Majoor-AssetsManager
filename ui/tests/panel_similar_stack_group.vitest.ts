@@ -61,6 +61,7 @@ describe("panel stack-group similar scope", () => {
         await Promise.resolve();
 
         expect(writes.get("similarResults")).toHaveLength(500);
+        expect(writes.get("similarSourceAssetId")).toBe("group:source-1");
         expect(writes.get("similarTitle")).toContain("500/750");
         expect(toastMock).toHaveBeenCalledWith(
             expect.stringContaining("500/750"),

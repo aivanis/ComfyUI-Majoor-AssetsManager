@@ -67,17 +67,15 @@ let _settingsResetBindings: any = null;
 function settingSectionForId(id: any): string {
     const safeId = String(id || "").trim();
     if (!safeId) return SETTINGS_NATIVE_SECTIONS.GENERAL;
+    if (safeId === GLOBAL_RESET_SETTING_ID || safeId === "Majoor.Language") {
+        return SETTINGS_NATIVE_SECTIONS.GENERAL;
+    }
     if (/^Majoor\.(Safety|Security)\./.test(safeId)) {
         return SETTINGS_NATIVE_SECTIONS.SECURITY;
     }
     if (
-        /^Majoor\.(Paths|ProbeBackend|MetadataFallback|Db|Observability)\./.test(safeId) ||
-        safeId === "Majoor.EnvVars.Reference" ||
-        safeId === "Majoor.AI.HuggingFaceTokenVisible" ||
-        safeId === "Majoor.AI.HuggingFaceToken" ||
-        safeId === "Majoor.AI.VerboseLogs" ||
-        safeId === "Majoor.AI.VectorStats" ||
-        safeId === "Majoor.AI.VectorBackfillAction"
+        /^Majoor\.(Paths|Db|ProbeBackend|MetadataFallback|Observability)\./.test(safeId) ||
+        safeId === "Majoor.EnvVars.Reference"
     ) {
         return SETTINGS_NATIVE_SECTIONS.ADVANCED;
     }
@@ -91,11 +89,10 @@ function settingSectionForId(id: any): string {
         return SETTINGS_NATIVE_SECTIONS.INDEXING;
     }
     if (safeId === "Majoor.RtHydrate.Concurrency") {
-        return SETTINGS_NATIVE_SECTIONS.ADVANCED;
+        return SETTINGS_NATIVE_SECTIONS.INDEXING;
     }
     if (
-        safeId === "Majoor.AI.VectorSearchEnabled" ||
-        safeId === "Majoor.AI.VectorCaptionOnIndex" ||
+        /^Majoor\.AI\.(HuggingFaceTokenVisible|HuggingFaceToken|VerboseLogs|VectorStats|VectorBackfillAction|VectorSearchEnabled|VectorCaptionOnIndex|VectorIndexOnScan|VectorConcurrency|VectorUnloadAfterUse|VectorUnloadNow)$/.test(safeId) ||
         /^Majoor\.Search\./.test(safeId)
     ) {
         return SETTINGS_NATIVE_SECTIONS.SEARCH_AI;
