@@ -1,18 +1,18 @@
-import { A as e, J as t, L as n, T as r, a as i, k as a, p as o, q as s, y as c } from "./events-C6W1gWsG.js";
+import { A as e, J as t, L as n, T as r, a as i, k as a, p as o, q as s, y as c } from "./events-iWiZ-Zty.js";
 import { a as l, n as u } from "./graphTraversal-CjIZsRsP.js";
-import { E as d, T as f, W as p, b as m, w as ee } from "./SidebarWorkflowSection-DfD3OCs0.js";
-import { n as h, t as g } from "./state-DPiaUMw1.js";
+import { E as d, G as f, T as p, b as m, w as h } from "./SidebarWorkflowSection-DslJPuWf.js";
+import { n as g, t as _ } from "./state-DPiaUMw1.js";
 //#region ui/features/viewer/floatingViewerProgress.ts
-var _ = "progress-update", v = "__MJR_MFV_PROGRESS_SERVICE__";
-function y() {
+var v = "progress-update", y = "__MJR_MFV_PROGRESS_SERVICE__";
+function b() {
 	return typeof globalThis < "u" ? globalThis : typeof window < "u" ? window : {};
 }
-function b(e, t) {
+function x(e, t) {
 	if (typeof CustomEvent == "function") return new CustomEvent(e, { detail: t });
 	let n = typeof Event == "function" ? new Event(e) : { type: e };
 	return n.detail = t, n;
 }
-var x = class {
+var S = class {
 	constructor(t, n = () => e()) {
 		this.id = String(t || ""), this.promptApi = null, this.executedNodeIds = [], this.totalNodes = 0, this.currentlyExecuting = null, this.errorDetails = null, this._getApp = typeof n == "function" ? n : () => null;
 	}
@@ -61,7 +61,7 @@ var x = class {
 	error(e) {
 		this.errorDetails = e || null;
 	}
-}, te = class extends EventTarget {
+}, ee = class extends EventTarget {
 	constructor({ getApi: t = (e) => a(e), getApp: n = () => e(), waitForApi: r = (e) => s(e) } = {}) {
 		super(), this._getApi = t, this._getApp = n, this._waitForApi = r, this.promptsMap = /* @__PURE__ */ new Map(), this.currentExecution = null, this.lastQueueRemaining = 0, this._api = null, this._listenerEntries = [], this._initPromise = null, this._queuePromptBinding = null;
 	}
@@ -77,7 +77,7 @@ var x = class {
 	}
 	getOrMakePrompt(e) {
 		let t = String(e || "").trim() || "unknown", n = this.promptsMap.get(t);
-		return n || (n = new x(t, this._getApp), this.promptsMap.set(t, n)), n;
+		return n || (n = new S(t, this._getApp), this.promptsMap.set(t, n)), n;
 	}
 	async ensureInitialized({ api: e = null, app: t = null, timeoutMs: n = 0 } = {}) {
 		return e && this._api === e ? e : !e && this._api ? this._api : (this._initPromise ||= this._ensureInitializedInternal({
@@ -127,7 +127,7 @@ var x = class {
 					let o = String(a?.prompt_id || a?.promptId || "").trim();
 					if (o) {
 						let e = n.getOrMakePrompt(o);
-						e.setPrompt(r), n.currentExecution ||= e, n.dispatchEvent(b("queue-prompt", { prompt: e })), n.dispatchProgressUpdate();
+						e.setPrompt(r), n.currentExecution ||= e, n.dispatchEvent(x("queue-prompt", { prompt: e })), n.dispatchProgressUpdate();
 					}
 					return a;
 				};
@@ -173,7 +173,7 @@ var x = class {
 		});
 	}
 	dispatchProgressUpdate() {
-		this.dispatchEvent(b(_, this.getSnapshot()));
+		this.dispatchEvent(x(v, this.getSnapshot()));
 	}
 	dispose({ resetPatchedQueuePrompt: e = !1, keepState: t = !1 } = {}) {
 		for (let { api: e, type: t, handler: n } of this._listenerEntries.splice(0)) try {
@@ -188,12 +188,12 @@ var x = class {
 		}
 		this._queuePromptBinding = null, this._api = null, t || (this.promptsMap.clear(), this.currentExecution = null, this.lastQueueRemaining = 0);
 	}
-}, S = y(), C = S[v] || new te();
-S[v] || (S[v] = C);
-function w(e = {}) {
-	return C.ensureInitialized(e);
+}, C = b(), w = C[y] || new ee();
+C[y] || (C[y] = w);
+function T(e = {}) {
+	return w.ensureInitialized(e);
 }
-function T(e) {
+function E(e) {
 	let t = Math.max(0, Number(e?.queue) || 0), n = e?.prompt || null;
 	if (n?.errorDetails) return [
 		String(n.errorDetails?.exception_type || "Execution error").trim(),
@@ -217,7 +217,7 @@ function T(e) {
 	}
 	return t > 0 ? `(${t}) Running... in another tab` : "Idle";
 }
-function ne(e) {
+function te(e) {
 	let t = e?.prompt || null;
 	if (t?.errorDetails) {
 		let e = t?.errorDetails || {}, n = String(t?.currentlyExecuting?.nodeLabel || e?.node_type || e?.node_id || "Execution").trim(), r = e?.exception_message ?? e?.error ?? e?.message ?? e?.detail ?? e?.reason ?? "", i = (Array.isArray(r) ? r.map((e) => String(e || "").trim()).filter(Boolean).join(" | ") : String(r || "").trim()).replace(/\s+/g, " ").trim();
@@ -228,7 +228,7 @@ function ne(e) {
 	let r = String(n.nodeLabel || n.nodeId || "Node").trim(), i = Number(n.step), a = Number(n.maxSteps);
 	return Number.isFinite(i) && Number.isFinite(a) && a > 0 ? n.pass > 1 ? `${r} #${n.pass} - ${i}/${a}` : `${r} - ${i}/${a}` : r;
 }
-function re(e, t) {
+function ne(e, t) {
 	if (!e?._progressEl && !e?._mediaProgressEl) return;
 	let n = t?.prompt || null, r = String(n?.errorDetails?.node_id || n?.currentlyExecuting?.nodeId || "").trim(), i = "0%", a = "0%", o = !!n?.errorDetails;
 	if (n?.currentlyExecuting) {
@@ -239,12 +239,12 @@ function re(e, t) {
 		let e = Number(n.currentlyExecuting?.step), t = Number(n.currentlyExecuting?.maxSteps);
 		Number.isFinite(e) && Number.isFinite(t) && t > 0 && (a = `${Math.max(0, Math.min(100, e / t * 100))}%`);
 	} else o && (i = "100%", a = "100%");
-	if (e._progressCurrentNodeId = r || null, e._progressEl && (e._progressNodesEl.style.width = i, e._progressStepsEl.style.width = a, e._progressTextEl.textContent = T(t), e._progressEl.classList.toggle("is-error", o), e._progressEl.classList.toggle("is-clickable", !!r), e._progressEl.title = r ? "Execution progress - click to center active node" : "Execution progress"), e._mediaProgressEl) {
-		let n = ne(t);
+	if (e._progressCurrentNodeId = r || null, e._progressEl && (e._progressNodesEl.style.width = i, e._progressStepsEl.style.width = a, e._progressTextEl.textContent = E(t), e._progressEl.classList.toggle("is-error", o), e._progressEl.classList.toggle("is-clickable", !!r), e._progressEl.title = r ? "Execution progress - click to center active node" : "Execution progress"), e._mediaProgressEl) {
+		let n = te(t);
 		e._mediaProgressTextEl.textContent = n, e._mediaProgressEl.title = n || "", e._mediaProgressEl.classList.toggle("is-error", o), e._mediaProgressEl.classList.toggle("is-visible", !!n);
 	}
 }
-function ie(t, n) {
+function re(t, n) {
 	let r = String(n || "").trim();
 	if (!r) return !1;
 	try {
@@ -253,7 +253,7 @@ function ie(t, n) {
 		return console.debug?.(e), !1;
 	}
 }
-function ae(e) {
+function ie(e) {
 	let t = document.createElement("div");
 	t.className = "mjr-mfv-progress", t.setAttribute("role", "status"), t.setAttribute("aria-live", "polite");
 	let n = document.createElement("div");
@@ -264,22 +264,22 @@ function ae(e) {
 	i.className = "mjr-mfv-progress-overlay", i.setAttribute("aria-hidden", "true");
 	let a = document.createElement("span");
 	return a.className = "mjr-mfv-progress-text", a.textContent = "Idle", t.appendChild(n), t.appendChild(r), t.appendChild(i), t.appendChild(a), t.addEventListener("pointerdown", (t) => {
-		t.button === 0 && ie(e, e._progressCurrentNodeId) && (t.preventDefault(), t.stopPropagation());
-	}), e._progressEl = t, e._progressNodesEl = n, e._progressStepsEl = r, e._progressTextEl = a, e._progressUpdateHandler && C.removeEventListener(_, e._progressUpdateHandler), e._progressUpdateHandler = (t) => {
-		re(e, t?.detail || C.getSnapshot());
-	}, C.addEventListener(_, e._progressUpdateHandler), w({ timeoutMs: 4e3 }).catch((e) => {
+		t.button === 0 && re(e, e._progressCurrentNodeId) && (t.preventDefault(), t.stopPropagation());
+	}), e._progressEl = t, e._progressNodesEl = n, e._progressStepsEl = r, e._progressTextEl = a, e._progressUpdateHandler && w.removeEventListener(v, e._progressUpdateHandler), e._progressUpdateHandler = (t) => {
+		ne(e, t?.detail || w.getSnapshot());
+	}, w.addEventListener(v, e._progressUpdateHandler), T({ timeoutMs: 4e3 }).catch((e) => {
 		console.debug?.(e);
-	}), re(e, C.getSnapshot()), t;
+	}), ne(e, w.getSnapshot()), t;
 }
-function oe(e) {
+function ae(e) {
 	let t = document.createElement("div");
 	t.className = "mjr-mfv-media-progress", t.setAttribute("aria-hidden", "true");
 	let n = document.createElement("span");
-	return n.className = "mjr-mfv-media-progress-text", t.appendChild(n), e._mediaProgressEl = t, e._mediaProgressTextEl = n, re(e, C.getSnapshot()), t;
+	return n.className = "mjr-mfv-media-progress-text", t.appendChild(n), e._mediaProgressEl = t, e._mediaProgressTextEl = n, ne(e, w.getSnapshot()), t;
 }
-function se(e) {
+function oe(e) {
 	if (e?._progressUpdateHandler) try {
-		C.removeEventListener(_, e._progressUpdateHandler);
+		w.removeEventListener(v, e._progressUpdateHandler);
 	} catch (e) {
 		console.debug?.(e);
 	}
@@ -287,16 +287,16 @@ function se(e) {
 }
 //#endregion
 //#region ui/components/VideoControls.ts
-var ce = 400, le = 1e3, ue = 220, de = .001;
-function fe(e, t) {
+var se = 400, ce = 1e3, le = 220, ue = .001;
+function de(e, t) {
 	let n = Number(e), r = Math.max(1, Number(t) || 1);
 	if (!Number.isFinite(n) || n <= 0) return 1;
 	let i = n / r, a = 10 ** Math.floor(Math.log10(Math.max(i, .001))), o = i / a;
 	return Math.max(.001, (o <= 1 ? 1 : o <= 2 ? 2 : o <= 5 ? 5 : 10) * a);
 }
-function pe(e, t, n) {
+function fe(e, t, n) {
 	try {
-		if (e?.aborted) return ee;
+		if (e?.aborted) return h;
 		let r = setTimeout(() => {
 			try {
 				if (e?.aborted) return;
@@ -329,18 +329,18 @@ function pe(e, t, n) {
 			}
 		};
 	} catch {
-		return ee;
+		return h;
 	}
 }
-function E(e) {
+function D(e) {
 	let t = Math.floor(Number(e) || 0);
 	return t < 10 ? `0${t}` : String(t);
 }
-function D(e) {
+function pe(e) {
 	let t = Number(e);
 	if (!Number.isFinite(t) || t < 0) return "0:00";
 	let n = Math.floor(t), r = Math.floor(n / 3600), i = Math.floor(n % 3600 / 60), a = n % 60;
-	return r > 0 ? `${r}:${E(i)}:${E(a)}` : `${i}:${E(a)}`;
+	return r > 0 ? `${r}:${D(i)}:${D(a)}` : `${i}:${D(a)}`;
 }
 function me(e, t, n) {
 	let r = document.createElement("button");
@@ -387,7 +387,7 @@ function ve(e) {
 }
 function ye(e, t) {
 	let n = Number(e), r = Number(t);
-	return Number.isFinite(n) && Number.isFinite(r) && Math.abs(n - r) <= de;
+	return Number.isFinite(n) && Number.isFinite(r) && Math.abs(n - r) <= ue;
 }
 function be(e, t) {
 	let n = [];
@@ -454,7 +454,7 @@ function be(e, t) {
 	} catch (e) {
 		console.debug?.(e);
 	}
-	n.push(f(e, "loadedmetadata", () => c(), { passive: !0 })), n.push(f(e, "canplay", () => c(), { passive: !0 })), n.push(f(i, "click", l)), n.push(f(e, "play", s, { passive: !0 })), n.push(f(e, "pause", s, { passive: !0 })), n.push(f(e, "ended", () => c(), { passive: !0 }));
+	n.push(p(e, "loadedmetadata", () => c(), { passive: !0 })), n.push(p(e, "canplay", () => c(), { passive: !0 })), n.push(p(i, "click", l)), n.push(p(e, "play", s, { passive: !0 })), n.push(p(e, "pause", s, { passive: !0 })), n.push(p(e, "ended", () => c(), { passive: !0 }));
 	try {
 		s();
 	} catch (e) {
@@ -481,7 +481,7 @@ function xe(e, t = {}) {
 		let n = _e(t), r = String(t?.mediaKind || "video").toLowerCase() === "audio", i = n === "viewerbar", a = n !== "preview", s = a, c = ve(t), l = t?.hostEl || e?.parentElement;
 		if (!e || !l) return {
 			controlsEl: null,
-			destroy: ee
+			destroy: h
 		};
 		if (n === "preview") return be(e, l);
 		try {
@@ -494,45 +494,45 @@ function xe(e, t = {}) {
 		});
 		let u = document.createElement("div");
 		u.className = `mjr-video-controls mjr-video-controls--${n}`, i && u.classList.add("mjr-video-controls--modern"), r && u.classList.add("mjr-video-controls--audio"), u.dataset.mjrLayout = "regular", u.setAttribute("role", "group"), u.setAttribute("aria-label", r ? o("video.audioControls", "Audio controls") : o("video.controls", "Video controls"));
-		let p = document.createElement("div");
-		p.className = "mjr-video-row mjr-video-row--top";
-		let _ = document.createElement("div");
-		_.className = "mjr-video-row mjr-video-row--bottom", u.appendChild(p), u.appendChild(_);
+		let f = document.createElement("div");
+		f.className = "mjr-video-row mjr-video-row--top";
 		let v = document.createElement("div");
-		v.className = "mjr-video-seek-wrap";
-		let y = document.createElement("input");
-		y.className = "mjr-video-range mjr-video-range--seek", y.type = "range", y.min = "0", y.max = String(le), y.step = "1", y.value = "0", y.setAttribute("aria-label", o("video.seek", "Seek")), y.title = r ? o("video.seekThroughAudio", "Seek through audio") : o("video.seekThrough", "Seek through video");
-		let b = document.createElement("div");
-		b.className = "mjr-video-seek-overlay";
-		let x = null, te = null, S = null, C = null;
-		s && (x = document.createElement("div"), x.className = "mjr-video-seek-zones", te = document.createElement("div"), te.className = "mjr-video-seek-zone mjr-video-seek-zone--leftTrim", S = document.createElement("div"), S.className = "mjr-video-seek-zone mjr-video-seek-zone--selected", C = document.createElement("div"), C.className = "mjr-video-seek-zone mjr-video-seek-zone--rightTrim", x.appendChild(te), x.appendChild(S), x.appendChild(C));
-		let w = document.createElement("div");
-		w.className = "mjr-video-seek-ticks";
+		v.className = "mjr-video-row mjr-video-row--bottom", u.appendChild(f), u.appendChild(v);
+		let y = document.createElement("div");
+		y.className = "mjr-video-seek-wrap";
+		let b = document.createElement("input");
+		b.className = "mjr-video-range mjr-video-range--seek", b.type = "range", b.min = "0", b.max = String(ce), b.step = "1", b.value = "0", b.setAttribute("aria-label", o("video.seek", "Seek")), b.title = r ? o("video.seekThroughAudio", "Seek through audio") : o("video.seekThrough", "Seek through video");
+		let x = document.createElement("div");
+		x.className = "mjr-video-seek-overlay";
+		let S = null, ee = null, C = null, w = null;
+		s && (S = document.createElement("div"), S.className = "mjr-video-seek-zones", ee = document.createElement("div"), ee.className = "mjr-video-seek-zone mjr-video-seek-zone--leftTrim", C = document.createElement("div"), C.className = "mjr-video-seek-zone mjr-video-seek-zone--selected", w = document.createElement("div"), w.className = "mjr-video-seek-zone mjr-video-seek-zone--rightTrim", S.appendChild(ee), S.appendChild(C), S.appendChild(w));
 		let T = document.createElement("div");
-		T.className = "mjr-video-seek-labels";
+		T.className = "mjr-video-seek-ticks";
+		let E = document.createElement("div");
+		E.className = "mjr-video-seek-labels";
+		let te = document.createElement("div");
+		te.className = "mjr-video-seek-mark mjr-video-seek-mark--in";
 		let ne = document.createElement("div");
-		ne.className = "mjr-video-seek-mark mjr-video-seek-mark--in";
+		ne.className = "mjr-video-seek-mark mjr-video-seek-mark--out";
 		let re = document.createElement("div");
-		re.className = "mjr-video-seek-mark mjr-video-seek-mark--out";
+		re.className = "mjr-video-seek-playhead";
 		let ie = document.createElement("div");
-		ie.className = "mjr-video-seek-playhead";
+		ie.className = "mjr-video-seek-playhead-label", x.appendChild(T), x.appendChild(E), x.appendChild(re), x.appendChild(ie);
 		let ae = document.createElement("div");
-		ae.className = "mjr-video-seek-playhead-label", b.appendChild(w), b.appendChild(T), b.appendChild(ie), b.appendChild(ae);
+		ae.className = "mjr-video-seek-handle mjr-video-seek-handle--in", ae.title = o("video.dragSetIn", "Drag to set In"), ae.setAttribute("aria-label", o("video.dragSetIn", "Drag to set In"));
 		let oe = document.createElement("div");
-		oe.className = "mjr-video-seek-handle mjr-video-seek-handle--in", oe.title = o("video.dragSetIn", "Drag to set In"), oe.setAttribute("aria-label", o("video.dragSetIn", "Drag to set In"));
-		let se = document.createElement("div");
-		se.className = "mjr-video-seek-handle mjr-video-seek-handle--out", se.title = o("video.dragSetOut", "Drag to set Out"), se.setAttribute("aria-label", o("video.dragSetOut", "Drag to set Out")), v.appendChild(y), x && v.appendChild(x), v.appendChild(b), s && (v.appendChild(ne), v.appendChild(re), v.appendChild(oe), v.appendChild(se));
-		let de = document.createElement("span");
-		de.className = "mjr-video-time", de.textContent = "0:00 / 0:00", de.title = o("video.currentTimeTotal", "Current time / Total duration");
-		let E = document.createElement("span");
-		E.className = "mjr-video-range-count", E.textContent = "";
+		oe.className = "mjr-video-seek-handle mjr-video-seek-handle--out", oe.title = o("video.dragSetOut", "Drag to set Out"), oe.setAttribute("aria-label", o("video.dragSetOut", "Drag to set Out")), y.appendChild(b), S && y.appendChild(S), y.appendChild(x), s && (y.appendChild(te), y.appendChild(ne), y.appendChild(ae), y.appendChild(oe));
+		let ue = document.createElement("span");
+		ue.className = "mjr-video-time", ue.textContent = "0:00 / 0:00", ue.title = o("video.currentTimeTotal", "Current time / Total duration");
+		let D = document.createElement("span");
+		D.className = "mjr-video-range-count", D.textContent = "";
 		try {
-			E.style.display = "none";
+			D.style.display = "none";
 		} catch (e) {
 			console.debug?.(e);
 		}
 		let xe = document.createElement("div");
-		xe.className = "mjr-video-timegroup", xe.appendChild(de), s && xe.appendChild(E);
+		xe.className = "mjr-video-timegroup", xe.appendChild(ue), s && xe.appendChild(D);
 		let O = document.createElement("span");
 		O.className = "mjr-video-frame", O.textContent = "F: 0", O.title = o("video.currentFrame", "Current frame number");
 		let Se = me("mjr-video-btn--play", o("btn.play", "Play"), o("video.playPauseSpace", "Play/Pause (Space)")), Ce = me("mjr-video-btn--step", "<", o("video.stepBack", "Step back")), we = me("mjr-video-btn--step", ">", o("video.stepForward", "Step forward")), Te = me("mjr-video-btn--jump mjr-video-btn--in", "|<", o("video.goToIn", "Go to In")), Ee = me("mjr-video-btn--jump mjr-video-btn--out", ">|", o("video.goToOut", "Go to Out")), De = me("mjr-video-btn--mark mjr-video-btn--in", "I", o("video.setInFromCurrent", "Set In from current frame")), Oe = me("mjr-video-btn--mark mjr-video-btn--out", "O", o("video.setOutFromCurrent", "Set Out from current frame")), ke = he("mjr-video-btn--toggle", "pi-refresh", o("video.loopPlaybackInRange", "Loop playback in range"), o("video.loop", "Loop")), Ae = ke.btn, je = ge("mjr-video-num--in", {
@@ -580,7 +580,7 @@ function xe(e, t = {}) {
 		let Ne = he("mjr-video-btn--mute", "pi-volume-up", o("video.mute", "Mute"), o("video.mute", "Mute")), M = Ne.btn, N = document.createElement("div");
 		N.className = "mjr-video-volume-wrap", N.style.cssText = "display:none; align-items:center; position:relative;";
 		let P = null;
-		P = document.createElement("input"), P.className = "mjr-video-range mjr-video-range--volume", P.type = "range", P.min = "0", P.max = "1", P.step = "0.02", P.value = String(h(Number(e.volume) || 0)), P.setAttribute("aria-label", o("video.volume", "Volume")), P.title = o("video.volume", "Volume");
+		P = document.createElement("input"), P.className = "mjr-video-range mjr-video-range--volume", P.type = "range", P.min = "0", P.max = "1", P.step = "0.02", P.value = String(g(Number(e.volume) || 0)), P.setAttribute("aria-label", o("video.volume", "Volume")), P.title = o("video.volume", "Volume");
 		try {
 			P.style.width = "120px";
 		} catch (e) {
@@ -608,7 +608,7 @@ function xe(e, t = {}) {
 		let z = document.createElement("div");
 		if (z.className = "mjr-video-bottom mjr-video-bottom--right", R.appendChild(Te), r || R.appendChild(Ce), R.appendChild(Se), r || R.appendChild(we), R.appendChild(Ee), s && Re.appendChild(L), s && z.appendChild(Ie), z.appendChild(Le), z.appendChild(M), s && z.appendChild(Oe), P && z.appendChild(N), i) {
 			let e = document.createElement("div");
-			e.className = "mjr-video-bar-timeline", s && e.appendChild(F), e.appendChild(v), s && e.appendChild(I);
+			e.className = "mjr-video-bar-timeline", s && e.appendChild(F), e.appendChild(y), s && e.appendChild(I);
 			let t = document.createElement("div");
 			t.className = "mjr-video-bar-actions";
 			let n = document.createElement("div");
@@ -617,7 +617,7 @@ function xe(e, t = {}) {
 			r.className = "mjr-video-bar-center", r.appendChild(R);
 			let i = document.createElement("div");
 			i.className = "mjr-video-bar-side mjr-video-bar-side--right", s && i.appendChild(Ie), i.appendChild(Le), i.appendChild(M), s && i.appendChild(Oe), P && i.appendChild(N), t.appendChild(n), t.appendChild(r), t.appendChild(i), u.replaceChildren(e, t);
-		} else s && p.appendChild(O), s && p.appendChild(F), p.appendChild(v), s && p.appendChild(I), p.appendChild(xe), _.appendChild(Re), _.appendChild(R), _.appendChild(z);
+		} else s && f.appendChild(O), s && f.appendChild(F), f.appendChild(y), s && f.appendChild(I), f.appendChild(xe), v.appendChild(Re), v.appendChild(R), v.appendChild(z);
 		let B = (e) => {
 			try {
 				e.stopPropagation?.();
@@ -638,10 +638,10 @@ function xe(e, t = {}) {
 				return {
 					signal: {
 						aborted: !1,
-						addEventListener: ee,
-						removeEventListener: ee
+						addEventListener: h,
+						removeEventListener: h
 					},
-					abort: ee
+					abort: h
 				};
 			}
 		})();
@@ -679,16 +679,16 @@ function xe(e, t = {}) {
 		} catch (e) {
 			console.debug?.(e);
 		}
-		H.push(f(u, "pointerdown", B)), H.push(f(u, "dblclick", V, { capture: !0 })), H.push(f(u, "wheel", V, {
+		H.push(p(u, "pointerdown", B)), H.push(p(u, "dblclick", V, { capture: !0 })), H.push(p(u, "wheel", V, {
 			capture: !0,
 			passive: !1
-		})), H.push(f(window, "dblclick", (e) => {
+		})), H.push(p(window, "dblclick", (e) => {
 			try {
 				u.contains?.(e?.target) && V(e);
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, { capture: !0 })), H.push(f(window, "wheel", (e) => {
+		}, { capture: !0 })), H.push(p(window, "wheel", (e) => {
 			try {
 				u.contains?.(e?.target) && V(e);
 			} catch (e) {
@@ -728,7 +728,7 @@ function xe(e, t = {}) {
 			if (!U._userInteracted) {
 				U._userInteracted = !0;
 				try {
-					e.muted && (e.muted = !1, it?.());
+					e.muted && (e.muted = !1, ot?.());
 				} catch (e) {
 					console.debug?.(e);
 				}
@@ -741,7 +741,7 @@ function xe(e, t = {}) {
 				} catch (e) {
 					console.debug?.(e);
 				}
-				We = pe(ze.signal, ue, () => {
+				We = fe(ze.signal, le, () => {
 					try {
 						O.classList.remove("is-step");
 					} catch (e) {
@@ -826,7 +826,7 @@ function xe(e, t = {}) {
 			try {
 				let e = Ye();
 				if (e <= 0) return;
-				let t = U.inFrame == null ? 0 : g(U.inFrame, 0, e), n = U.outFrame == null ? e : g(U.outFrame, 0, e);
+				let t = U.inFrame == null ? 0 : _(U.inFrame, 0, e), n = U.outFrame == null ? e : _(U.outFrame, 0, e);
 				n < t ? (U.inFrame = n, U.outFrame = t) : (U.inFrame = t, U.outFrame = n);
 			} catch (e) {
 				console.debug?.(e);
@@ -835,8 +835,8 @@ function xe(e, t = {}) {
 			try {
 				let e = Ye();
 				return {
-					inF: U.inFrame == null ? 0 : g(U.inFrame, 0, e),
-					outF: U.outFrame == null ? e : g(U.outFrame, 0, e),
+					inF: U.inFrame == null ? 0 : _(U.inFrame, 0, e),
+					outF: U.outFrame == null ? e : _(U.outFrame, 0, e),
 					maxF: e
 				};
 			} catch {
@@ -846,13 +846,28 @@ function xe(e, t = {}) {
 					maxF: 0
 				};
 			}
+		}, Ze = () => {
+			try {
+				if (!s || r) return ce;
+				let e = Ye();
+				if (Number.isFinite(e) && e > ce) return Math.max(ce, Math.floor(e));
+			} catch (e) {
+				console.debug?.(e);
+			}
+			return ce;
+		}, Qe = () => {
+			try {
+				b.max = String(Ze());
+			} catch (e) {
+				console.debug?.(e);
+			}
 		}, q = () => {
 			try {
 				Se.textContent = !e?.paused || U._ppReverse ? o("video.pause", "Pause") : o("video.play", "Play");
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, Ze = () => {
+		}, $e = () => {
 			try {
 				let t = !!e?.muted || (Number(e?.volume) || 0) <= .001;
 				try {
@@ -868,30 +883,32 @@ function xe(e, t = {}) {
 		}, J = (t = null) => {
 			try {
 				let n = Number(e?.duration), i = t ?? e?.currentTime, o = Number(i), c = Number.isFinite(n) && n > 0;
-				if (de.textContent = `${D(o)} / ${c ? D(n) : "0:00"}`, y.disabled = !c, c) {
-					let e = h((o || 0) / n), t = Math.round(e * 1e3);
-					!Number.isNaN(t) && !U._seeking && !y.matches?.(":active") && (y.value = String(t));
+				if (ue.textContent = `${pe(o)} / ${c ? pe(n) : "0:00"}`, b.disabled = !c, c) {
+					let e = g((o || 0) / n);
+					Qe();
+					let t = Math.round(e * Ze());
+					!Number.isNaN(t) && !U._seeking && !b.matches?.(":active") && (b.value = String(t));
 					try {
-						ie.style.left = `${e * 100}%`;
+						re.style.left = `${e * 100}%`;
 					} catch (e) {
 						console.debug?.(e);
 					}
 				} else {
-					y.value = "0";
+					b.value = "0";
 					try {
-						ie.style.left = "0%";
+						re.style.left = "0%";
 					} catch (e) {
 						console.debug?.(e);
 					}
 				}
 				let l = s ? Ye() : 0, u = s ? W(o) : 0;
 				if (a) {
-					s && (O.textContent = r ? `T: ${D(o)} / ${D(n)}` : `F: ${u} / ${l}`);
+					s && (O.textContent = r ? `T: ${pe(o)} / ${pe(n)}` : `F: ${u} / ${l}`);
 					try {
 						if (Number.isFinite(n) && n > 0) {
-							let e = h((o || 0) / n);
-							ae.style.left = `${e * 100}%`, ae.textContent = r ? D(o) : String(u), ae.style.display = "";
-						} else ae.style.display = "none";
+							let e = g((o || 0) / n);
+							ie.style.left = `${e * 100}%`, ie.textContent = r ? pe(o) : String(u), ie.style.display = "";
+						} else ie.style.display = "none";
 					} catch (e) {
 						console.debug?.(e);
 					}
@@ -900,7 +917,7 @@ function xe(e, t = {}) {
 					je.matches?.(":focus") || (je.value = String(U.inFrame ?? 0)), Me.matches?.(":focus") || (Me.value = String(U.outFrame ?? l));
 					try {
 						let { inF: e, outF: t, maxF: n } = K(), i = e <= 0 && t >= n, a = Math.max(0, Math.floor(t) - Math.floor(e) + 1);
-						!i && n > 0 ? (E.textContent = r ? `R: ${D(a / m(U.fps, 30))}` : `R: ${a}f`, E.style.display = "") : E.style.display = "none";
+						!i && n > 0 ? (D.textContent = r ? `R: ${pe(a / m(U.fps, 30))}` : `R: ${a}f`, D.style.display = "") : D.style.display = "none";
 					} catch (e) {
 						console.debug?.(e);
 					}
@@ -908,58 +925,58 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, Qe = () => {
+		}, et = () => {
 			if (!(!a || !r)) try {
 				let t = Number(e?.duration);
 				if (!Number.isFinite(t) || t <= 0) {
-					w.style.backgroundImage = "", T.replaceChildren();
+					T.style.backgroundImage = "", E.replaceChildren();
 					try {
-						T.dataset.mjrLabelKey = "";
+						E.dataset.mjrLabelKey = "";
 					} catch (e) {
 						console.debug?.(e);
 					}
 					return;
 				}
-				let n = fe(t, 80), r = fe(t, 8), i = n / t * 100, a = r / t * 100;
+				let n = de(t, 80), r = de(t, 8), i = n / t * 100, a = r / t * 100;
 				if (Number.isFinite(i) && i > .02) {
 					let e = `repeating-linear-gradient(to right, rgba(255,255,255,0.16) 0, rgba(255,255,255,0.16) 1px, transparent 1px, transparent ${i}%)`, t = `repeating-linear-gradient(to right, rgba(255,255,255,0.3) 0, rgba(255,255,255,0.3) 1px, transparent 1px, transparent ${a}%)`;
-					w.style.backgroundImage = `${t}, ${e}`;
-				} else w.style.backgroundImage = "";
+					T.style.backgroundImage = `${t}, ${e}`;
+				} else T.style.backgroundImage = "";
 				let o = `audio|${Math.round(t * 1e3)}|${Math.round(r * 1e3)}`;
-				if (T?.dataset?.mjrLabelKey === o) return;
-				T.dataset.mjrLabelKey = o, T.replaceChildren();
+				if (E?.dataset?.mjrLabelKey === o) return;
+				E.dataset.mjrLabelKey = o, E.replaceChildren();
 				let s = (e) => {
 					let n = document.createElement("span");
 					n.className = "mjr-video-seek-label";
 					let r = Math.max(0, Math.min(t, Number(e) || 0));
-					return n.style.left = `${h(r / t) * 100}%`, n.textContent = D(r), n;
+					return n.style.left = `${g(r / t) * 100}%`, n.textContent = pe(r), n;
 				};
-				T.appendChild(s(0));
-				for (let e = r; e < t; e += r) T.appendChild(s(e));
-				T.appendChild(s(t));
+				E.appendChild(s(0));
+				for (let e = r; e < t; e += r) E.appendChild(s(e));
+				E.appendChild(s(t));
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}, Y = () => {
 			if (!s) {
-				Qe();
+				et();
 				return;
 			}
 			try {
 				let { inF: e, outF: t, maxF: n } = K();
 				if (!Number.isFinite(n) || n <= 0) return;
-				let i = h(e / n) * 100, a = h(t / n) * 100, o = e <= 0 && t >= n;
+				let i = g(e / n) * 100, a = g(t / n) * 100, o = e <= 0 && t >= n;
 				try {
-					y.style.background = "";
+					b.style.background = "";
 				} catch (e) {
 					console.debug?.(e);
 				}
 				try {
-					let e = h(i / 100) * 100, t = h(a / 100) * 100, n = Math.min(e, t), r = Math.max(e, t);
-					if (x && te && S && C) {
-						te.style.left = "0%", te.style.width = `${n}%`, S.style.left = `${n}%`, S.style.width = `${Math.max(0, r - n)}%`, C.style.left = `${r}%`, C.style.width = `${Math.max(0, 100 - r)}%`;
+					let e = g(i / 100) * 100, t = g(a / 100) * 100, n = Math.min(e, t), r = Math.max(e, t);
+					if (S && ee && C && w) {
+						ee.style.left = "0%", ee.style.width = `${n}%`, C.style.left = `${n}%`, C.style.width = `${Math.max(0, r - n)}%`, w.style.left = `${r}%`, w.style.width = `${Math.max(0, 100 - r)}%`;
 						try {
-							x.classList.toggle("is-trimmed", !o), x.classList.toggle("is-fullrange", o);
+							S.classList.toggle("is-trimmed", !o), S.classList.toggle("is-fullrange", o);
 						} catch (e) {
 							console.debug?.(e);
 						}
@@ -968,35 +985,35 @@ function xe(e, t = {}) {
 					console.debug?.(e);
 				}
 				try {
-					ne.style.left = `${i}%`, re.style.left = `${a}%`;
+					te.style.left = `${i}%`, ne.style.left = `${a}%`;
 				} catch (e) {
 					console.debug?.(e);
 				}
 				try {
-					oe.style.left = `${i}%`, se.style.left = `${a}%`;
+					ae.style.left = `${i}%`, oe.style.left = `${a}%`;
 				} catch (e) {
 					console.debug?.(e);
 				}
 				if (r) {
-					Qe();
+					et();
 					return;
 				}
 				try {
-					let e = Math.max(1, Math.floor(n / ce)), t = Math.max(e, Math.floor(Number(U.step) || 1)), r = t / n * 100, i = r * 10;
+					let e = Math.max(1, Math.floor(n / se)), t = Math.max(e, Math.floor(Number(U.step) || 1)), r = t / n * 100, i = r * 10;
 					if (Number.isFinite(r) && r > .02) {
 						let e = `repeating-linear-gradient(to right, rgba(255,255,255,0.16) 0, rgba(255,255,255,0.16) 1px, transparent 1px, transparent ${r}%)`, t = `repeating-linear-gradient(to right, rgba(255,255,255,0.28) 0, rgba(255,255,255,0.28) 1px, transparent 1px, transparent ${i}%)`;
-						w.style.backgroundImage = `${t}, ${e}`;
-					} else w.style.backgroundImage = "";
+						T.style.backgroundImage = `${t}, ${e}`;
+					} else T.style.backgroundImage = "";
 					(() => {
 						try {
 							let e = `${n}|${t}`;
-							if (T?.dataset?.mjrLabelKey === e) return;
-							T.dataset.mjrLabelKey = e;
+							if (E?.dataset?.mjrLabelKey === e) return;
+							E.dataset.mjrLabelKey = e;
 						} catch (e) {
 							console.debug?.(e);
 						}
 						try {
-							T.replaceChildren();
+							E.replaceChildren();
 						} catch (e) {
 							console.debug?.(e);
 						}
@@ -1009,21 +1026,21 @@ function xe(e, t = {}) {
 						let r = (e) => {
 							let t = document.createElement("span");
 							t.className = "mjr-video-seek-label";
-							let r = h(e / n) * 100;
+							let r = g(e / n) * 100;
 							return t.style.left = `${r}%`, t.textContent = String(Math.floor(e)), t;
 						};
 						try {
-							T.appendChild(r(0));
+							E.appendChild(r(0));
 						} catch (e) {
 							console.debug?.(e);
 						}
 						for (let t = e; t < n; t += e) try {
-							T.appendChild(r(t));
+							E.appendChild(r(t));
 						} catch (e) {
 							console.debug?.(e);
 						}
 						try {
-							T.appendChild(r(n));
+							E.appendChild(r(n));
 						} catch (e) {
 							console.debug?.(e);
 						}
@@ -1042,30 +1059,30 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, $e = () => {
+		}, tt = () => {
 			try {
 				U.inFrame = 0, G(), J(), Y(), X({ prefer: "in" });
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, et = () => {
+		}, nt = () => {
 			try {
 				let { maxF: e } = K();
 				U.outFrame = Math.max(0, Number(e) || 0), G(), J(), Y(), X({ prefer: "out" });
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, tt = () => {
+		}, rt = () => {
 			try {
 				U._ppRafId != null && (cancelAnimationFrame(U._ppRafId), U._ppRafId = null);
 			} catch (e) {
 				console.debug?.(e);
 			}
 		};
-		H.push(tt);
-		let nt = () => {
+		H.push(rt);
+		let it = () => {
 			try {
-				tt(), U._ppReverse = !0, e.pause?.(), q();
+				rt(), U._ppReverse = !0, e.pause?.(), q();
 				let t = 1e3 / (m(U.fps, 30) * Math.max(.25, Number(U.playbackRate) || 1)), n = performance.now(), r = (i) => {
 					try {
 						if (!U._ppReverse || !U.pingpong) {
@@ -1093,10 +1110,10 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e), U._ppReverse = !1;
 			}
-		}, rt = () => {
+		}, at = () => {
 			try {
 				let e = Ye();
-				U.inFrame = 0, U.outFrame = e > 0 ? e : null, U.step = 1, U.loop = !!s, U.pingpong = !1, U._ppReverse = !1, tt(), U.once = !1, qe(1);
+				U.inFrame = 0, U.outFrame = e > 0 ? e : null, U.step = 1, U.loop = !!s, U.pingpong = !1, U._ppReverse = !1, rt(), U.once = !1, qe(1);
 				try {
 					k.value = "1";
 				} catch (e) {
@@ -1111,31 +1128,31 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, it = () => {
+		}, ot = () => {
 			try {
-				let t = h(Number(e?.volume) || 0);
+				let t = g(Number(e?.volume) || 0);
 				try {
 					P && !P.matches?.(":active") && (P.value = String(t));
 				} catch (e) {
 					console.debug?.(e);
 				}
-				Ze();
+				$e();
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}, Z = (t) => {
 			try {
 				let { maxF: n } = K();
-				e.currentTime = Xe(g(t, 0, n > 0 ? n : Infinity));
+				e.currentTime = Xe(_(t, 0, n > 0 ? n : Infinity));
 			} catch (e) {
 				console.debug?.(e);
 			}
 			J();
-		}, at = (t) => {
+		}, st = (t) => {
 			Ue();
 			try {
 				let n = Math.max(1, Math.floor(Number(U.step) || 1)), { inF: r, outF: i } = K(), a = W() + t * n;
-				U.loop ? (a < r && (a = i), a > i && (a = r)) : a = g(a, r, i);
+				U.loop ? (a < r && (a = i), a > i && (a = r)) : a = _(a, r, i);
 				try {
 					e.pause?.();
 				} catch (e) {
@@ -1145,7 +1162,7 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, ot = () => {
+		}, ct = () => {
 			if (s) try {
 				G();
 				let { inF: e, outF: t } = K(), n = W();
@@ -1153,15 +1170,15 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, st = () => {
+		}, lt = () => {
 			Ue();
 			try {
 				if (U._ppReverse) {
-					U._ppReverse = !1, tt(), q();
+					U._ppReverse = !1, rt(), q();
 					return;
 				}
 				if (e.paused) {
-					ot();
+					ct();
 					let t = e.play?.();
 					t && typeof t.catch == "function" && t.catch(() => {});
 				} else e.pause?.();
@@ -1170,36 +1187,36 @@ function xe(e, t = {}) {
 			}
 			q();
 		};
-		H.push(f(e, "click", (t) => {
+		H.push(p(e, "click", (t) => {
 			try {
 				if (t?.target !== e) return;
 			} catch (e) {
 				console.debug?.(e);
 			}
-			st();
-		})), H.push(f(Se, "click", (e) => {
-			B(e), st();
-		})), H.push(f(Ce, "click", (e) => {
-			B(e), at(-1);
-		})), H.push(f(we, "click", (e) => {
-			B(e), at(1);
-		})), H.push(f(Te, "click", (e) => {
+			lt();
+		})), H.push(p(Se, "click", (e) => {
+			B(e), lt();
+		})), H.push(p(Ce, "click", (e) => {
+			B(e), st(-1);
+		})), H.push(p(we, "click", (e) => {
+			B(e), st(1);
+		})), H.push(p(Te, "click", (e) => {
 			B(e);
 			let { inF: t } = K();
 			Z(t), Ge();
-		})), H.push(f(Ee, "click", (e) => {
+		})), H.push(p(Ee, "click", (e) => {
 			B(e);
 			let { outF: t } = K();
 			Z(t), Ge();
 		}));
-		let ct = (t) => {
+		let ut = (t) => {
 			try {
 				let n = Number(e?.duration);
 				if (!Number.isFinite(n) || n <= 0) return !1;
-				let r = v.getBoundingClientRect?.(), i = Number(r?.width) || 0;
+				let r = y.getBoundingClientRect?.(), i = Number(r?.width) || 0;
 				if (!(i > 0)) return !1;
-				let a = h(g((Number(t) || 0) - Number(r.left || 0), 0, i) / i), o = a * n;
-				return e.currentTime = o, y.value = String(Math.round(a * le)), J(o), !0;
+				let a = g(_((Number(t) || 0) - Number(r.left || 0), 0, i) / i), o = a * n;
+				return e.currentTime = o, Qe(), b.value = String(Math.round(a * Ze())), J(o), !0;
 			} catch (e) {
 				return console.debug?.(e), !1;
 			}
@@ -1207,11 +1224,11 @@ function xe(e, t = {}) {
 			active: !1,
 			pointerId: null,
 			ac: null
-		}, lt = (e = null) => {
+		}, dt = (e = null) => {
 			if (Q.active) {
 				e && V(e), Q.active = !1, U._seeking = !1;
 				try {
-					v.releasePointerCapture?.(Q.pointerId);
+					y.releasePointerCapture?.(Q.pointerId);
 				} catch (e) {
 					console.debug?.(e);
 				}
@@ -1223,18 +1240,18 @@ function xe(e, t = {}) {
 				}
 				Q.ac = null, J();
 			}
-		}, ut = (e) => {
-			Q.active && (V(e), ct(e.clientX));
+		}, ft = (e) => {
+			Q.active && (V(e), ut(e.clientX));
 		};
-		if (H.push(() => lt()), H.push(f(v, "pointerdown", (e) => {
+		if (H.push(() => dt()), H.push(p(y, "pointerdown", (e) => {
 			try {
 				if (e?.button != null && e.button !== 0 || e?.target?.closest?.(".mjr-video-seek-handle, .mjr-video-seek-mark")) return;
 			} catch (e) {
 				console.debug?.(e);
 			}
-			V(e), Ue(), U._seeking = !0, Q.active = !0, Q.pointerId = e?.pointerId ?? null, ct(e?.clientX);
+			V(e), Ue(), U._seeking = !0, Q.active = !0, Q.pointerId = e?.pointerId ?? null, ut(e?.clientX);
 			try {
-				v.setPointerCapture?.(Q.pointerId);
+				y.setPointerCapture?.(Q.pointerId);
 			} catch (e) {
 				console.debug?.(e);
 			}
@@ -1245,45 +1262,45 @@ function xe(e, t = {}) {
 			}
 			try {
 				let e = new AbortController();
-				Q.ac = e, window.addEventListener("pointermove", ut, {
+				Q.ac = e, window.addEventListener("pointermove", ft, {
 					passive: !1,
 					capture: !0,
 					signal: e.signal
-				}), window.addEventListener("pointerup", lt, {
+				}), window.addEventListener("pointerup", dt, {
 					passive: !1,
 					capture: !0,
 					signal: e.signal
-				}), window.addEventListener("pointercancel", lt, {
+				}), window.addEventListener("pointercancel", dt, {
 					passive: !1,
 					capture: !0,
 					signal: e.signal
-				}), window.addEventListener("blur", lt, { signal: e.signal });
+				}), window.addEventListener("blur", dt, { signal: e.signal });
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, { passive: !1 })), H.push(f(y, "pointerdown", () => {
+		}, { passive: !1 })), H.push(p(b, "pointerdown", () => {
 			U._seeking = !0;
-		})), H.push(f(y, "pointerup", () => {
+		})), H.push(p(b, "pointerup", () => {
 			Q.active || (U._seeking = !1);
-		})), H.push(f(y, "pointercancel", () => {
+		})), H.push(p(b, "pointercancel", () => {
 			Q.active || (U._seeking = !1);
-		})), H.push(f(y, "input", (t) => {
+		})), H.push(p(b, "input", (t) => {
 			B(t), Ue();
 			try {
 				let t = Number(e?.duration);
 				if (!Number.isFinite(t) || t <= 0) return;
-				let n = Number(y.value);
-				e.currentTime = h((Number.isFinite(n) ? n : 0) / 1e3) * t;
+				let n = Number(b.value);
+				e.currentTime = g((Number.isFinite(n) ? n : 0) / Ze()) * t;
 			} catch (e) {
 				console.debug?.(e);
 			}
 			J();
 		})), s) {
-			H.push(f(De, "click", (e) => {
+			H.push(p(De, "click", (e) => {
 				B(e), U.inFrame = W(), G(), J(), Y(), X({ prefer: "in" });
-			})), H.push(f(Oe, "click", (e) => {
+			})), H.push(p(Oe, "click", (e) => {
 				B(e), U.outFrame = W(), G(), J(), Y(), X({ prefer: "out" });
-			})), H.push(f(je, "change", (e) => {
+			})), H.push(p(je, "change", (e) => {
 				B(e);
 				try {
 					let e = Number(je.value);
@@ -1292,7 +1309,7 @@ function xe(e, t = {}) {
 					console.debug?.(e);
 				}
 				J(), Y(), X({ prefer: "in" });
-			})), H.push(f(Me, "change", (e) => {
+			})), H.push(p(Me, "change", (e) => {
 				B(e);
 				try {
 					let e = Number(Me.value);
@@ -1301,14 +1318,14 @@ function xe(e, t = {}) {
 					console.debug?.(e);
 				}
 				J(), Y(), X({ prefer: "out" });
-			})), H.push(f(k, "change", (e) => {
+			})), H.push(p(k, "change", (e) => {
 				B(e);
 				try {
 					U.step = Math.max(1, Math.floor(Number(k.value) || 1)), k.value = String(U.step);
 				} catch (e) {
 					console.debug?.(e);
 				}
-			})), H.push(f(A, "change", (e) => {
+			})), H.push(p(A, "change", (e) => {
 				B(e);
 				try {
 					U.fps = m(A.value, 30), A.value = String(U.fps), He(!1), G();
@@ -1316,30 +1333,30 @@ function xe(e, t = {}) {
 					console.debug?.(e);
 				}
 				J(), Y();
-			})), H.push(f(Ae, "click", (e) => {
-				B(e), !U.loop && !U.pingpong ? (U.loop = !0, U.pingpong = !1) : U.loop && !U.pingpong ? (U.loop = !1, U.pingpong = !0) : (U.loop = !1, U.pingpong = !1), (U.loop || U.pingpong) && (U.once = !1), U.pingpong || (U._ppReverse = !1, tt()), Je();
-			})), H.push(f(Pe, "click", (e) => {
-				B(e), $e();
-			})), H.push(f(Fe, "click", (e) => {
-				B(e), et();
-			})), H.push(f(E, "click", (e) => {
-				B(e), rt();
+			})), H.push(p(Ae, "click", (e) => {
+				B(e), !U.loop && !U.pingpong ? (U.loop = !0, U.pingpong = !1) : U.loop && !U.pingpong ? (U.loop = !1, U.pingpong = !0) : (U.loop = !1, U.pingpong = !1), (U.loop || U.pingpong) && (U.once = !1), U.pingpong || (U._ppReverse = !1, rt()), Je();
+			})), H.push(p(Pe, "click", (e) => {
+				B(e), tt();
+			})), H.push(p(Fe, "click", (e) => {
+				B(e), nt();
+			})), H.push(p(D, "click", (e) => {
+				B(e), at();
 			}));
 			try {
-				E.title = o("video.resetPlayerControls", "Reset player controls"), E.style.cursor = "pointer", E.style.userSelect = "none";
+				D.title = o("video.resetPlayerControls", "Reset player controls"), D.style.cursor = "pointer", D.style.userSelect = "none";
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}
-		H.push(f(M, "click", (t) => {
+		H.push(p(M, "click", (t) => {
 			B(t);
 			try {
 				e.muted = !e.muted, N && (N.style.display = e.muted ? "none" : "inline-flex");
 			} catch (e) {
 				console.debug?.(e);
 			}
-			it();
-		})), H.push(f(M, "contextmenu", (e) => {
+			ot();
+		})), H.push(p(M, "contextmenu", (e) => {
 			V(e);
 			try {
 				if (!N) return;
@@ -1348,45 +1365,45 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-			it();
-		})), H.push(f(window, "pointerdown", (e) => {
+			ot();
+		})), H.push(p(window, "pointerdown", (e) => {
 			try {
 				if (!N || N.style.display === "none" || M.contains?.(e?.target) || N.contains?.(e?.target)) return;
 				N.style.display = "none";
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, { capture: !0 })), P && H.push(f(P, "input", (t) => {
+		}, { capture: !0 })), P && H.push(p(P, "input", (t) => {
 			B(t);
 			try {
-				let t = h(Number(P.value) || 0);
+				let t = g(Number(P.value) || 0);
 				e.volume = t, t > .001 && (e.muted = !1);
 			} catch (e) {
 				console.debug?.(e);
 			}
-			it();
-		})), H.push(f(j, "change", (e) => {
+			ot();
+		})), H.push(p(j, "change", (e) => {
 			B(e);
 			try {
 				qe(Number(j.value) || 1);
 			} catch (e) {
 				console.debug?.(e);
 			}
-		})), H.push(f(e, "ratechange", () => {
+		})), H.push(p(e, "ratechange", () => {
 			try {
 				qe(Number(e.playbackRate) || U.playbackRate || 1);
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}));
-		let dt = () => {
+		let pt = () => {
 			if (s) try {
 				if (U._seeking || e?.paused) return;
 				let { inF: t, outF: n, maxF: r } = K();
 				if (r <= 0 || t <= 0 && n >= r && !U.loop && !U.pingpong && !U.once || U._ppReverse) return;
 				let i = W();
 				if (i >= n - Math.max(1, Math.floor(Number(U.step) || 1))) if (U.pingpong) {
-					nt();
+					it();
 					return;
 				} else if (U.loop) {
 					Z(t);
@@ -1418,7 +1435,7 @@ function xe(e, t = {}) {
 		}, $ = {
 			rafId: null,
 			rvfcId: null
-		}, ft = () => {
+		}, mt = () => {
 			try {
 				$.rvfcId != null && typeof e?.cancelVideoFrameCallback == "function" && e.cancelVideoFrameCallback($.rvfcId);
 			} catch (e) {
@@ -1431,17 +1448,17 @@ function xe(e, t = {}) {
 				console.debug?.(e);
 			}
 			$.rafId = null;
-		}, pt = (t = 0, n = null) => {
+		}, ht = (t = 0, n = null) => {
 			$.rafId = null, $.rvfcId = null;
 			try {
-				d(J, n?.mediaTime), d(dt);
+				d(J, n?.mediaTime), d(pt);
 			} catch (e) {
 				console.debug?.(e);
 			}
 			if (!(!(U._ppReverse || !e?.paused) || ze.signal?.aborted)) {
 				try {
 					if (typeof e?.requestVideoFrameCallback == "function" && !U._ppReverse) {
-						$.rvfcId = e.requestVideoFrameCallback(pt);
+						$.rvfcId = e.requestVideoFrameCallback(ht);
 						return;
 					}
 				} catch (e) {
@@ -1449,32 +1466,32 @@ function xe(e, t = {}) {
 				}
 				try {
 					typeof requestAnimationFrame == "function" && ($.rafId = requestAnimationFrame((t) => {
-						pt(t, { mediaTime: Number(e?.currentTime) || 0 });
+						ht(t, { mediaTime: Number(e?.currentTime) || 0 });
 					}));
 				} catch (e) {
 					console.debug?.(e);
 				}
 			}
-		}, mt = () => {
-			ft(), !(!(U._ppReverse || !e?.paused) || ze.signal?.aborted) && pt(0, { mediaTime: Number(e?.currentTime) || 0 });
+		}, gt = () => {
+			mt(), !(!(U._ppReverse || !e?.paused) || ze.signal?.aborted) && ht(0, { mediaTime: Number(e?.currentTime) || 0 });
 		};
-		H.push(ft), H.push(f(e, "play", () => {
-			d(q), mt();
+		H.push(mt), H.push(p(e, "play", () => {
+			d(q), gt();
 		}));
-		for (let t of ["pause", "ended"]) H.push(f(e, t, () => {
-			ft(), d(q), d(J);
+		for (let t of ["pause", "ended"]) H.push(p(e, t, () => {
+			mt(), d(q), d(J);
 		}));
 		for (let t of [
 			"timeupdate",
 			"loadedmetadata",
 			"durationchange",
 			"seeked"
-		]) H.push(f(e, t, () => d(J)));
-		H.push(f(e, "timeupdate", dt)), H.push(f(e, "ended", () => {
+		]) H.push(p(e, t, () => d(J)));
+		H.push(p(e, "timeupdate", pt)), H.push(p(e, "ended", () => {
 			if (s) try {
 				let { inF: t, outF: n, maxF: r } = K(), i = t <= 0 && n >= r;
 				if (U.pingpong && !U._ppReverse) {
-					nt();
+					it();
 					return;
 				}
 				if (!U.loop && !i) return;
@@ -1488,7 +1505,7 @@ function xe(e, t = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, { passive: !0 })), a && (H.push(f(e, "loadedmetadata", () => {
+		}, { passive: !0 })), a && (H.push(p(e, "loadedmetadata", () => {
 			if (!s) {
 				Y();
 				return;
@@ -1500,22 +1517,22 @@ function xe(e, t = {}) {
 				console.debug?.(e);
 			}
 			Y();
-		})), H.push(f(e, "durationchange", () => d(Y)))), s && H.push(f(e, "mjr:frameStep", () => {
+		})), H.push(p(e, "durationchange", () => d(Y)))), s && H.push(p(e, "mjr:frameStep", () => {
 			d(Ge);
 		}));
-		for (let t of ["volumechange"]) H.push(f(e, t, () => d(it)));
+		for (let t of ["volumechange"]) H.push(p(e, t, () => d(ot)));
 		try {
 			U.fps = m(A.value, U.nativeFps || 30), He(!0), U.step = Math.max(1, Math.floor(Number(k.value) || 1)), G(), Je(), qe(U.playbackRate);
 		} catch (e) {
 			console.debug?.(e);
 		}
-		d(q), d(J), d(Y), d(it);
+		d(q), d(J), d(Y), d(ot);
 		try {
-			(!e?.paused || U._ppReverse) && mt();
+			(!e?.paused || U._ppReverse) && gt();
 		} catch (e) {
 			console.debug?.(e);
 		}
-		let ht = (e = {}) => {
+		let _t = (e = {}) => {
 			let t = 0, n = !1;
 			try {
 				t = Math.max(0, Ye()), n = t > 0 && U.outFrame != null && U.outFrame >= t - 1;
@@ -1553,7 +1570,7 @@ function xe(e, t = {}) {
 		try {
 			if (s) {
 				let e = Number(t?.initialFps), n = Number(t?.initialFrameCount);
-				(Number.isFinite(e) || Number.isFinite(n)) && ht({
+				(Number.isFinite(e) || Number.isFinite(n)) && _t({
 					fps: e,
 					frameCount: n
 				});
@@ -1570,8 +1587,8 @@ function xe(e, t = {}) {
 				captureEl: null
 			}, t = (e) => {
 				try {
-					let t = v.getBoundingClientRect(), n = g((Number(e) || 0) - t.left, 0, t.width || 1), r = t.width > 0 ? n / t.width : 0, { maxF: i } = K();
-					return g(Math.round(r * i), 0, i);
+					let t = y.getBoundingClientRect(), n = _((Number(e) || 0) - t.left, 0, t.width || 1), r = t.width > 0 ? n / t.width : 0, { maxF: i } = K();
+					return _(Math.round(r * i), 0, i);
 				} catch {
 					return 0;
 				}
@@ -1594,7 +1611,7 @@ function xe(e, t = {}) {
 					console.debug?.(e);
 				}
 				try {
-					v.setPointerCapture?.(n.pointerId);
+					y.setPointerCapture?.(n.pointerId);
 				} catch (e) {
 					console.debug?.(e);
 				}
@@ -1627,7 +1644,7 @@ function xe(e, t = {}) {
 				if (e.active) {
 					V(t), e.active = !1;
 					try {
-						v.releasePointerCapture?.(e.pointerId);
+						y.releasePointerCapture?.(e.pointerId);
 					} catch (e) {
 						console.debug?.(e);
 					}
@@ -1650,11 +1667,11 @@ function xe(e, t = {}) {
 					e.ac = null;
 				}
 			};
-			H.push(f(oe, "pointerdown", (e) => n(e, "in"), { passive: !1 })), H.push(f(se, "pointerdown", (e) => n(e, "out"), { passive: !1 })), H.push(f(ne, "pointerdown", (e) => n(e, "in"), { passive: !1 })), H.push(f(re, "pointerdown", (e) => n(e, "out"), { passive: !1 })), H.push(f(v, "pointermove", r, { passive: !1 })), H.push(f(v, "pointerup", i, { passive: !1 })), H.push(f(v, "pointercancel", i, { passive: !1 }));
+			H.push(p(ae, "pointerdown", (e) => n(e, "in"), { passive: !1 })), H.push(p(oe, "pointerdown", (e) => n(e, "out"), { passive: !1 })), H.push(p(te, "pointerdown", (e) => n(e, "in"), { passive: !1 })), H.push(p(ne, "pointerdown", (e) => n(e, "out"), { passive: !1 })), H.push(p(y, "pointermove", r, { passive: !1 })), H.push(p(y, "pointerup", i, { passive: !1 })), H.push(p(y, "pointercancel", i, { passive: !1 }));
 		}
 		return d(() => l.appendChild(u)), {
 			controlsEl: u,
-			setMediaInfo: ht,
+			setMediaInfo: _t,
 			setPlaybackRate: (e) => {
 				try {
 					return qe(e);
@@ -1679,14 +1696,14 @@ function xe(e, t = {}) {
 			},
 			togglePlay: () => {
 				try {
-					return st(), !0;
+					return lt(), !0;
 				} catch {
 					return !1;
 				}
 			},
 			stepFrames: (e) => {
 				try {
-					return at(e), !0;
+					return st(e), !0;
 				} catch {
 					return !1;
 				}
@@ -1733,7 +1750,7 @@ function xe(e, t = {}) {
 	} catch {
 		return {
 			controlsEl: null,
-			destroy: ee
+			destroy: h
 		};
 	}
 }
@@ -1807,7 +1824,25 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 		if (!e) return r;
 		let i = Array.isArray(t) ? t.filter((t) => t && t !== e) : [];
 		if (!i.length) return r;
-		let a = [e, ...i].filter(Boolean), o = !1, s = /* @__PURE__ */ new WeakSet(), c = (e) => {
+		let a = [e, ...i].filter(Boolean), o = !1, s = /* @__PURE__ */ new WeakSet(), c = {
+			source: null,
+			rafId: null,
+			rvfcId: null
+		}, l = () => {
+			try {
+				let e = c.source;
+				c.rvfcId != null && typeof e?.cancelVideoFrameCallback == "function" && e.cancelVideoFrameCallback(c.rvfcId);
+			} catch (e) {
+				console.debug?.(e);
+			}
+			c.rvfcId = null;
+			try {
+				c.rafId != null && typeof cancelAnimationFrame == "function" && cancelAnimationFrame(c.rafId);
+			} catch (e) {
+				console.debug?.(e);
+			}
+			c.rafId = null, c.source = null;
+		}, u = (e) => {
 			try {
 				if (e && e.paused === !1) return;
 				try {
@@ -1820,7 +1855,7 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}, l = (e) => {
+		}, d = (e) => {
 			if (!o) try {
 				let t = Number(e?.currentTime) || 0;
 				for (let r of a) if (!(!r || r === e)) try {
@@ -1831,10 +1866,36 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 			} catch {
 				o = !1;
 			}
-		}, u = () => l(e), d = (t, n = e) => {
+		}, f = () => {
+			let t = c.source || e;
+			if (c.rafId = null, c.rvfcId = null, !(!t || r.signal.aborted || t.paused)) {
+				d(t);
+				try {
+					if (typeof t?.requestVideoFrameCallback == "function") {
+						c.rvfcId = t.requestVideoFrameCallback(f);
+						return;
+					}
+				} catch (e) {
+					console.debug?.(e);
+				}
+				try {
+					typeof requestAnimationFrame == "function" && (c.rafId = requestAnimationFrame(f));
+				} catch (e) {
+					console.debug?.(e);
+				}
+			}
+		}, p = (t = e) => {
+			l(), c.source = t || e, !(!c.source || c.source.paused || r.signal.aborted) && f();
+		};
+		try {
+			r.signal.addEventListener("abort", l, { once: !0 });
+		} catch (e) {
+			console.debug?.(e);
+		}
+		let m = () => d(e), h = (t, n = e) => {
 			if (!o) {
 				for (let e of a) if (!(!e || e === n)) try {
-					if (t) c(e);
+					if (t) u(e);
 					else {
 						try {
 							s.add(e);
@@ -1847,7 +1908,7 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 					console.debug?.(e);
 				}
 			}
-		}, f = (t = e) => {
+		}, g = (t = e) => {
 			if (!o) {
 				for (let e of a) if (!(!e || e === t)) try {
 					e.muted = !!t.muted, e.volume = Number(t.volume) || 0;
@@ -1855,7 +1916,7 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 					console.debug?.(e);
 				}
 			}
-		}, p = (t = e) => {
+		}, _ = (t = e) => {
 			if (!o) {
 				for (let e of a) if (!(!e || e === t)) try {
 					e.playbackRate = Number(t.playbackRate) || 1;
@@ -1881,61 +1942,66 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 			console.debug?.(e);
 		}
 		try {
-			f(), p(), u(), e.paused || d(!0);
+			g(), _(), m(), e.paused || (h(!0), p(e));
 		} catch (e) {
 			console.debug?.(e);
 		}
-		e.addEventListener("play", () => d(!0), {
+		e.addEventListener("play", () => h(!0), {
 			signal: r.signal,
 			passive: !0
-		}), e.addEventListener("pause", () => d(!1), {
+		}), e.addEventListener("play", () => p(e), {
 			signal: r.signal,
 			passive: !0
-		}), e.addEventListener("timeupdate", u, {
+		}), e.addEventListener("pause", () => {
+			l(), h(!1);
+		}, {
 			signal: r.signal,
 			passive: !0
-		}), e.addEventListener("seeking", u, {
+		}), e.addEventListener("timeupdate", m, {
 			signal: r.signal,
 			passive: !0
-		}), e.addEventListener("seeked", u, {
+		}), e.addEventListener("seeking", m, {
 			signal: r.signal,
 			passive: !0
-		}), e.addEventListener("ended", u, {
+		}), e.addEventListener("seeked", m, {
 			signal: r.signal,
 			passive: !0
-		}), e.addEventListener("volumechange", f, {
+		}), e.addEventListener("ended", m, {
 			signal: r.signal,
 			passive: !0
-		}), e.addEventListener("ratechange", p, {
+		}), e.addEventListener("volumechange", g, {
+			signal: r.signal,
+			passive: !0
+		}), e.addEventListener("ratechange", _, {
 			signal: r.signal,
 			passive: !0
 		});
-		for (let e of i) try {
-			e.addEventListener("play", () => {
-				if (s.has(e)) {
-					s.delete(e);
+		for (let t of i) try {
+			t.addEventListener("play", () => {
+				if (s.has(t)) {
+					s.delete(t), p(e);
 					return;
 				}
-				l(e), p(e), d(!0, e);
+				d(t), _(t), h(!0, t), p(t);
 			}, {
 				signal: r.signal,
 				passive: !0
-			}), e.addEventListener("pause", () => {
-				if (s.has(e)) {
-					s.delete(e);
+			}), t.addEventListener("pause", () => {
+				if (s.has(t)) {
+					s.delete(t);
 					return;
 				}
-				e?.ended || d(!1, e);
+				t?.ended || (l(), h(!1, t));
 			}, {
 				signal: r.signal,
 				passive: !0
-			}), e.addEventListener("seeking", () => l(e), {
+			}), t.addEventListener("seeking", () => d(t), {
 				signal: r.signal,
 				passive: !0
-			}), e.addEventListener("seeked", () => l(e), {
+			}), t.addEventListener("seeked", () => d(t), {
 				signal: r.signal,
 				passive: !0
-			}), e.addEventListener("ratechange", () => p(e), {
+			}), t.addEventListener("ratechange", () => _(t), {
 				signal: r.signal,
 				passive: !0
 			});
@@ -1954,7 +2020,7 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 							o = !1;
 						}
 						try {
-							e.paused || c(t);
+							e.paused || u(t);
 						} catch (e) {
 							console.debug?.(e);
 						}
@@ -1971,7 +2037,7 @@ function Oe(e, t, { threshold: n = .15 } = {}) {
 		}
 		try {
 			for (let e of i) try {
-				e.addEventListener("loadedmetadata", u, {
+				e.addEventListener("loadedmetadata", m, {
 					signal: r.signal,
 					passive: !0,
 					once: !0
@@ -2488,7 +2554,7 @@ function Be() {
 function U(t = e()) {
 	if (typeof document > "u") return !1;
 	I?.root?.isConnected || (I = ze());
-	let n = p(t), r = () => H(I.body, n, String(I.search.value || "").trim().toLowerCase());
+	let n = f(t), r = () => H(I.body, n, String(I.search.value || "").trim().toLowerCase());
 	return I.search.oninput = r, I.search.value = "", r(), I.root.hidden = !1, setTimeout(() => I?.search?.focus?.(), 0), !0;
 }
 //#endregion
@@ -2502,4 +2568,4 @@ try {
 	console.debug?.(e);
 }
 //#endregion
-export { se as _, ke as a, Te as c, O as d, we as f, ae as g, oe as h, je as i, Ee as l, xe as m, Me as n, Ae as o, Ce as p, k as r, Oe as s, Ve as t, Se as u, w as v, C as y };
+export { oe as _, ke as a, Te as c, O as d, we as f, ie as g, ae as h, je as i, Ee as l, xe as m, Me as n, Ae as o, Ce as p, k as r, Oe as s, Ve as t, Se as u, T as v, w as y };

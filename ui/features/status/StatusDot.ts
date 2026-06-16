@@ -13,6 +13,7 @@ import {
     saveDbBackup,
     restoreDbBackup,
     vectorBackfill,
+    unloadVectorModels,
 } from "../../api/client.js";
 import { ENDPOINTS } from "../../api/endpoints.js";
 import { APP_CONFIG } from "../../app/config.js";
@@ -679,7 +680,7 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
 
     const actionsRow = document.createElement("div");
     actionsRow.style.cssText =
-        "margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px;";
+        "margin-top: 10px; display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;";
 
     const actionLog = document.createElement("div");
     actionLog.style.cssText =
@@ -712,6 +713,8 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
         actionLog.style.color = "inherit";
         actionLog.style.opacity = "0.9";
     };
+
+    let memoryPurgeBtn: HTMLButtonElement;
 
     const resetBtn = document.createElement("button");
     resetBtn.type = "button";
@@ -759,6 +762,7 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
 
         const originalText = resetBtn.textContent;
         resetBtn.disabled = true;
+        memoryPurgeBtn.disabled = true;
         resetBtn.textContent = t("btn.resetting");
 
         // Status indicator feedback
@@ -799,6 +803,7 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
         } finally {
             setMaintenanceActive(false);
             resetBtn.disabled = false;
+            memoryPurgeBtn.disabled = false;
             resetBtn.textContent = originalText;
             emitGlobalGridReload("index-reset");
             try {
@@ -875,6 +880,7 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
         const originalResetText = resetBtn.textContent;
         backfillBtn.disabled = true;
         resetBtn.disabled = true;
+        memoryPurgeBtn.disabled = true;
         backfillBtn.textContent = "Backfilling...";
         setActionLog(`Backfill started (${backfillScopeLabel})...`, "info");
         recordToastHistory(
@@ -1111,6 +1117,7 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
             setMaintenanceActive(false);
             backfillBtn.disabled = false;
             resetBtn.disabled = false;
+            memoryPurgeBtn.disabled = false;
             backfillBtn.textContent = originalBackfillText;
             resetBtn.textContent = originalResetText;
             emitGlobalGridReload("vector-backfill");
@@ -1125,7 +1132,89 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
         }
     };
 
+    memoryPurgeBtn = document.createElement("button");
+    memoryPurgeBtn.type = "button";
+    memoryPurgeBtn.textContent = t("btn.memoryPurge", "Memory purge");
+    memoryPurgeBtn.title = t(
+        "tooltip.memoryPurge",
+        "Unload Majoor AI models, ask ComfyUI to unload loaded models, and clear torch cache when idle.",
+    );
+    memoryPurgeBtn.style.cssText = `
+        padding: 5px 12px;
+        font-size: 11px;
+        border-radius: 6px;
+        border: 1px solid rgba(156, 204, 101, 0.45);
+        background: transparent;
+        color: inherit;
+        cursor: pointer;
+        transition: border 0.2s, background 0.2s;
+    `;
+    memoryPurgeBtn.onmouseenter = () => {
+        memoryPurgeBtn.style.borderColor = "rgba(156, 204, 101, 0.85)";
+        memoryPurgeBtn.style.background = "rgba(156, 204, 101, 0.12)";
+    };
+    memoryPurgeBtn.onmouseleave = () => {
+        memoryPurgeBtn.style.borderColor = "rgba(156, 204, 101, 0.45)";
+        memoryPurgeBtn.style.background = "transparent";
+    };
+    memoryPurgeBtn.onclick = async (event) => {
+        event.stopPropagation();
+        const originalText = memoryPurgeBtn.textContent;
+        memoryPurgeBtn.disabled = true;
+        backfillBtn.disabled = true;
+        resetBtn.disabled = true;
+        memoryPurgeBtn.textContent = t("btn.memoryPurging", "Purging...");
+        setActionLog(t("status.memoryPurgeStarted", "Memory purge started..."), "info");
+        statusDot.style.background = "var(--mjr-status-info, #64B5F6)";
+        applyStatusHighlight(section, "info");
+        try {
+            const res = await unloadVectorModels();
+            if (res?.ok) {
+                const comfyPurged = !!res?.data?.comfy_models;
+                const msg = comfyPurged
+                    ? t(
+                          "toast.memoryPurgeComplete",
+                          "Memory purge complete. Majoor AI and ComfyUI model caches were released.",
+                      )
+                    : t(
+                          "toast.memoryPurgeCompleteMajoorOnly",
+                          "Memory purge complete. Majoor AI caches were released.",
+                      );
+                comfyToast(msg, "success", 3200);
+                setActionLog(msg, "success");
+                statusDot.style.background = "var(--mjr-status-success, #4CAF50)";
+                applyStatusHighlight(section, "success");
+            } else {
+                const err = String(res?.error || "Memory purge failed");
+                comfyToast(err, "error", 4500);
+                setActionLog(err, "error");
+                statusDot.style.background = "var(--mjr-status-error, #f44336)";
+                applyStatusHighlight(section, "error");
+            }
+        } catch (error: any) {
+            const err = String(error?.message || error || "Memory purge failed");
+            comfyToast(err, "error", 4500);
+            setActionLog(err, "error");
+            statusDot.style.background = "var(--mjr-status-error, #f44336)";
+            applyStatusHighlight(section, "error");
+        } finally {
+            memoryPurgeBtn.disabled = false;
+            backfillBtn.disabled = false;
+            resetBtn.disabled = false;
+            memoryPurgeBtn.textContent = originalText;
+            try {
+                const target = getScanContext ? getScanContext() : null;
+                await updateStatus(statusDot, statusText, capabilities, target, null, {
+                    force: true,
+                });
+            } catch (e) {
+                console.debug?.(e);
+            }
+        }
+    };
+
     actionsRow.appendChild(backfillBtn);
+    actionsRow.appendChild(memoryPurgeBtn);
     actionsRow.appendChild(resetBtn);
     body.appendChild(actionLog);
 
@@ -1175,6 +1264,7 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
             ? t("btn.resetting", "Resetting...")
             : t("btn.deletingDb");
         resetBtn.disabled = true;
+        memoryPurgeBtn.disabled = true;
 
         statusDot.style.background = "var(--mjr-status-info, #64B5F6)";
         applyStatusHighlight(section, "info");
@@ -1210,6 +1300,7 @@ export function createStatusIndicator(options: Record<string, any> = {}): any {
             deleteDbBtn.disabled = false;
             deleteDbBtn.textContent = originalText;
             resetBtn.disabled = false;
+            memoryPurgeBtn.disabled = false;
             emitGlobalGridReload(
                 preserveVectors ? "index-reset-preserve-vectors" : "db-force-delete",
             );

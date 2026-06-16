@@ -11,6 +11,7 @@ import { consumeEarlyFetch, peekEarlyFetchKey } from "../../features/runtime/ear
 import { mjrDbg } from "../../utils/logging.js";
 import {
     appendAssets as cardAppendAssets,
+    rebuildAssetRendererState,
 } from "../../features/grid/AssetCardRenderer.js";
 import { getStackAwareAssetKey, ensureDupStackCard, disposeStackGroupCards } from "../../features/grid/StackGroupCards.js";
 import {
@@ -167,14 +168,19 @@ function getAdaptivePageLimit(baseLimit: any, emptyAppendBatches: any) {
     return Math.max(1, Math.min(APP_CONFIG.MAX_PAGE_SIZE, safeBaseLimit * multiplier));
 }
 
-function resetAssetCollectionsState(state: any) {
-    state.seenKeys = new Set();
-    state.assetIdSet = new Set();
-    state.filenameCounts = new Map();
-    state.nonImageSiblingKeys = new Set();
-    state.stemMap = new Map();
-    state.renderedFilenameMap = new Map();
-    state.hiddenPngSiblings = 0;
+function resetAssetCollectionsState(state: any, options: Record<string, any> = {}) {
+    const assets = Array.isArray(state.assets) ? state.assets : [];
+    if (options.rebuildFromVisible && assets.length) {
+        rebuildAssetRendererState(state, assets, {
+            assetKey: options.assetKey || state.assetKeyFn,
+            preserveHiddenCount: !!options.preserveHiddenCount,
+        });
+        return;
+    }
+    rebuildAssetRendererState(state, [], {
+        assetKey: options.assetKey || state.assetKeyFn,
+        preserveHiddenCount: false,
+    });
 }
 
 export function useGridLoader({
@@ -1199,7 +1205,11 @@ export function useGridLoader({
             if (deferVisualResetUntilNextPage) {
                 state.query = safeQuery;
                 setLegacyPageState({ offset: 0, cursor: null, total: null, done: false });
-                resetAssetCollectionsState(state);
+                resetAssetCollectionsState(state, {
+                    rebuildFromVisible: true,
+                    preserveHiddenCount: true,
+                    assetKey: (asset: any) => assetKey(asset, gridContainer),
+                });
             } else {
                 resetAssets({ query: safeQuery, total: null, done: false });
                 setLegacyPageState({ offset: 0, cursor: null, total: null, done: false });

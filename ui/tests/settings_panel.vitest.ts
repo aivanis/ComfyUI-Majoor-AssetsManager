@@ -230,6 +230,52 @@ describe("SettingsPanel", () => {
                     type: "number",
                     defaultValue: 30,
                 });
+                addSetting({
+                    id: "Majoor.Paths.OutputDirectory",
+                    name: "Majoor: Generation Output Directory",
+                    category: ["Majoor Assets Manager", "Advanced", "Paths / Output"],
+                    type: "text",
+                    defaultValue: "",
+                });
+                addSetting({
+                    id: "Majoor.ProbeBackend.Mode",
+                    name: "Majoor: Probe backend",
+                    category: ["Majoor Assets Manager", "Advanced", "Probe backend"],
+                    type: "combo",
+                    defaultValue: "auto",
+                });
+                addSetting({
+                    id: "Majoor.MetadataFallback.Image",
+                    name: "Majoor: Metadata Fallback (Images)",
+                    category: ["Majoor Assets Manager", "Advanced", "Metadata"],
+                    type: "boolean",
+                    defaultValue: true,
+                });
+                addSetting({
+                    id: "Majoor.Observability.Enabled",
+                    name: "Majoor: Runtime status dashboard",
+                    category: ["Majoor Assets Manager", "Advanced", "Observability"],
+                    type: "boolean",
+                    defaultValue: false,
+                });
+                addSetting({
+                    id: "Majoor.AI.HuggingFaceToken",
+                    name: "Majoor: HuggingFace Token",
+                    category: ["Majoor Assets Manager", "Advanced", "HuggingFace Token"],
+                    type: "text",
+                    defaultValue: "",
+                });
+            },
+        }));
+        vi.doMock("../app/settings/settingsScanning.js", () => ({
+            registerScanningSettings: (addSetting) => {
+                addSetting({
+                    id: "Majoor.RtHydrate.Concurrency",
+                    name: "Majoor: Hydrate Concurrency",
+                    category: ["Majoor Assets Manager", "Scanning", "Hydration"],
+                    type: "number",
+                    defaultValue: 5,
+                });
             },
         }));
         vi.doMock("../app/settings/settingsSearch.js", () => ({
@@ -240,6 +286,27 @@ describe("SettingsPanel", () => {
                     category: ["Majoor Assets Manager", "Search", "AI"],
                     type: "boolean",
                     defaultValue: true,
+                });
+                addSetting({
+                    id: "Majoor.AI.VectorIndexOnScan",
+                    name: "Majoor: Index vectors during scans",
+                    category: ["Majoor Assets Manager", "Search", "AI"],
+                    type: "boolean",
+                    defaultValue: false,
+                });
+                addSetting({
+                    id: "Majoor.AI.VectorConcurrency",
+                    name: "Majoor: Vector indexing concurrency",
+                    category: ["Majoor Assets Manager", "Search", "AI"],
+                    type: "number",
+                    defaultValue: 1,
+                });
+                addSetting({
+                    id: "Majoor.AI.VectorUnloadAfterUse",
+                    name: "Majoor: Unload AI models after use",
+                    category: ["Majoor Assets Manager", "Search", "AI"],
+                    type: "boolean",
+                    defaultValue: false,
                 });
             },
         }));
@@ -270,7 +337,52 @@ describe("SettingsPanel", () => {
             "Advanced",
             "Database",
         ]);
+        expect(categoryById.get("Majoor.Paths.OutputDirectory")).toEqual([
+            "Majoor Assets Manager",
+            "Advanced",
+            "Paths / Output",
+        ]);
+        expect(categoryById.get("Majoor.ProbeBackend.Mode")).toEqual([
+            "Majoor Assets Manager",
+            "Advanced",
+            "Probe backend",
+        ]);
+        expect(categoryById.get("Majoor.MetadataFallback.Image")).toEqual([
+            "Majoor Assets Manager",
+            "Advanced",
+            "Metadata",
+        ]);
+        expect(categoryById.get("Majoor.Observability.Enabled")).toEqual([
+            "Majoor Assets Manager",
+            "Advanced",
+            "Observability",
+        ]);
+        expect(categoryById.get("Majoor.AI.HuggingFaceToken")).toEqual([
+            "Majoor Assets Manager",
+            "Search & AI",
+            "HuggingFace Token",
+        ]);
+        expect(categoryById.get("Majoor.RtHydrate.Concurrency")).toEqual([
+            "Majoor Assets Manager",
+            "Indexing & Watcher",
+            "Hydration",
+        ]);
         expect(categoryById.get("Majoor.AI.VectorSearchEnabled")).toEqual([
+            "Majoor Assets Manager",
+            "Search & AI",
+            "AI",
+        ]);
+        expect(categoryById.get("Majoor.AI.VectorIndexOnScan")).toEqual([
+            "Majoor Assets Manager",
+            "Search & AI",
+            "AI",
+        ]);
+        expect(categoryById.get("Majoor.AI.VectorConcurrency")).toEqual([
+            "Majoor Assets Manager",
+            "Search & AI",
+            "AI",
+        ]);
+        expect(categoryById.get("Majoor.AI.VectorUnloadAfterUse")).toEqual([
             "Majoor Assets Manager",
             "Search & AI",
             "AI",

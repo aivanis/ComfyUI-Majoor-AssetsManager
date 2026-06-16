@@ -40,9 +40,20 @@ export async function setVectorSearchSettings(settings: any = true) {
         if ("enabled" in settings) payload.enabled = !!settings.enabled;
         if ("caption_on_index" in settings) payload.caption_on_index = !!settings.caption_on_index;
         if ("captionOnIndex" in settings) payload.caption_on_index = !!settings.captionOnIndex;
+        if ("index_on_scan" in settings) payload.index_on_scan = !!settings.index_on_scan;
+        if ("indexOnScan" in settings) payload.index_on_scan = !!settings.indexOnScan;
+        if ("unload_after_use" in settings) payload.unload_after_use = !!settings.unload_after_use;
+        if ("unloadAfterUse" in settings) payload.unload_after_use = !!settings.unloadAfterUse;
+        if ("concurrency" in settings) payload.concurrency = Number(settings.concurrency) || 1;
+        if ("vectorConcurrency" in settings)
+            payload.concurrency = Number(settings.vectorConcurrency) || 1;
         return post(ENDPOINTS.SETTINGS_VECTOR_SEARCH, payload);
     }
     return post(ENDPOINTS.SETTINGS_VECTOR_SEARCH, { enabled: !!settings });
+}
+
+export async function unloadVectorModels() {
+    return post(ENDPOINTS.SETTINGS_VECTOR_SEARCH_UNLOAD, {});
 }
 
 export async function getExecutionGroupingSettings() {

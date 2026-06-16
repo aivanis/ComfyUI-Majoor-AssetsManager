@@ -51,6 +51,21 @@ vi.mock("../utils/ids.js", () => ({
 
 vi.mock("../features/grid/AssetCardRenderer.js", () => ({
     appendAssets: appendAssetsMock,
+    rebuildAssetRendererState: vi.fn((state, assets = [], { assetKey = null, preserveHiddenCount = false } = {}) => {
+        const previousHiddenCount = Number(state?.hiddenPngSiblings || 0) || 0;
+        state.seenKeys = new Set();
+        state.assetIdSet = new Set();
+        state.filenameCounts = new Map();
+        state.nonImageSiblingKeys = new Set();
+        state.stemMap = new Map();
+        state.renderedFilenameMap = new Map();
+        state.hiddenPngSiblings = preserveHiddenCount ? previousHiddenCount : 0;
+        for (const asset of Array.isArray(assets) ? assets : []) {
+            if (asset?.id != null) state.assetIdSet.add(String(asset.id));
+            const key = typeof assetKey === "function" ? assetKey(asset) : "";
+            if (key) state.seenKeys.add(key);
+        }
+    }),
 }));
 
 vi.mock("../features/grid/StackGroupCards.js", () => ({

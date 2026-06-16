@@ -24,6 +24,35 @@ export function installFollowerVideoSync(leader: any, followers: any[], { thresh
 
         let syncing = false;
         const expectedPlaybackEvents = new WeakSet();
+        const playbackSync: Record<string, any> = {
+            source: null,
+            rafId: null,
+            rvfcId: null,
+        };
+
+        const cancelPlaybackSync = () => {
+            try {
+                const source = playbackSync.source;
+                if (
+                    playbackSync.rvfcId != null &&
+                    typeof source?.cancelVideoFrameCallback === "function"
+                ) {
+                    source.cancelVideoFrameCallback(playbackSync.rvfcId);
+                }
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+            playbackSync.rvfcId = null;
+            try {
+                if (playbackSync.rafId != null && typeof cancelAnimationFrame === "function") {
+                    cancelAnimationFrame(playbackSync.rafId);
+                }
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+            playbackSync.rafId = null;
+            playbackSync.source = null;
+        };
 
         const tryPlay = (v: any) => {
             try {
@@ -60,6 +89,42 @@ export function installFollowerVideoSync(leader: any, followers: any[], { thresh
                 syncing = false;
             }
         };
+
+        const tickPlaybackSync = () => {
+            const source = playbackSync.source || leader;
+            playbackSync.rafId = null;
+            playbackSync.rvfcId = null;
+            if (!source || ac.signal.aborted || source.paused) return;
+            syncTimeFrom(source);
+            try {
+                if (typeof source?.requestVideoFrameCallback === "function") {
+                    playbackSync.rvfcId = source.requestVideoFrameCallback(tickPlaybackSync);
+                    return;
+                }
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+            try {
+                if (typeof requestAnimationFrame === "function") {
+                    playbackSync.rafId = requestAnimationFrame(tickPlaybackSync);
+                }
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+        };
+
+        const startPlaybackSync = (source = leader) => {
+            cancelPlaybackSync();
+            playbackSync.source = source || leader;
+            if (!playbackSync.source || playbackSync.source.paused || ac.signal.aborted) return;
+            tickPlaybackSync();
+        };
+
+        try {
+            ac.signal.addEventListener("abort", cancelPlaybackSync, { once: true });
+        } catch (e: any) {
+            console.debug?.(e);
+        }
 
         const syncTimeToLeader = () => syncTimeFrom(leader);
 
@@ -131,7 +196,10 @@ export function installFollowerVideoSync(leader: any, followers: any[], { thresh
             syncVolume();
             syncRate();
             syncTimeToLeader();
-            if (!leader.paused) syncPlayState(true);
+            if (!leader.paused) {
+                syncPlayState(true);
+                startPlaybackSync(leader);
+            }
         } catch (e: any) {
             console.debug?.(e);
         }
@@ -140,7 +208,14 @@ export function installFollowerVideoSync(leader: any, followers: any[], { thresh
             signal: ac.signal,
             passive: true,
         });
-        leader.addEventListener("pause", () => syncPlayState(false), {
+        leader.addEventListener("play", () => startPlaybackSync(leader), {
+            signal: ac.signal,
+            passive: true,
+        });
+        leader.addEventListener("pause", () => {
+            cancelPlaybackSync();
+            syncPlayState(false);
+        }, {
             signal: ac.signal,
             passive: true,
         });
@@ -159,11 +234,13 @@ export function installFollowerVideoSync(leader: any, followers: any[], { thresh
                 media.addEventListener("play", () => {
                     if (expectedPlaybackEvents.has(media)) {
                         expectedPlaybackEvents.delete(media);
+                        startPlaybackSync(leader);
                         return;
                     }
                     syncTimeFrom(media);
                     syncRate(media);
                     syncPlayState(true, media);
+                    startPlaybackSync(media);
                 }, {
                     signal: ac.signal,
                     passive: true,
@@ -176,6 +253,7 @@ export function installFollowerVideoSync(leader: any, followers: any[], { thresh
                             return;
                         }
                         if (media?.ended) return;
+                        cancelPlaybackSync();
                         syncPlayState(false, media);
                     },
                     {

@@ -427,6 +427,8 @@ The README focuses on the user workflow. Detailed reference material lives in th
 
 Optional AI features add semantic search, visual similarity, auto-tags, captions, prompt alignment, and smart collection suggestions. They require additional model dependencies and a vector backfill step for best coverage.
 
+Low-VRAM systems can disable semantic search, disable vector indexing during scans, keep vector concurrency at `1`, and enable **Unload AI models after use** in Settings -> Search -> AI. The **Memory purge** action in Index Status releases Majoor's SigLIP/X-CLIP/Florence caches and asks ComfyUI to unload loaded models when the queue is idle.
+
 Read: [`docs/AI_FEATURES.md`](docs/AI_FEATURES.md)
 
 ### Privacy And Offline Use

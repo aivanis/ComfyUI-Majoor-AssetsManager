@@ -122,6 +122,7 @@ export const APP_DEFAULTS = Object.freeze({
     // UI safety knobs
     DELETE_CONFIRMATION: true,
     DEBUG_VERBOSE_ERRORS: false,
+    SIDEBAR_ASSET_BADGE_ENABLED: true,
 });
 
 // Widen literal types to their base types and strip readonly to allow runtime mutation.

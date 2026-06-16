@@ -723,11 +723,7 @@ const estimateRowHeight = computed(() => {
     settingsVersion.value;
     const showDetails = !!APP_CONFIG.GRID_SHOW_DETAILS;
     const thumbHeight = itemWidth.value;
-    // Actual card-info height: padding 12px + filename-line ~15px + margin 4px
-    // + meta-row ~13px = ~44px. Use 52px to account for font-rendering variance
-    // and to match the CSS .mjr-show-details toggle that hides .mjr-card-info
-    // when the setting is off (fixes virtualizer row-height mismatch / blink).
-    const metaHeight = showDetails ? 52 : 0;
+    const metaHeight = showDetails ? 82 : 0;
     if (workflowGroupingMode.value !== "none") {
         return Math.max(48, thumbHeight + metaHeight + gapPx.value);
     }

@@ -148,6 +148,26 @@ const hasSimilarScope = computed(() =>
     (Array.isArray(panelStore.similarResults) && panelStore.similarResults.length > 0) ||
     Boolean(panelStore.similarTitle),
 );
+const similarScopeKind = computed(() => {
+    const source = String(panelStore.similarSourceAssetId || "");
+    if (
+        source.startsWith("stack:") ||
+        source.startsWith("duplicates:") ||
+        source.startsWith("group:") ||
+        source.startsWith("node:")
+    ) {
+        return "group";
+    }
+    return "similar";
+});
+const similarTabLabel = computed(() =>
+    similarScopeKind.value === "group" ? t("tab.group", "Group") : t("tab.similar", "Similar"),
+);
+const similarTabTitle = computed(() =>
+    similarScopeKind.value === "group"
+        ? t("tooltip.tab.group", "Browse current grouped assets")
+        : t("tooltip.tab.similar", "Browse current similar findings"),
+);
 
 // FilterPopover is now a Vue component — filterPopoverRef exposes input DOM refs
 // for filtersController.bindFilters() backward compatibility (Phase 2.5)
@@ -648,8 +668,8 @@ defineExpose({
                         data-scope="similar"
                         :class="{ 'is-active': activeScope === 'similar' }"
                         :style="{ display: hasSimilarScope ? '' : 'none' }"
-                        :title="t('tooltip.tab.similar', 'Browse current similar findings')"
-                    >{{ t("tab.similar", "Similar") }}</MButton>
+                        :title="similarTabTitle"
+                    >{{ similarTabLabel }}</MButton>
                 </div>
 
                 <div class="mjr-am-header-tools">

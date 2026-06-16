@@ -9,7 +9,7 @@
  *
  * Phase 4.2 - full inner card replacement.
  */
-import { computed, inject, ref, watch, watchEffect, onMounted, onUnmounted } from "vue";
+import { computed, inject, ref, watch, watchEffect, onMounted, onBeforeUnmount, onUnmounted } from "vue";
 import { buildAssetViewURL } from "../../../api/endpoints.js";
 import {
     genTimeColor,
@@ -283,7 +283,7 @@ const hasGraphMapWorkflowThumbnail = computed(() =>
 const explicitPreviewUrl = computed(() =>
     String(props.asset.preview_url || props.asset.previewUrl || props.asset.url || "").trim(),
 );
-const imageUrl = computed(() => explicitThumbnailUrl.value || explicitPreviewUrl.value || viewUrl.value);
+const imageUrl = computed(() => viewUrl.value);
 const videoUrl = computed(() => explicitPreviewUrl.value || viewUrl.value);
 const posterUrl = computed(() =>
     explicitThumbnailUrl.value,
@@ -450,6 +450,7 @@ const stackCount = computed(() =>
 
 const hasDupStack = computed(() => !!props.asset._mjrDupStack && Number(props.asset._mjrDupCount || 0) >= 2);
 const dupCount = computed(() => Number(props.asset._mjrDupCount || 0) || 0);
+const showDupStackButton = computed(() => hasDupStack.value && !hasStackGroup.value);
 const stackOpening = ref(false);
 const dupOpening = ref(false);
 
@@ -492,6 +493,8 @@ const model3dImgError = ref(false);
 const cachedImageSrc = ref("");
 let imageLoadRequestId = 0;
 let imageCachedSourceKey = "";
+let imageErrorSourceKey = "";
+let model3dErrorSourceKey = "";
 
 function releaseCachedImageSrc() {
     try {
@@ -505,7 +508,29 @@ function releaseCachedImageSrc() {
 // --- Image thumb lifecycle (blob cache) ---------------------------------------
 
 watch(
-    () => [imgRef.value, imageUrl.value],
+    () => (isWorkflow.value ? explicitThumbnailUrl.value : isImage.value ? imageUrl.value : ""),
+    (source) => {
+        const key = String(source || "").trim();
+        if (!key || key === imageErrorSourceKey) return;
+        imgError.value = false;
+        imageErrorSourceKey = "";
+    },
+    { immediate: true },
+);
+
+watch(
+    () => (isModel3D.value ? posterUrl.value : ""),
+    (source) => {
+        const key = String(source || "").trim();
+        if (!key || key === model3dErrorSourceKey) return;
+        model3dImgError.value = false;
+        model3dErrorSourceKey = "";
+    },
+    { immediate: true },
+);
+
+watch(
+    () => [isImage.value ? imgRef.value : null, isImage.value ? imageUrl.value : ""],
     async ([img, url], _oldValue, onCleanup) => {
         if (!img || !url || imgError.value) return;
         const requestId = (imageLoadRequestId += 1);
@@ -515,9 +540,10 @@ watch(
             cancelled = true;
             controller.abort();
         });
-        releaseCachedImageSrc();
-        cachedImageSrc.value = "";
         try {
+            const currentSourceKey = imageCachedSourceKey || String(img.dataset?.mjrSourceKey || "");
+            if (cachedImageSrc.value && currentSourceKey === url) return;
+            img.dataset.mjrSourceKey = url;
             await waitForImageBlobLoadWindow();
             if (cancelled || requestId !== imageLoadRequestId || !img.isConnected) return;
             const cached = await loadImageBlob(url, { signal: controller.signal });
@@ -526,8 +552,15 @@ watch(
                 return;
             }
             if (cached && cached !== cachedImageSrc.value) {
+                const previousSourceKey = imageCachedSourceKey;
                 cachedImageSrc.value = cached;
                 imageCachedSourceKey = cached !== url ? url : "";
+                if (previousSourceKey && previousSourceKey !== imageCachedSourceKey) {
+                    MediaBlobCache.releaseUrl(previousSourceKey);
+                }
+            } else if (!cached && imageCachedSourceKey && imageCachedSourceKey !== url) {
+                releaseCachedImageSrc();
+                cachedImageSrc.value = "";
             }
         } catch {}
     },
@@ -567,7 +600,7 @@ watch(videoMode, (mode) => {
     }
 });
 
-onUnmounted(() => {
+onBeforeUnmount(() => {
     window.removeEventListener("mjr-settings-changed", onSettingsChangedForVideo);
     imageLoadRequestId += 1;
     releaseCachedImageSrc();
@@ -575,6 +608,10 @@ onUnmounted(() => {
     if (v) {
         try { unobserveVideoThumb(v); } catch {}
     }
+});
+
+onUnmounted(() => {
+    window.removeEventListener("mjr-settings-changed", onSettingsChangedForVideo);
 });
 
 // --- Workflow dot (imperative - createWorkflowDot has complex enrichment logic) --
@@ -609,7 +646,16 @@ watchEffect(() => {
 
 function onImgError(event) {
     imgError.value = true;
-    try { MediaBlobCache.markError(imageUrl.value); } catch {}
+    try {
+        const failedUrl = isWorkflow.value ? explicitThumbnailUrl.value : imageUrl.value;
+        imageErrorSourceKey = String(failedUrl || "").trim();
+        MediaBlobCache.markError(failedUrl);
+    } catch {}
+}
+
+function onModel3dImgError() {
+    model3dImgError.value = true;
+    model3dErrorSourceKey = String(posterUrl.value || "").trim();
 }
 
 function onFileBadgeClick(event) {
@@ -671,7 +717,6 @@ function emitWorkflowAction(action, event) {
             </div>
             <img
                 v-if="explicitThumbnailUrl && !imgError"
-                ref="imgRef"
                 :class="[
                     'mjr-thumb-media',
                     {
@@ -681,7 +726,7 @@ function emitWorkflowAction(action, event) {
                 :alt="filename"
                 decoding="async"
                 loading="lazy"
-                :src="cachedImageSrc || explicitThumbnailUrl"
+                :src="explicitThumbnailUrl"
                 @error="onImgError"
             />
             <div
@@ -774,7 +819,7 @@ function emitWorkflowAction(action, event) {
                 :src="posterUrl"
                 :draggable="false"
                 :alt="filename"
-                @error="model3dImgError = true"
+                @error="onModel3dImgError"
             />
             <div
                 v-else
@@ -909,7 +954,7 @@ function emitWorkflowAction(action, event) {
 
     <!-- -- DUPLICATE STACK BUTTON (same-filename copies) -------------------- -->
     <MButton
-        v-if="hasDupStack"
+        v-if="showDupStackButton"
         type="button"
         class="mjr-dup-stack-button"
         severity="secondary"
