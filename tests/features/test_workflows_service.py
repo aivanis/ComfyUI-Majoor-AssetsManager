@@ -129,6 +129,59 @@ def test_save_duplicate_move_delete_workflow(monkeypatch, tmp_path):
     assert not moved_path.exists()
 
 
+def test_save_workflow_persists_user_info_and_notes(monkeypatch, tmp_path):
+    workflow_dir = tmp_path / "workflows"
+    monkeypatch.setenv("MJR_AM_WORKFLOW_DIRECTORY", str(workflow_dir))
+
+    saved = save_workflow(
+        workflow={"name": "Info Demo", "nodes": [{"id": 1, "type": "LoadImage"}]},
+        name="info-demo",
+        info={
+            "task": "Image Edit",
+            "model_family": "Flux",
+            "provider": "local",
+            "runs_on": "local",
+            "notes": "Use the high detail branch before export.",
+        },
+    )
+
+    assert saved.ok
+    workflow = saved.data["workflow"]
+    assert workflow["task"] == "Image Edit"
+    assert workflow["model_family"] == "Flux"
+    assert workflow["provider"] == "local"
+    assert workflow["runs_on"] == "local"
+    assert workflow["notes"] == "Use the high detail branch before export."
+    assert workflow["user_task"] == "Image Edit"
+
+
+def test_save_workflow_uses_detected_info_when_user_info_is_empty(monkeypatch, tmp_path):
+    workflow_dir = tmp_path / "workflows"
+    monkeypatch.setenv("MJR_AM_WORKFLOW_DIRECTORY", str(workflow_dir))
+
+    saved = save_workflow(
+        workflow={
+            "name": "Detected Demo",
+            "task": "T2V",
+            "model_family": "Wan",
+            "provider": "Replicate",
+            "runs_on": "api",
+            "nodes": [{"id": 1, "type": "KSampler"}],
+        },
+        name="detected-demo",
+        info={"task": "", "model_family": "", "provider": "", "runs_on": "", "notes": ""},
+    )
+
+    assert saved.ok
+    workflow = saved.data["workflow"]
+    assert workflow["task"] == "T2V"
+    assert workflow["model_family"] == "Wan"
+    assert workflow["provider"] == "Replicate"
+    assert workflow["runs_on"] == "api"
+    assert workflow["user_task"] == "T2V"
+    assert workflow["user_model_family"] == "Wan"
+
+
 def test_move_workflow_same_target_is_noop(monkeypatch, tmp_path):
     workflow_dir = tmp_path / "workflows"
     monkeypatch.setenv("MJR_AM_WORKFLOW_DIRECTORY", str(workflow_dir))

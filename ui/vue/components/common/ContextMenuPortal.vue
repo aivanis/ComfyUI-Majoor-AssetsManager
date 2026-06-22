@@ -16,6 +16,7 @@ import AddToCollectionMenu from "./AddToCollectionMenu.vue";
 import GridContextMenu from "../grid/GridContextMenu.vue";
 import WorkflowInfoDialog from "../workflows/WorkflowInfoDialog.vue";
 import WorkflowPickerDialog from "../workflows/WorkflowPickerDialog.vue";
+import WorkflowSaveInfoDialog from "../workflows/WorkflowSaveInfoDialog.vue";
 
 const portalId = ref("");
 
@@ -37,5 +38,6 @@ onUnmounted(() => {
         <AddToCollectionMenu />
         <WorkflowPickerDialog />
         <WorkflowInfoDialog />
+        <WorkflowSaveInfoDialog />
     </template>
 </template>

@@ -256,6 +256,10 @@ onUnmounted(() => {
                     :class="{
                         'is-disabled': item.disabled,
                         'has-submenu': Array.isArray(item.submenu) && item.submenu.length,
+                        'is-tone-graph-map': item.tone === 'graph-map',
+                        'is-tone-rename': item.tone === 'rename',
+                        'is-tone-delete': item.tone === 'delete',
+                        'is-tone-floating-viewer': item.tone === 'floating-viewer',
                     }"
                     role="menuitem"
                     :aria-disabled="item.disabled ? 'true' : 'false'"
@@ -304,7 +308,13 @@ onUnmounted(() => {
                     class="mjr-context-menu-item"
                     severity="secondary"
                     text
-                    :class="{ 'is-disabled': item.disabled }"
+                    :class="{
+                        'is-disabled': item.disabled,
+                        'is-tone-graph-map': item.tone === 'graph-map',
+                        'is-tone-rename': item.tone === 'rename',
+                        'is-tone-delete': item.tone === 'delete',
+                        'is-tone-floating-viewer': item.tone === 'floating-viewer',
+                    }"
                     role="menuitem"
                     :aria-disabled="item.disabled ? 'true' : 'false'"
                     :tabindex="item.disabled ? -1 : 0"

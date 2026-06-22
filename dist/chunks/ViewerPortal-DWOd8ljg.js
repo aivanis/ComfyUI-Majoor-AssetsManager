@@ -1,19 +1,19 @@
-import { a as e, i as t } from "./viewerRuntimeHosts-CHGQYjAV.js";
-import { r as n } from "./events-iWiZ-Zty.js";
-import { i as r, r as i } from "./floatingViewerManager-C2DFj5aE.js";
-import { B as a, C as o, D as s, E as c, G as l, H as u, I as d, L as f, P as p, R as m, S as h, T as g, U as _, ct as v, et as y, k as b, lt as x, ot as S, st as C, w, x as T } from "./mjr-primevue-DaF1IwbI.js";
-import { t as E } from "./TagsEditor-CkC61D6v.js";
-import { a as D, c as O, i as k, n as A, o as j, r as M, s as N, t as P } from "./Viewer-DK2hHW4D.js";
+import { a as e, i as t } from "./viewerRuntimeHosts-6HaE-P9G.js";
+import { r as n } from "./events-Bz2Vm8U5.js";
+import { i as r, r as i } from "./floatingViewerManager-DcCl0apN.js";
+import { B as a, C as o, D as s, E as c, G as l, H as u, I as d, O as f, R as p, T as m, W as h, ct as g, dt as _, j as v, k as y, lt as b, nt as x, q as S, ut as C, w, z as T } from "./mjr-primevue-n1rsQYJg.js";
+import { t as E } from "./TagsEditor-TgRVv4vY.js";
+import { a as D, c as O, i as k, n as A, o as ee, r as j, s as M, t as N } from "./Viewer-C0dP3-Uv.js";
 //#region ui/vue/components/viewer/FloatingViewerHost.vue
-var F = {
+var P = {
 	__name: "FloatingViewerHost",
 	setup(e) {
-		let n = y(null), r = null;
-		return d(() => {
+		let n = x(null), r = null;
+		return p(() => {
 			r = t(n.value);
-		}), f(() => {
+		}), T(() => {
 			r?.(), r = null;
-		}), (e, t) => (m(), s("div", {
+		}), (e, t) => (a(), y("div", {
 			ref_key: "hostRef",
 			ref: n,
 			class: "mjr-viewer-runtime-host mjr-viewer-runtime-host--floating",
@@ -25,15 +25,15 @@ var F = {
 			}
 		}, null, 512));
 	}
-}, I = {
+}, F = {
 	__name: "ViewerOverlayHost",
 	setup(t) {
-		let n = y(null), r = null;
-		return d(() => {
+		let n = x(null), r = null;
+		return p(() => {
 			r = e(n.value);
-		}), f(() => {
+		}), T(() => {
 			r?.(), r = null;
-		}), (e, t) => (m(), s("div", {
+		}), (e, t) => (a(), y("div", {
 			ref_key: "hostRef",
 			ref: n,
 			class: "mjr-viewer-runtime-host mjr-viewer-runtime-host--main",
@@ -45,26 +45,26 @@ var F = {
 			}
 		}, null, 512));
 	}
-}, L = {
+}, I = {
 	key: 0,
 	class: "mjr-context-menu-separator"
-}, R = { class: "mjr-context-menu-item-left" }, z = { class: "mjr-context-menu-item-right" }, B = {
+}, L = { class: "mjr-context-menu-item-left" }, R = { class: "mjr-context-menu-item-right" }, z = {
 	key: 0,
 	class: "mjr-context-menu-hint"
-}, V = {
+}, B = {
 	key: 1,
 	class: "mjr-context-menu-submenu-arrow"
-}, H = {
+}, V = {
 	key: 0,
 	class: "mjr-context-menu-separator"
-}, U = { class: "mjr-context-menu-item-left" }, W = {
+}, H = { class: "mjr-context-menu-item-left" }, U = {
 	key: 0,
 	class: "mjr-context-menu-hint"
-}, G = {
+}, W = {
 	__name: "ViewerContextMenu",
 	setup(e) {
-		let t = y(null), n = y(null), r = y(null), i = null, D = null, A = o(() => F(O.main, 10041)), N = o(() => F(O.submenu, 10042)), P = o(() => F(O.tags, 10043));
-		function F(e, t) {
+		let t = x(null), n = x(null), r = x(null), i = null, D = null, A = m(() => P(O.main, 10041)), M = m(() => P(O.submenu, 10042)), N = m(() => P(O.tags, 10043));
+		function P(e, t) {
 			return {
 				position: "fixed",
 				left: `${Math.round(Number(e?.x) || 0)}px`,
@@ -73,47 +73,47 @@ var F = {
 				zIndex: String(t)
 			};
 		}
-		function I() {
+		function F() {
 			i &&= (clearTimeout(i), null);
 		}
-		function G() {
-			I(), i = setTimeout(() => {
+		function W() {
+			F(), i = setTimeout(() => {
 				k();
 			}, 180);
 		}
-		function K(e, t) {
+		function G(e, t) {
 			if (!e?.open || !t) return;
 			let n = t.getBoundingClientRect(), r = Number(window.innerWidth || 0), i = Number(window.innerHeight || 0), a = Number(e.x) || 0, o = Number(e.y) || 0;
 			a + n.width > r && (a = Math.max(8, r - n.width - 10)), o + n.height > i && (o = Math.max(8, i - n.height - 10)), a < 8 && (a = 8), o < 8 && (o = 8), e.x = a, e.y = o;
 		}
-		async function q(e, t) {
-			await p(), K(e, t?.value || null);
+		async function K(e, t) {
+			await d(), G(e, t?.value || null);
 		}
-		function J(e) {
+		function q(e) {
 			try {
 				e?.value?.querySelector?.(".mjr-context-menu-item:not([aria-disabled=\"true\"])")?.focus?.();
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}
-		function Y(e, t) {
+		function J(e, t) {
 			if (!Array.isArray(e?.submenu) || !e.submenu.length) {
 				k();
 				return;
 			}
-			I();
+			F();
 			let n = (t?.currentTarget)?.getBoundingClientRect?.();
-			j({
+			ee({
 				x: Math.round((n?.right || O.main.x || 0) + 6),
 				y: Math.round((n?.top || O.main.y || 0) - 4),
 				items: e.submenu,
 				title: e.label || ""
 			});
 		}
-		async function X(e, t, n = "main") {
+		async function Y(e, t, n = "main") {
 			if (!(!e || e.type !== "item" || e.disabled)) {
 				if (Array.isArray(e.submenu) && e.submenu.length) {
-					Y(e, t);
+					J(e, t);
 					return;
 				}
 				try {
@@ -121,38 +121,38 @@ var F = {
 				} catch (e) {
 					console.error("[ViewerContextMenu.vue] Action failed:", e);
 				} finally {
-					e.closeOnSelect === !1 ? n === "submenu" && k() : M();
+					e.closeOnSelect === !1 ? n === "submenu" && k() : j();
 				}
 			}
 		}
-		function Z(e, t) {
+		function X(e, t) {
 			if (Array.isArray(e?.submenu) && e.submenu.length) {
-				Y(e, t);
+				J(e, t);
 				return;
 			}
 			k();
 		}
-		function Q(e) {
-			Array.isArray(e?.submenu) && e.submenu.length && G();
+		function Z(e) {
+			Array.isArray(e?.submenu) && e.submenu.length && W();
 		}
-		function ee() {
-			I();
+		function Q() {
+			F();
 		}
 		function te() {
-			G();
+			W();
 		}
 		function ne(e) {
 			let i = e?.target;
-			t.value?.contains?.(i) || n.value?.contains?.(i) || r.value?.contains?.(i) || M();
+			t.value?.contains?.(i) || n.value?.contains?.(i) || r.value?.contains?.(i) || j();
 		}
 		function re(e) {
-			e?.key === "Escape" && M();
+			e?.key === "Escape" && j();
 		}
 		function $() {
-			M();
+			j();
 		}
 		function ie(e) {
-			String(e?.detail?.source || "") !== "viewer" && M();
+			String(e?.detail?.source || "") !== "viewer" && j();
 		}
 		function ae(e) {
 			let t = O.tags.asset;
@@ -166,13 +166,13 @@ var F = {
 				console.debug?.(e);
 			}
 		}
-		return _(() => O.main.open, async (e) => {
-			e && (await q(O.main, t), J(t));
-		}), _(() => O.submenu.open, async (e) => {
-			e && (await q(O.submenu, n), J(n));
-		}), _(() => O.tags.open, async (e) => {
-			e && await q(O.tags, r);
-		}), d(() => {
+		return l(() => O.main.open, async (e) => {
+			e && (await K(O.main, t), q(t));
+		}), l(() => O.submenu.open, async (e) => {
+			e && (await K(O.submenu, n), q(n));
+		}), l(() => O.tags.open, async (e) => {
+			e && await K(O.tags, r);
+		}), p(() => {
 			D = new AbortController();
 			let e = {
 				capture: !0,
@@ -186,29 +186,29 @@ var F = {
 				passive: !0,
 				signal: D.signal
 			}), window.addEventListener("mjr-close-all-menus", ie, { signal: D.signal });
-		}), f(() => {
-			I();
+		}), T(() => {
+			F();
 			try {
 				D?.abort();
 			} catch (e) {
 				console.debug?.(e);
 			}
-			D = null, M();
+			D = null, j();
 		}), (e, i) => {
-			let o = u("MButton");
-			return m(), g(h, { to: "body" }, [
-				S(O).main.open ? (m(), s("div", {
+			let l = h("MButton");
+			return a(), s(w, { to: "body" }, [
+				g(O).main.open ? (a(), y("div", {
 					key: 0,
 					ref_key: "mainMenuRef",
 					ref: t,
 					class: "mjr-viewer-context-menu mjr-context-menu",
-					style: v(A.value),
+					style: C(A.value),
 					role: "menu",
 					"aria-label": "Viewer context menu"
-				}, [(m(!0), s(T, null, a(S(O).main.items, (e) => (m(), s(T, { key: e.id }, [e.type === "separator" ? (m(), s("div", L)) : (m(), g(o, {
+				}, [(a(!0), y(o, null, u(g(O).main.items, (e) => (a(), y(o, { key: e.id }, [e.type === "separator" ? (a(), y("div", I)) : (a(), s(l, {
 					key: 1,
 					type: "button",
-					class: C(["mjr-context-menu-item", {
+					class: b(["mjr-context-menu-item", {
 						"is-disabled": e.disabled,
 						"has-submenu": Array.isArray(e.submenu) && e.submenu.length
 					}]),
@@ -217,14 +217,14 @@ var F = {
 					role: "menuitem",
 					"aria-disabled": e.disabled ? "true" : "false",
 					tabindex: e.disabled ? -1 : 0,
-					onClick: (t) => X(e, t),
-					onMouseenter: (t) => Z(e, t),
-					onMouseleave: (t) => Q(e)
+					onClick: (t) => Y(e, t),
+					onMouseenter: (t) => X(e, t),
+					onMouseleave: (t) => Z(e)
 				}, {
-					default: l(() => [w("span", R, [e.iconClass ? (m(), s("i", {
+					default: S(() => [c("span", L, [e.iconClass ? (a(), y("i", {
 						key: 0,
-						class: C(e.iconClass)
-					}, null, 2)) : c("", !0), w("span", null, x(e.label), 1)]), w("span", z, [e.rightHint ? (m(), s("span", B, x(e.rightHint), 1)) : c("", !0), Array.isArray(e.submenu) && e.submenu.length ? (m(), s("span", V, " > ")) : c("", !0)])]),
+						class: b(e.iconClass)
+					}, null, 2)) : f("", !0), c("span", null, _(e.label), 1)]), c("span", R, [e.rightHint ? (a(), y("span", z, _(e.rightHint), 1)) : f("", !0), Array.isArray(e.submenu) && e.submenu.length ? (a(), y("span", B, " > ")) : f("", !0)])]),
 					_: 2
 				}, 1032, [
 					"class",
@@ -233,97 +233,97 @@ var F = {
 					"onClick",
 					"onMouseenter",
 					"onMouseleave"
-				]))], 64))), 128))], 4)) : c("", !0),
-				S(O).submenu.open ? (m(), s("div", {
+				]))], 64))), 128))], 4)) : f("", !0),
+				g(O).submenu.open ? (a(), y("div", {
 					key: 1,
 					ref_key: "submenuRef",
 					ref: n,
 					class: "mjr-viewer-rating-submenu mjr-context-menu",
-					style: v(N.value),
+					style: C(M.value),
 					role: "menu",
 					"aria-label": "Viewer context submenu",
-					onMouseenter: ee,
+					onMouseenter: Q,
 					onMouseleave: te
-				}, [(m(!0), s(T, null, a(S(O).submenu.items, (e) => (m(), s(T, { key: e.id }, [e.type === "separator" ? (m(), s("div", H)) : (m(), g(o, {
+				}, [(a(!0), y(o, null, u(g(O).submenu.items, (e) => (a(), y(o, { key: e.id }, [e.type === "separator" ? (a(), y("div", V)) : (a(), s(l, {
 					key: 1,
 					type: "button",
-					class: C(["mjr-context-menu-item", { "is-disabled": e.disabled }]),
+					class: b(["mjr-context-menu-item", { "is-disabled": e.disabled }]),
 					severity: "secondary",
 					text: "",
 					role: "menuitem",
 					"aria-disabled": e.disabled ? "true" : "false",
 					tabindex: e.disabled ? -1 : 0,
-					onClick: (t) => X(e, t, "submenu")
+					onClick: (t) => Y(e, t, "submenu")
 				}, {
-					default: l(() => [w("span", U, [e.iconClass ? (m(), s("i", {
+					default: S(() => [c("span", H, [e.iconClass ? (a(), y("i", {
 						key: 0,
-						class: C(e.iconClass)
-					}, null, 2)) : c("", !0), w("span", null, x(e.label), 1)]), e.rightHint ? (m(), s("span", W, x(e.rightHint), 1)) : c("", !0)]),
+						class: b(e.iconClass)
+					}, null, 2)) : f("", !0), c("span", null, _(e.label), 1)]), e.rightHint ? (a(), y("span", U, _(e.rightHint), 1)) : f("", !0)]),
 					_: 2
 				}, 1032, [
 					"class",
 					"aria-disabled",
 					"tabindex",
 					"onClick"
-				]))], 64))), 128))], 36)) : c("", !0),
-				S(O).tags.open && S(O).tags.asset ? (m(), s("div", {
+				]))], 64))), 128))], 36)) : f("", !0),
+				g(O).tags.open && g(O).tags.asset ? (a(), y("div", {
 					key: 2,
 					ref_key: "tagsPopoverRef",
 					ref: r,
 					class: "mjr-viewer-popover",
-					style: v(P.value)
-				}, [b(E, {
-					asset: S(O).tags.asset,
-					"model-value": S(O).tags.asset?.tags || [],
+					style: C(N.value)
+				}, [v(E, {
+					asset: g(O).tags.asset,
+					"model-value": g(O).tags.asset?.tags || [],
 					"onUpdate:modelValue": ae,
 					onTagsChange: oe
-				}, null, 8, ["asset", "model-value"])], 4)) : c("", !0)
+				}, null, 8, ["asset", "model-value"])], 4)) : f("", !0)
 			]);
 		};
 	}
-}, K = {
+}, G = {
 	__name: "ViewerContextMenuPortal",
 	setup(e) {
-		let t = y(""), n = o(() => D(t.value));
-		return d(() => {
+		let t = x(""), n = m(() => D(t.value));
+		return p(() => {
 			t.value = A();
-		}), f(() => {
-			N(t.value), t.value = "";
-		}), (e, t) => n.value ? (m(), g(G, { key: 0 })) : c("", !0);
+		}), T(() => {
+			M(t.value), t.value = "";
+		}), (e, t) => n.value ? (a(), s(W, { key: 0 })) : f("", !0);
 	}
-}, q = {
+}, K = {
 	__name: "ViewerPortal",
 	setup(e) {
 		let t = null;
-		function a(e) {
+		function s(e) {
 			let n = e?.detail || {}, r = Array.isArray(n?.assets) ? n.assets.filter(Boolean) : n?.asset ? [n.asset] : [];
 			if (!r.length) return;
 			let i = Math.max(0, Math.min(Number(n?.index) || 0, r.length - 1)), a = String(n?.mode || "").trim().toLowerCase();
 			try {
-				t ||= P(), t.open?.(r, i), (a === "ab" || a === "sidebyside") && t.setMode?.(a), n.handled = !0;
+				t ||= N(), t.open?.(r, i), (a === "ab" || a === "sidebyside") && t.setMode?.(a), n.handled = !0;
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}
-		return d(() => {
+		return p(() => {
 			try {
 				i();
 			} catch (e) {
 				console.debug?.(e);
 			}
 			try {
-				t = P();
+				t = N();
 			} catch (e) {
 				console.debug?.(e);
 			}
 			try {
-				window.addEventListener(n.OPEN_VIEWER, a);
+				window.addEventListener(n.OPEN_VIEWER, s);
 			} catch (e) {
 				console.debug?.(e);
 			}
-		}), f(() => {
+		}), T(() => {
 			try {
-				window.removeEventListener(n.OPEN_VIEWER, a);
+				window.removeEventListener(n.OPEN_VIEWER, s);
 			} catch (e) {
 				console.debug?.(e);
 			}
@@ -338,12 +338,12 @@ var F = {
 				console.debug?.(e);
 			}
 			t = null;
-		}), (e, t) => (m(), s(T, null, [
-			b(I),
-			b(F),
-			b(K)
+		}), (e, t) => (a(), y(o, null, [
+			v(F),
+			v(P),
+			v(G)
 		], 64));
 	}
 };
 //#endregion
-export { q as default };
+export { K as default };

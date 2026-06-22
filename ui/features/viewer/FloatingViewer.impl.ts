@@ -229,27 +229,41 @@ export class FloatingViewer {
     }
 
     _forwardKeydownToController(event: any) {
+        let forwardedEvent: KeyboardEvent | null = null;
         try {
-            const handler = this._controller?.handleForwardedKeydown;
-            if (typeof handler === "function") {
-                handler(event);
-                return;
+            const KeyboardEventCtor =
+                (typeof window !== "undefined" && (window as any).KeyboardEvent) ||
+                (typeof globalThis !== "undefined" && (globalThis as any).KeyboardEvent);
+            if (typeof KeyboardEventCtor !== "function") {
+                throw new Error("KeyboardEvent unavailable");
             }
+            forwardedEvent = new KeyboardEventCtor("keydown", {
+                key: event?.key,
+                code: event?.code,
+                keyCode: event?.keyCode,
+                ctrlKey: event?.ctrlKey,
+                shiftKey: event?.shiftKey,
+                altKey: event?.altKey,
+                metaKey: event?.metaKey,
+                repeat: Boolean(event?.repeat),
+                bubbles: true,
+                cancelable: true,
+            });
+            const dispatched = window.dispatchEvent(forwardedEvent);
+            if (!dispatched || forwardedEvent.defaultPrevented) {
+                event?.preventDefault?.();
+                event?.stopPropagation?.();
+                event?.stopImmediatePropagation?.();
+            }
+            return;
         } catch (e: any) {
             console.debug?.(e);
         }
         try {
-            window.dispatchEvent(
-                new KeyboardEvent("keydown", {
-                    key: event?.key,
-                    code: event?.code,
-                    keyCode: event?.keyCode,
-                    ctrlKey: event?.ctrlKey,
-                    shiftKey: event?.shiftKey,
-                    altKey: event?.altKey,
-                    metaKey: event?.metaKey,
-                }),
-            );
+            const handler = this._controller?.handleForwardedKeydown;
+            if (typeof handler === "function") {
+                handler(event);
+            }
         } catch (e: any) {
             console.debug?.(e);
         }

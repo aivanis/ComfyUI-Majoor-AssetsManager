@@ -1,12 +1,12 @@
-import { $ as e, $t as t, Bt as n, C as r, Ct as i, Dt as a, E as o, Et as s, F as c, G as l, Gt as u, H as d, Ht as f, It as p, J as m, K as h, Lt as g, Mt as _, Nt as v, Pt as y, Q as b, Qt as x, St as S, Tt as C, Ut as w, Wt as T, X as E, Y as D, Z as ee, _t as te, at as ne, bt as re, et as O, gt as ie, it as ae, j as oe, jt as se, kt as ce, nt as le, q as ue, rt as de, vt as fe, wt as pe, x as me, xt as he, yt as ge } from "./viewerRuntimeHosts-CHGQYjAV.js";
-import { G as _e, M as ve, a as k, c as ye, d as be, dt as xe, f as Se, l as Ce, m as we, o as A, p as j, s as Te, u as Ee, v as De, w as Oe } from "./events-iWiZ-Zty.js";
-import { A as ke, D as Ae, a as je, g as Me, h as Ne, i as Pe, t as Fe } from "./mediaFps-dibNFbk4.js";
-import { t as Ie } from "./floatingViewerManager-C2DFj5aE.js";
-import { $ as Le, B as M, C as N, D as P, E as F, F as Re, G as ze, H as Be, I as Ve, K as He, O as Ue, R as I, T as We, U as Ge, a as Ke, b as qe, c as Je, ct as L, d as Ye, et as R, f as Xe, g as Ze, h as Qe, i as $e, k as et, l as tt, lt as z, m as nt, n as rt, o as it, ot as B, p as at, r as ot, s as st, st as ct, t as lt, u as ut, v as dt, w as V, x as H, y as ft } from "./mjr-primevue-DaF1IwbI.js";
-import { t as pt } from "./mjr-vue-vendor-DoNL_65D.js";
+import { $ as e, $t as t, Bt as n, C as r, Ct as i, Dt as a, E as o, Et as s, F as c, G as l, Gt as u, H as d, Ht as f, It as p, J as m, K as h, Lt as g, Mt as _, Nt as v, Pt as y, Q as b, Qt as x, St as S, Tt as C, Ut as w, Wt as T, X as E, Y as D, Z as ee, _t as te, at as ne, bt as re, et as O, gt as ie, it as ae, j as oe, jt as k, kt as se, nt as ce, q as le, rt as ue, vt as de, wt as fe, x as pe, xt as me, yt as he } from "./viewerRuntimeHosts-6HaE-P9G.js";
+import { G as ge, M as _e, a as A, c as ve, d as ye, dt as be, f as xe, l as Se, m as Ce, o as j, p as M, s as we, u as Te, v as Ee, w as De } from "./events-Bz2Vm8U5.js";
+import { A as Oe, D as ke, a as Ae, g as je, h as Me, i as Ne, t as Pe } from "./mediaFps-CdGbfYY3.js";
+import { t as Fe } from "./floatingViewerManager-DcCl0apN.js";
+import { A as Ie, B as N, C as P, D as Le, E as F, G as Re, H as I, J as ze, L as Be, O as L, R as Ve, S as He, T as R, W as Ue, _ as We, a as Ge, b as Ke, c as qe, ct as z, d as Je, dt as B, f as Ye, g as Xe, h as Ze, i as Qe, j as $e, k as V, l as et, lt as tt, m as nt, n as rt, nt as H, o as it, p as at, q as ot, r as st, s as ct, t as lt, tt as ut, u as dt, ut as U, y as ft } from "./mjr-primevue-n1rsQYJg.js";
+import { t as pt } from "./mjr-vue-vendor-D2GeV7Qd.js";
 import { a as mt, i as ht, n as gt, o as _t, r as vt, t as yt } from "./geninfoParser-5vKgjqjD.js";
 //#region ui/app/settings/settingsUtils.ts
-var U = (e, t) => {
+var W = (e, t) => {
 	if (typeof e == "boolean") return e;
 	if (typeof e == "string") {
 		let t = e.trim().toLowerCase();
@@ -24,7 +24,7 @@ var U = (e, t) => {
 		].includes(t)) return !1;
 	}
 	return !!t;
-}, W = (e, t) => {
+}, G = (e, t) => {
 	let n = Number(e);
 	return Number.isFinite(n) ? n : Number(t);
 }, bt = (e, t, n) => {
@@ -45,84 +45,84 @@ var U = (e, t) => {
 	"small",
 	"medium",
 	"large"
-]), Tt = (e, t) => Math.max(60, Math.min(600, Math.round(W(e, t)))), Et = (e = {}) => {
+]), Tt = (e, t) => Math.max(60, Math.min(600, Math.round(G(e, t)))), Et = (e = {}) => {
 	let t = Number(e?.minSize);
-	if (Number.isFinite(t)) return Tt(t, A.GRID_MIN_SIZE);
+	if (Number.isFinite(t)) return Tt(t, j.GRID_MIN_SIZE);
 	let n = bt(String(e?.minSizePreset || "").toLowerCase(), wt, "");
-	return n ? Ct[n] : Tt(e?.minSize, A.GRID_MIN_SIZE);
-}, Dt = (e = {}) => Tt(e?.minSize, A.FEED_GRID_MIN_SIZE), Ot = (e) => {
-	let t = Math.round(W(e, A.GRID_MIN_SIZE));
+	return n ? Ct[n] : Tt(e?.minSize, j.GRID_MIN_SIZE);
+}, Dt = (e = {}) => Tt(e?.minSize, j.FEED_GRID_MIN_SIZE), Ot = (e) => {
+	let t = Math.round(G(e, j.GRID_MIN_SIZE));
 	return t <= 100 ? "small" : t >= 150 ? "large" : "medium";
-}, G = {
+}, K = {
 	debug: {
-		safeCall: A.DEBUG_SAFE_CALL,
-		safeListeners: A.DEBUG_SAFE_LISTENERS,
-		viewer: A.DEBUG_VIEWER
+		safeCall: j.DEBUG_SAFE_CALL,
+		safeListeners: j.DEBUG_SAFE_LISTENERS,
+		viewer: j.DEBUG_VIEWER
 	},
 	grid: {
-		pageSize: A.DEFAULT_PAGE_SIZE,
-		minSize: A.GRID_MIN_SIZE,
-		minSizePreset: Ot(A.GRID_MIN_SIZE),
-		gap: A.GRID_GAP,
-		showExtBadge: A.GRID_SHOW_BADGES_EXTENSION,
-		showRatingBadge: A.GRID_SHOW_BADGES_RATING,
-		showTagsBadge: A.GRID_SHOW_BADGES_TAGS,
-		showDetails: A.GRID_SHOW_DETAILS,
-		showFilename: A.GRID_SHOW_DETAILS_FILENAME,
-		showDate: A.GRID_SHOW_DETAILS_DATE,
-		showDimensions: A.GRID_SHOW_DETAILS_DIMENSIONS,
-		showGenTime: A.GRID_SHOW_DETAILS_GENTIME,
-		showHoverInfo: A.GRID_SHOW_HOVER_INFO,
-		showWorkflowDot: A.GRID_SHOW_WORKFLOW_DOT,
-		workflowGroupBy: A.WORKFLOW_GRID_GROUP_BY,
-		videoAutoplayMode: A.GRID_VIDEO_AUTOPLAY_MODE,
-		starColor: A.BADGE_STAR_COLOR,
-		badgeImageColor: A.BADGE_IMAGE_COLOR,
-		badgeVideoColor: A.BADGE_VIDEO_COLOR,
-		badgeAudioColor: A.BADGE_AUDIO_COLOR,
-		badgeModel3dColor: A.BADGE_MODEL3D_COLOR,
-		badgeDuplicateAlertColor: A.BADGE_DUPLICATE_ALERT_COLOR
+		pageSize: j.DEFAULT_PAGE_SIZE,
+		minSize: j.GRID_MIN_SIZE,
+		minSizePreset: Ot(j.GRID_MIN_SIZE),
+		gap: j.GRID_GAP,
+		showExtBadge: j.GRID_SHOW_BADGES_EXTENSION,
+		showRatingBadge: j.GRID_SHOW_BADGES_RATING,
+		showTagsBadge: j.GRID_SHOW_BADGES_TAGS,
+		showDetails: j.GRID_SHOW_DETAILS,
+		showFilename: j.GRID_SHOW_DETAILS_FILENAME,
+		showDate: j.GRID_SHOW_DETAILS_DATE,
+		showDimensions: j.GRID_SHOW_DETAILS_DIMENSIONS,
+		showGenTime: j.GRID_SHOW_DETAILS_GENTIME,
+		showHoverInfo: j.GRID_SHOW_HOVER_INFO,
+		showWorkflowDot: j.GRID_SHOW_WORKFLOW_DOT,
+		workflowGroupBy: j.WORKFLOW_GRID_GROUP_BY,
+		videoAutoplayMode: j.GRID_VIDEO_AUTOPLAY_MODE,
+		starColor: j.BADGE_STAR_COLOR,
+		badgeImageColor: j.BADGE_IMAGE_COLOR,
+		badgeVideoColor: j.BADGE_VIDEO_COLOR,
+		badgeAudioColor: j.BADGE_AUDIO_COLOR,
+		badgeModel3dColor: j.BADGE_MODEL3D_COLOR,
+		badgeDuplicateAlertColor: j.BADGE_DUPLICATE_ALERT_COLOR
 	},
 	infiniteScroll: {
-		enabled: A.INFINITE_SCROLL_ENABLED,
-		rootMargin: A.INFINITE_SCROLL_ROOT_MARGIN,
-		threshold: A.INFINITE_SCROLL_THRESHOLD,
-		bottomGapPx: A.BOTTOM_GAP_PX
+		enabled: j.INFINITE_SCROLL_ENABLED,
+		rootMargin: j.INFINITE_SCROLL_ROOT_MARGIN,
+		threshold: j.INFINITE_SCROLL_THRESHOLD,
+		bottomGapPx: j.BOTTOM_GAP_PX
 	},
 	siblings: { hidePngSiblings: !0 },
-	autoScan: { onStartup: A.AUTO_SCAN_ON_STARTUP },
+	autoScan: { onStartup: j.AUTO_SCAN_ON_STARTUP },
 	scan: { fastMode: !0 },
 	watcher: {
 		enabled: !0,
-		debounceMs: A.WATCHER_DEBOUNCE_MS,
-		dedupeTtlMs: A.WATCHER_DEDUPE_TTL_MS,
+		debounceMs: j.WATCHER_DEBOUNCE_MS,
+		dedupeTtlMs: j.WATCHER_DEDUPE_TTL_MS,
 		maxPending: 500,
 		minSize: 100,
 		maxSize: 4294967296
 	},
 	safety: { confirmDeletion: !0 },
-	status: { pollInterval: A.STATUS_POLL_INTERVAL },
+	status: { pollInterval: j.STATUS_POLL_INTERVAL },
 	viewer: {
-		allowPanAtZoom1: A.VIEWER_ALLOW_PAN_AT_ZOOM_1,
-		disableWebGL: A.VIEWER_DISABLE_WEBGL_VIDEO,
-		pauseDuringExecution: A.VIEWER_PAUSE_DURING_EXECUTION,
-		floatingPauseDuringExecution: A.FLOATING_VIEWER_PAUSE_DURING_EXECUTION,
-		mfvLiveDefault: A.MFV_LIVE_DEFAULT,
-		mfvPreviewDefault: A.MFV_PREVIEW_DEFAULT,
-		videoGradeThrottleFps: A.VIEWER_VIDEO_GRADE_THROTTLE_FPS,
-		scopesFps: A.VIEWER_SCOPES_FPS,
-		metaTtlMs: A.VIEWER_META_TTL_MS,
-		metaMaxEntries: A.VIEWER_META_MAX_ENTRIES,
+		allowPanAtZoom1: j.VIEWER_ALLOW_PAN_AT_ZOOM_1,
+		disableWebGL: j.VIEWER_DISABLE_WEBGL_VIDEO,
+		pauseDuringExecution: j.VIEWER_PAUSE_DURING_EXECUTION,
+		floatingPauseDuringExecution: j.FLOATING_VIEWER_PAUSE_DURING_EXECUTION,
+		mfvLiveDefault: j.MFV_LIVE_DEFAULT,
+		mfvPreviewDefault: j.MFV_PREVIEW_DEFAULT,
+		videoGradeThrottleFps: j.VIEWER_VIDEO_GRADE_THROTTLE_FPS,
+		scopesFps: j.VIEWER_SCOPES_FPS,
+		metaTtlMs: j.VIEWER_META_TTL_MS,
+		metaMaxEntries: j.VIEWER_META_MAX_ENTRIES,
 		mfvSidebarPosition: "right",
-		mfvPreviewMethod: A.MFV_PREVIEW_METHOD,
+		mfvPreviewMethod: j.MFV_PREVIEW_METHOD,
 		ltxavRgbFallback: !1
 	},
 	rtHydrate: {
-		concurrency: A.RT_HYDRATE_CONCURRENCY,
-		queueMax: A.RT_HYDRATE_QUEUE_MAX,
-		seenMax: A.RT_HYDRATE_SEEN_MAX,
-		pruneBudget: A.RT_HYDRATE_PRUNE_BUDGET,
-		seenTtlMs: A.RT_HYDRATE_SEEN_TTL_MS
+		concurrency: j.RT_HYDRATE_CONCURRENCY,
+		queueMax: j.RT_HYDRATE_QUEUE_MAX,
+		seenMax: j.RT_HYDRATE_SEEN_MAX,
+		pruneBudget: j.RT_HYDRATE_PRUNE_BUDGET,
+		seenTtlMs: j.RT_HYDRATE_SEEN_TTL_MS
 	},
 	observability: {
 		enabled: !1,
@@ -132,22 +132,22 @@ var U = (e, t) => {
 		verboseStartupLogs: !1
 	},
 	feed: {
-		minSize: A.FEED_GRID_MIN_SIZE,
-		showInfo: A.FEED_SHOW_INFO,
-		showFilename: A.FEED_SHOW_FILENAME,
-		showDimensions: A.FEED_SHOW_DIMENSIONS,
-		showDate: A.FEED_SHOW_DATE,
-		showGenTime: A.FEED_SHOW_GENTIME,
-		showWorkflowDot: A.FEED_SHOW_WORKFLOW_DOT,
-		showExtBadge: A.FEED_SHOW_BADGES_EXTENSION,
-		showRatingBadge: A.FEED_SHOW_BADGES_RATING,
-		showTagsBadge: A.FEED_SHOW_BADGES_TAGS
+		minSize: j.FEED_GRID_MIN_SIZE,
+		showInfo: j.FEED_SHOW_INFO,
+		showFilename: j.FEED_SHOW_FILENAME,
+		showDimensions: j.FEED_SHOW_DIMENSIONS,
+		showDate: j.FEED_SHOW_DATE,
+		showGenTime: j.FEED_SHOW_GENTIME,
+		showWorkflowDot: j.FEED_SHOW_WORKFLOW_DOT,
+		showExtBadge: j.FEED_SHOW_BADGES_EXTENSION,
+		showRatingBadge: j.FEED_SHOW_BADGES_RATING,
+		showTagsBadge: j.FEED_SHOW_BADGES_TAGS
 	},
 	sidebar: {
 		position: "right",
 		showPreviewThumb: !0,
 		widthPx: 360,
-		assetBadgeEnabled: A.SIDEBAR_ASSET_BADGE_ENABLED
+		assetBadgeEnabled: j.SIDEBAR_ASSET_BADGE_ENABLED
 	},
 	probeBackend: { mode: "auto" },
 	i18n: { followComfyLanguage: !0 },
@@ -167,15 +167,15 @@ var U = (e, t) => {
 	},
 	ratingTagsSync: { enabled: !0 },
 	cache: { tagsTTLms: 3e4 },
-	search: { maxResults: A.SEARCH_DEFAULT_LIMIT },
+	search: { maxResults: j.SEARCH_DEFAULT_LIMIT },
 	ai: {
 		vectorSearchEnabled: !0,
 		vectorCaptionOnIndex: !1,
 		verboseAiLogs: !1
 	},
-	executionGrouping: { enabled: A.EXECUTION_GROUPING_ENABLED },
+	executionGrouping: { enabled: j.EXECUTION_GROUPING_ENABLED },
 	workflowMinimap: {
-		enabled: A.WORKFLOW_MINIMAP_ENABLED,
+		enabled: j.WORKFLOW_MINIMAP_ENABLED,
 		nodeColors: !0,
 		showLinks: !0,
 		showGroups: !0,
@@ -186,10 +186,10 @@ var U = (e, t) => {
 		size: "comfortable"
 	},
 	ui: {
-		cardHoverColor: A.UI_CARD_HOVER_COLOR,
-		cardSelectionColor: A.UI_CARD_SELECTION_COLOR,
-		ratingColor: A.UI_RATING_COLOR,
-		tagColor: A.UI_TAG_COLOR
+		cardHoverColor: j.UI_CARD_HOVER_COLOR,
+		cardSelectionColor: j.UI_CARD_SELECTION_COLOR,
+		ratingColor: j.UI_RATING_COLOR,
+		tagColor: j.UI_TAG_COLOR
 	},
 	security: {
 		safeMode: !1,
@@ -203,26 +203,26 @@ var U = (e, t) => {
 		tokenConfigured: !1,
 		tokenHint: ""
 	}
-}, K = () => {
+}, q = () => {
 	try {
-		let e = we.get(t);
-		if (!e) return { ...G };
+		let e = Ce.get(t);
+		if (!e) return { ...K };
 		let n = JSON.parse(e), r = n && typeof n == "object" && Number.isInteger(n.version) && n.data && typeof n.data == "object";
-		if (!r && !(n && typeof n == "object" && !Array.isArray(n))) return { ...G };
-		if (r && Number(n.version) > 1) return console.warn("[Majoor] settings schema version is newer than this build, using defaults"), { ...G };
+		if (!r && !(n && typeof n == "object" && !Array.isArray(n))) return { ...K };
+		if (r && Number(n.version) > 1) return console.warn("[Majoor] settings schema version is newer than this build, using defaults"), { ...K };
 		let i = r ? n.data : n, a = new Set(/* @__PURE__ */ "debug.grid.infiniteScroll.siblings.autoScan.scan.watcher.status.viewer.rtHydrate.observability.feed.sidebar.probeBackend.i18n.paths.db.ratingTagsSync.cache.search.ai.executionGrouping.workflowMinimap.ui.security.safety".split(".")), o = {};
 		if (i && typeof i == "object") for (let [e, t] of Object.entries(i)) a.has(e) && (o[e] = t);
-		let s = St(G, o);
+		let s = St(K, o);
 		if (!r) try {
-			q(s);
+			J(s);
 		} catch (e) {
 			console.debug?.(e);
 		}
 		return s;
 	} catch (e) {
-		return console.warn("[Majoor] settings load failed, using defaults", e), { ...G };
+		return console.warn("[Majoor] settings load failed, using defaults", e), { ...K };
 	}
-}, q = (e) => {
+}, J = (e) => {
 	try {
 		let t = JSON.parse(JSON.stringify(e || {}));
 		t?.security && typeof t.security == "object" && (t.security.apiToken = "");
@@ -230,69 +230,69 @@ var U = (e, t) => {
 			version: 1,
 			data: t
 		};
-		if (!we.set("mjrSettings", JSON.stringify(n))) throw Error("SettingsStore rejected the write");
+		if (!Ce.set("mjrSettings", JSON.stringify(n))) throw Error("SettingsStore rejected the write");
 	} catch (e) {
 		console.warn("[Majoor] settings save failed", e);
 		try {
 			let e = Date.now();
-			e - (Number(window?._mjrSettingsSaveFailAt || 0) || 0) > 3e4 && (window._mjrSettingsSaveFailAt = e, Ae(j("dialog.settingsSaveFailed", "Majoor: Failed to save settings (browser storage full or blocked).")));
+			e - (Number(window?._mjrSettingsSaveFailAt || 0) || 0) > 3e4 && (window._mjrSettingsSaveFailAt = e, ke(M("dialog.settingsSaveFailed", "Majoor: Failed to save settings (browser storage full or blocked).")));
 		} catch (e) {
 			console.debug?.(e);
 		}
 		try {
-			ke("mjr-settings-save-failed", { error: String(e?.message || e || "") }, { warnPrefix: "[Majoor]" });
+			Oe("mjr-settings-save-failed", { error: String(e?.message || e || "") }, { warnPrefix: "[Majoor]" });
 		} catch (e) {
 			console.debug?.(e);
 		}
 	}
-}, J = (e) => {
-	let t = Number(A.MAX_PAGE_SIZE) || 2e3;
-	k.DEFAULT_PAGE_SIZE = Math.max(50, Math.min(t, Number(e.grid?.pageSize) || A.DEFAULT_PAGE_SIZE)), k.AUTO_SCAN_ON_STARTUP = !!e.autoScan?.onStartup, k.EXECUTION_GROUPING_ENABLED = !!(e.executionGrouping?.enabled ?? A.EXECUTION_GROUPING_ENABLED), k.STATUS_POLL_INTERVAL = Math.max(1e3, Number(e.status?.pollInterval) || A.STATUS_POLL_INTERVAL), k.DEBUG_SAFE_CALL = !!e.debug?.safeCall, k.DEBUG_SAFE_LISTENERS = !!e.debug?.safeListeners, k.DEBUG_VIEWER = !!e.debug?.viewer, k.GRID_MIN_SIZE = Et(e.grid), k.FEED_GRID_MIN_SIZE = Dt(e.feed), k.GRID_GAP = Math.max(0, Math.min(40, Math.round(W(e.grid?.gap, A.GRID_GAP)))), k.GRID_SHOW_BADGES_EXTENSION = !!(e.grid?.showExtBadge ?? A.GRID_SHOW_BADGES_EXTENSION), k.GRID_SHOW_BADGES_RATING = !!(e.grid?.showRatingBadge ?? A.GRID_SHOW_BADGES_RATING), k.GRID_SHOW_BADGES_TAGS = !!(e.grid?.showTagsBadge ?? A.GRID_SHOW_BADGES_TAGS), k.GRID_SHOW_DETAILS = !!(e.grid?.showDetails ?? A.GRID_SHOW_DETAILS), k.GRID_SHOW_DETAILS_FILENAME = !!(e.grid?.showFilename ?? A.GRID_SHOW_DETAILS_FILENAME), k.GRID_SHOW_DETAILS_DATE = !!(e.grid?.showDate ?? A.GRID_SHOW_DETAILS_DATE), k.GRID_SHOW_DETAILS_DIMENSIONS = !!(e.grid?.showDimensions ?? A.GRID_SHOW_DETAILS_DIMENSIONS), k.GRID_SHOW_DETAILS_GENTIME = !!(e.grid?.showGenTime ?? A.GRID_SHOW_DETAILS_GENTIME), k.GRID_SHOW_HOVER_INFO = !!(e.grid?.showHoverInfo ?? A.GRID_SHOW_HOVER_INFO), k.GRID_SHOW_WORKFLOW_DOT = !!(e.grid?.showWorkflowDot ?? A.GRID_SHOW_WORKFLOW_DOT);
+}, Y = (e) => {
+	let t = Number(j.MAX_PAGE_SIZE) || 2e3;
+	A.DEFAULT_PAGE_SIZE = Math.max(50, Math.min(t, Number(e.grid?.pageSize) || j.DEFAULT_PAGE_SIZE)), A.AUTO_SCAN_ON_STARTUP = !!e.autoScan?.onStartup, A.EXECUTION_GROUPING_ENABLED = !!(e.executionGrouping?.enabled ?? j.EXECUTION_GROUPING_ENABLED), A.STATUS_POLL_INTERVAL = Math.max(1e3, Number(e.status?.pollInterval) || j.STATUS_POLL_INTERVAL), A.DEBUG_SAFE_CALL = !!e.debug?.safeCall, A.DEBUG_SAFE_LISTENERS = !!e.debug?.safeListeners, A.DEBUG_VIEWER = !!e.debug?.viewer, A.GRID_MIN_SIZE = Et(e.grid), A.FEED_GRID_MIN_SIZE = Dt(e.feed), A.GRID_GAP = Math.max(0, Math.min(40, Math.round(G(e.grid?.gap, j.GRID_GAP)))), A.GRID_SHOW_BADGES_EXTENSION = !!(e.grid?.showExtBadge ?? j.GRID_SHOW_BADGES_EXTENSION), A.GRID_SHOW_BADGES_RATING = !!(e.grid?.showRatingBadge ?? j.GRID_SHOW_BADGES_RATING), A.GRID_SHOW_BADGES_TAGS = !!(e.grid?.showTagsBadge ?? j.GRID_SHOW_BADGES_TAGS), A.GRID_SHOW_DETAILS = !!(e.grid?.showDetails ?? j.GRID_SHOW_DETAILS), A.GRID_SHOW_DETAILS_FILENAME = !!(e.grid?.showFilename ?? j.GRID_SHOW_DETAILS_FILENAME), A.GRID_SHOW_DETAILS_DATE = !!(e.grid?.showDate ?? j.GRID_SHOW_DETAILS_DATE), A.GRID_SHOW_DETAILS_DIMENSIONS = !!(e.grid?.showDimensions ?? j.GRID_SHOW_DETAILS_DIMENSIONS), A.GRID_SHOW_DETAILS_GENTIME = !!(e.grid?.showGenTime ?? j.GRID_SHOW_DETAILS_GENTIME), A.GRID_SHOW_HOVER_INFO = !!(e.grid?.showHoverInfo ?? j.GRID_SHOW_HOVER_INFO), A.GRID_SHOW_WORKFLOW_DOT = !!(e.grid?.showWorkflowDot ?? j.GRID_SHOW_WORKFLOW_DOT);
 	{
-		let t = String(e.grid?.workflowGroupBy ?? A.WORKFLOW_GRID_GROUP_BY).toLowerCase();
-		k.WORKFLOW_GRID_GROUP_BY = [
+		let t = String(e.grid?.workflowGroupBy ?? j.WORKFLOW_GRID_GROUP_BY).toLowerCase();
+		A.WORKFLOW_GRID_GROUP_BY = [
 			"none",
 			"task",
 			"model",
 			"category"
-		].includes(t) ? t : A.WORKFLOW_GRID_GROUP_BY;
+		].includes(t) ? t : j.WORKFLOW_GRID_GROUP_BY;
 	}
-	k.FEED_SHOW_INFO = !!(e.feed?.showInfo ?? A.FEED_SHOW_INFO), k.FEED_SHOW_FILENAME = !!(e.feed?.showFilename ?? A.FEED_SHOW_FILENAME), k.FEED_SHOW_DIMENSIONS = !!(e.feed?.showDimensions ?? A.FEED_SHOW_DIMENSIONS), k.FEED_SHOW_DATE = !!(e.feed?.showDate ?? A.FEED_SHOW_DATE), k.FEED_SHOW_GENTIME = !!(e.feed?.showGenTime ?? A.FEED_SHOW_GENTIME), k.FEED_SHOW_WORKFLOW_DOT = !!(e.feed?.showWorkflowDot ?? A.FEED_SHOW_WORKFLOW_DOT), k.FEED_SHOW_BADGES_EXTENSION = !!(e.feed?.showExtBadge ?? A.FEED_SHOW_BADGES_EXTENSION), k.FEED_SHOW_BADGES_RATING = !!(e.feed?.showRatingBadge ?? A.FEED_SHOW_BADGES_RATING), k.FEED_SHOW_BADGES_TAGS = !!(e.feed?.showTagsBadge ?? A.FEED_SHOW_BADGES_TAGS);
+	A.FEED_SHOW_INFO = !!(e.feed?.showInfo ?? j.FEED_SHOW_INFO), A.FEED_SHOW_FILENAME = !!(e.feed?.showFilename ?? j.FEED_SHOW_FILENAME), A.FEED_SHOW_DIMENSIONS = !!(e.feed?.showDimensions ?? j.FEED_SHOW_DIMENSIONS), A.FEED_SHOW_DATE = !!(e.feed?.showDate ?? j.FEED_SHOW_DATE), A.FEED_SHOW_GENTIME = !!(e.feed?.showGenTime ?? j.FEED_SHOW_GENTIME), A.FEED_SHOW_WORKFLOW_DOT = !!(e.feed?.showWorkflowDot ?? j.FEED_SHOW_WORKFLOW_DOT), A.FEED_SHOW_BADGES_EXTENSION = !!(e.feed?.showExtBadge ?? j.FEED_SHOW_BADGES_EXTENSION), A.FEED_SHOW_BADGES_RATING = !!(e.feed?.showRatingBadge ?? j.FEED_SHOW_BADGES_RATING), A.FEED_SHOW_BADGES_TAGS = !!(e.feed?.showTagsBadge ?? j.FEED_SHOW_BADGES_TAGS);
 	{
-		let t = e.grid?.videoAutoplayMode ?? A.GRID_VIDEO_AUTOPLAY_MODE;
-		t ??= e.grid?.videoHoverAutoplay === !1 ? "off" : "hover", t === !0 && (t = "hover"), t === !1 && (t = "off"), t !== "hover" && t !== "always" && t !== "off" && (t = "hover"), k.GRID_VIDEO_AUTOPLAY_MODE = t;
+		let t = e.grid?.videoAutoplayMode ?? j.GRID_VIDEO_AUTOPLAY_MODE;
+		t ??= e.grid?.videoHoverAutoplay === !1 ? "off" : "hover", t === !0 && (t = "hover"), t === !1 && (t = "off"), t !== "hover" && t !== "always" && t !== "off" && (t = "hover"), A.GRID_VIDEO_AUTOPLAY_MODE = t;
 	}
 	let n = (e, t) => {
 		let n = String(e || "").trim();
 		return /^[0-9a-fA-F]{6}$/.test(n) && (n = `#${n}`), /^#[0-9a-fA-F]{3,8}$/.test(n) ? n : t;
 	};
-	k.BADGE_STAR_COLOR = n(e.grid?.starColor, A.BADGE_STAR_COLOR), k.BADGE_IMAGE_COLOR = n(e.grid?.badgeImageColor, A.BADGE_IMAGE_COLOR), k.BADGE_VIDEO_COLOR = n(e.grid?.badgeVideoColor, A.BADGE_VIDEO_COLOR), k.BADGE_AUDIO_COLOR = n(e.grid?.badgeAudioColor, A.BADGE_AUDIO_COLOR), k.BADGE_MODEL3D_COLOR = n(e.grid?.badgeModel3dColor, A.BADGE_MODEL3D_COLOR), k.BADGE_DUPLICATE_ALERT_COLOR = n(e.grid?.badgeDuplicateAlertColor, A.BADGE_DUPLICATE_ALERT_COLOR), k.UI_CARD_HOVER_COLOR = n(e.ui?.cardHoverColor, A.UI_CARD_HOVER_COLOR), k.UI_CARD_SELECTION_COLOR = n(e.ui?.cardSelectionColor, A.UI_CARD_SELECTION_COLOR), k.UI_RATING_COLOR = n(e.ui?.ratingColor, A.UI_RATING_COLOR), k.UI_TAG_COLOR = n(e.ui?.tagColor, A.UI_TAG_COLOR);
+	A.BADGE_STAR_COLOR = n(e.grid?.starColor, j.BADGE_STAR_COLOR), A.BADGE_IMAGE_COLOR = n(e.grid?.badgeImageColor, j.BADGE_IMAGE_COLOR), A.BADGE_VIDEO_COLOR = n(e.grid?.badgeVideoColor, j.BADGE_VIDEO_COLOR), A.BADGE_AUDIO_COLOR = n(e.grid?.badgeAudioColor, j.BADGE_AUDIO_COLOR), A.BADGE_MODEL3D_COLOR = n(e.grid?.badgeModel3dColor, j.BADGE_MODEL3D_COLOR), A.BADGE_DUPLICATE_ALERT_COLOR = n(e.grid?.badgeDuplicateAlertColor, j.BADGE_DUPLICATE_ALERT_COLOR), A.UI_CARD_HOVER_COLOR = n(e.ui?.cardHoverColor, j.UI_CARD_HOVER_COLOR), A.UI_CARD_SELECTION_COLOR = n(e.ui?.cardSelectionColor, j.UI_CARD_SELECTION_COLOR), A.UI_RATING_COLOR = n(e.ui?.ratingColor, j.UI_RATING_COLOR), A.UI_TAG_COLOR = n(e.ui?.tagColor, j.UI_TAG_COLOR);
 	try {
 		let e = Array.from(document.querySelectorAll(".mjr-assets-manager"));
-		for (let t of e) t.style.setProperty("--mjr-star-active", k.BADGE_STAR_COLOR), t.style.setProperty("--mjr-badge-image", k.BADGE_IMAGE_COLOR), t.style.setProperty("--mjr-badge-video", k.BADGE_VIDEO_COLOR), t.style.setProperty("--mjr-badge-audio", k.BADGE_AUDIO_COLOR), t.style.setProperty("--mjr-badge-model3d", k.BADGE_MODEL3D_COLOR), t.style.setProperty("--mjr-badge-duplicate-alert", k.BADGE_DUPLICATE_ALERT_COLOR), t.style.setProperty("--mjr-card-hover-color", k.UI_CARD_HOVER_COLOR), t.style.setProperty("--mjr-card-selection-color", k.UI_CARD_SELECTION_COLOR), t.style.setProperty("--mjr-rating-color", k.UI_RATING_COLOR), t.style.setProperty("--mjr-tag-color", k.UI_TAG_COLOR);
+		for (let t of e) t.style.setProperty("--mjr-star-active", A.BADGE_STAR_COLOR), t.style.setProperty("--mjr-badge-image", A.BADGE_IMAGE_COLOR), t.style.setProperty("--mjr-badge-video", A.BADGE_VIDEO_COLOR), t.style.setProperty("--mjr-badge-audio", A.BADGE_AUDIO_COLOR), t.style.setProperty("--mjr-badge-model3d", A.BADGE_MODEL3D_COLOR), t.style.setProperty("--mjr-badge-duplicate-alert", A.BADGE_DUPLICATE_ALERT_COLOR), t.style.setProperty("--mjr-card-hover-color", A.UI_CARD_HOVER_COLOR), t.style.setProperty("--mjr-card-selection-color", A.UI_CARD_SELECTION_COLOR), t.style.setProperty("--mjr-rating-color", A.UI_RATING_COLOR), t.style.setProperty("--mjr-tag-color", A.UI_TAG_COLOR);
 	} catch (e) {
 		console.debug?.(e);
 	}
-	k.INFINITE_SCROLL_ENABLED = !!e.infiniteScroll?.enabled, k.INFINITE_SCROLL_ROOT_MARGIN = String(e.infiniteScroll?.rootMargin || A.INFINITE_SCROLL_ROOT_MARGIN), k.INFINITE_SCROLL_THRESHOLD = Math.max(0, Math.min(1, W(e.infiniteScroll?.threshold, A.INFINITE_SCROLL_THRESHOLD))), k.BOTTOM_GAP_PX = Math.max(0, Math.min(5e3, Math.round(W(e.infiniteScroll?.bottomGapPx, A.BOTTOM_GAP_PX)))), k.VIEWER_ALLOW_PAN_AT_ZOOM_1 = !!e.viewer?.allowPanAtZoom1, k.VIEWER_DISABLE_WEBGL_VIDEO = !!e.viewer?.disableWebGL, k.VIEWER_PAUSE_DURING_EXECUTION = !!(e.viewer?.pauseDuringExecution ?? A.VIEWER_PAUSE_DURING_EXECUTION), k.FLOATING_VIEWER_PAUSE_DURING_EXECUTION = !!(e.viewer?.floatingPauseDuringExecution ?? A.FLOATING_VIEWER_PAUSE_DURING_EXECUTION), k.MFV_LIVE_DEFAULT = e.viewer?.mfvLiveDefault ?? A.MFV_LIVE_DEFAULT, k.MFV_PREVIEW_DEFAULT = e.viewer?.mfvPreviewDefault ?? A.MFV_PREVIEW_DEFAULT, k.MFV_LIVE_AUTO_OPEN = !1, k.MFV_PREVIEW_AUTO_OPEN = !1, k.MFV_NODE_STREAM_AUTO_OPEN = !1;
+	A.INFINITE_SCROLL_ENABLED = !!e.infiniteScroll?.enabled, A.INFINITE_SCROLL_ROOT_MARGIN = String(e.infiniteScroll?.rootMargin || j.INFINITE_SCROLL_ROOT_MARGIN), A.INFINITE_SCROLL_THRESHOLD = Math.max(0, Math.min(1, G(e.infiniteScroll?.threshold, j.INFINITE_SCROLL_THRESHOLD))), A.BOTTOM_GAP_PX = Math.max(0, Math.min(5e3, Math.round(G(e.infiniteScroll?.bottomGapPx, j.BOTTOM_GAP_PX)))), A.VIEWER_ALLOW_PAN_AT_ZOOM_1 = !!e.viewer?.allowPanAtZoom1, A.VIEWER_DISABLE_WEBGL_VIDEO = !!e.viewer?.disableWebGL, A.VIEWER_PAUSE_DURING_EXECUTION = !!(e.viewer?.pauseDuringExecution ?? j.VIEWER_PAUSE_DURING_EXECUTION), A.FLOATING_VIEWER_PAUSE_DURING_EXECUTION = !!(e.viewer?.floatingPauseDuringExecution ?? j.FLOATING_VIEWER_PAUSE_DURING_EXECUTION), A.MFV_LIVE_DEFAULT = e.viewer?.mfvLiveDefault ?? j.MFV_LIVE_DEFAULT, A.MFV_PREVIEW_DEFAULT = e.viewer?.mfvPreviewDefault ?? j.MFV_PREVIEW_DEFAULT, A.MFV_LIVE_AUTO_OPEN = !1, A.MFV_PREVIEW_AUTO_OPEN = !1, A.MFV_NODE_STREAM_AUTO_OPEN = !1;
 	{
-		let t = String(e.viewer?.mfvPreviewMethod || A.MFV_PREVIEW_METHOD).toLowerCase();
-		k.MFV_PREVIEW_METHOD = [
+		let t = String(e.viewer?.mfvPreviewMethod || j.MFV_PREVIEW_METHOD).toLowerCase();
+		A.MFV_PREVIEW_METHOD = [
 			"default",
 			"auto",
 			"latent2rgb",
 			"taesd",
 			"none"
-		].includes(t) ? t : A.MFV_PREVIEW_METHOD;
+		].includes(t) ? t : j.MFV_PREVIEW_METHOD;
 	}
 	{
 		let t = String(e.viewer?.mfvSidebarPosition || "right").toLowerCase();
-		k.MFV_SIDEBAR_POSITION = [
+		A.MFV_SIDEBAR_POSITION = [
 			"left",
 			"right",
 			"bottom"
 		].includes(t) ? t : "right";
 	}
-	k.VIEWER_VIDEO_GRADE_THROTTLE_FPS = Math.max(1, Math.min(60, Math.round(W(e.viewer?.videoGradeThrottleFps, A.VIEWER_VIDEO_GRADE_THROTTLE_FPS)))), k.VIEWER_SCOPES_FPS = Math.max(1, Math.min(60, Math.round(W(e.viewer?.scopesFps, A.VIEWER_SCOPES_FPS)))), k.VIEWER_META_TTL_MS = Math.max(1e3, Math.min(10 * 6e4, Math.round(W(e.viewer?.metaTtlMs, A.VIEWER_META_TTL_MS)))), k.VIEWER_META_MAX_ENTRIES = Math.max(50, Math.min(5e3, Math.round(W(e.viewer?.metaMaxEntries, A.VIEWER_META_MAX_ENTRIES)))), k.WORKFLOW_MINIMAP_ENABLED = !!(e.workflowMinimap?.enabled ?? A.WORKFLOW_MINIMAP_ENABLED), k.RT_HYDRATE_CONCURRENCY = Math.max(1, Math.min(16, Math.round(W(e.rtHydrate?.concurrency, A.RT_HYDRATE_CONCURRENCY)))), k.RT_HYDRATE_QUEUE_MAX = Math.max(10, Math.min(5e3, Math.round(W(e.rtHydrate?.queueMax, A.RT_HYDRATE_QUEUE_MAX)))), k.RT_HYDRATE_SEEN_MAX = Math.max(1e3, Math.min(2e5, Math.round(W(e.rtHydrate?.seenMax, A.RT_HYDRATE_SEEN_MAX)))), k.RT_HYDRATE_PRUNE_BUDGET = Math.max(10, Math.min(1e4, Math.round(W(e.rtHydrate?.pruneBudget, A.RT_HYDRATE_PRUNE_BUDGET)))), k.RT_HYDRATE_SEEN_TTL_MS = Math.max(5e3, Math.min(360 * 6e4, Math.round(W(e.rtHydrate?.seenTtlMs, A.RT_HYDRATE_SEEN_TTL_MS)))), k.DELETE_CONFIRMATION = !!e.safety?.confirmDeletion, k.DEBUG_VERBOSE_ERRORS = !!e.observability?.verboseErrors, k.WATCHER_MAX_PENDING = Math.max(10, Math.min(5e3, Math.round(W(e.watcher?.maxPending, 500)))), k.WATCHER_MIN_SIZE = Math.max(0, Math.min(1e6, Math.round(W(e.watcher?.minSize, 100)))), k.WATCHER_MAX_SIZE = Math.max(1e5, Math.min(17179869184, Math.round(W(e.watcher?.maxSize, 4294967296)))), k.DB_TIMEOUT_MS = Math.max(1e3, Math.min(3e4, Math.round(W(e.db?.timeoutMs, 5e3)))), k.DB_MAX_CONNECTIONS = Math.max(1, Math.min(100, Math.round(W(e.db?.maxConnections, 10)))), k.DB_QUERY_TIMEOUT_MS = Math.max(500, Math.min(1e4, Math.round(W(e.db?.queryTimeoutMs, 1e3)))), k.SIDEBAR_ASSET_BADGE_ENABLED = !!(e.sidebar?.assetBadgeEnabled ?? A.SIDEBAR_ASSET_BADGE_ENABLED), k.SEARCH_REQUEST_LIMIT = Math.max(10, Math.min(A.MAX_PAGE_SIZE || 2e3, Math.round(W(e.search?.maxResults, A.SEARCH_DEFAULT_LIMIT))));
+	A.VIEWER_VIDEO_GRADE_THROTTLE_FPS = Math.max(1, Math.min(60, Math.round(G(e.viewer?.videoGradeThrottleFps, j.VIEWER_VIDEO_GRADE_THROTTLE_FPS)))), A.VIEWER_SCOPES_FPS = Math.max(1, Math.min(60, Math.round(G(e.viewer?.scopesFps, j.VIEWER_SCOPES_FPS)))), A.VIEWER_META_TTL_MS = Math.max(1e3, Math.min(10 * 6e4, Math.round(G(e.viewer?.metaTtlMs, j.VIEWER_META_TTL_MS)))), A.VIEWER_META_MAX_ENTRIES = Math.max(50, Math.min(5e3, Math.round(G(e.viewer?.metaMaxEntries, j.VIEWER_META_MAX_ENTRIES)))), A.WORKFLOW_MINIMAP_ENABLED = !!(e.workflowMinimap?.enabled ?? j.WORKFLOW_MINIMAP_ENABLED), A.RT_HYDRATE_CONCURRENCY = Math.max(1, Math.min(16, Math.round(G(e.rtHydrate?.concurrency, j.RT_HYDRATE_CONCURRENCY)))), A.RT_HYDRATE_QUEUE_MAX = Math.max(10, Math.min(5e3, Math.round(G(e.rtHydrate?.queueMax, j.RT_HYDRATE_QUEUE_MAX)))), A.RT_HYDRATE_SEEN_MAX = Math.max(1e3, Math.min(2e5, Math.round(G(e.rtHydrate?.seenMax, j.RT_HYDRATE_SEEN_MAX)))), A.RT_HYDRATE_PRUNE_BUDGET = Math.max(10, Math.min(1e4, Math.round(G(e.rtHydrate?.pruneBudget, j.RT_HYDRATE_PRUNE_BUDGET)))), A.RT_HYDRATE_SEEN_TTL_MS = Math.max(5e3, Math.min(360 * 6e4, Math.round(G(e.rtHydrate?.seenTtlMs, j.RT_HYDRATE_SEEN_TTL_MS)))), A.DELETE_CONFIRMATION = !!e.safety?.confirmDeletion, A.DEBUG_VERBOSE_ERRORS = !!e.observability?.verboseErrors, A.WATCHER_MAX_PENDING = Math.max(10, Math.min(5e3, Math.round(G(e.watcher?.maxPending, 500)))), A.WATCHER_MIN_SIZE = Math.max(0, Math.min(1e6, Math.round(G(e.watcher?.minSize, 100)))), A.WATCHER_MAX_SIZE = Math.max(1e5, Math.min(17179869184, Math.round(G(e.watcher?.maxSize, 4294967296)))), A.DB_TIMEOUT_MS = Math.max(1e3, Math.min(3e4, Math.round(G(e.db?.timeoutMs, 5e3)))), A.DB_MAX_CONNECTIONS = Math.max(1, Math.min(100, Math.round(G(e.db?.maxConnections, 10)))), A.DB_QUERY_TIMEOUT_MS = Math.max(500, Math.min(1e4, Math.round(G(e.db?.queryTimeoutMs, 1e3)))), A.SIDEBAR_ASSET_BADGE_ENABLED = !!(e.sidebar?.assetBadgeEnabled ?? j.SIDEBAR_ASSET_BADGE_ENABLED), A.SEARCH_REQUEST_LIMIT = Math.max(10, Math.min(j.MAX_PAGE_SIZE || 2e3, Math.round(G(e.search?.maxResults, j.SEARCH_DEFAULT_LIMIT))));
 };
 async function kt() {
 	try {
@@ -300,26 +300,26 @@ async function kt() {
 		if (!t?.ok) return;
 		let n = t.data?.prefs;
 		if (!n || typeof n != "object") return;
-		let r = K();
-		if (r.security = r.security || {}, r.security.safeMode = U(n.safe_mode, r.security.safeMode), r.security.allowWrite = U(n.allow_write, r.security.allowWrite), r.security.requireAuth = U(n.require_auth, r.security.requireAuth), r.security.allowRemoteWrite = U(n.allow_remote_write, r.security.allowRemoteWrite), r.security.allowInsecureTokenTransport = U(n.allow_insecure_token_transport, r.security.allowInsecureTokenTransport), r.security.allowDelete = U(n.allow_delete, r.security.allowDelete), r.security.allowRename = U(n.allow_rename, r.security.allowRename), r.security.allowOpenInFolder = U(n.allow_open_in_folder, r.security.allowOpenInFolder), r.security.allowResetIndex = U(n.allow_reset_index, r.security.allowResetIndex), r.security.tokenConfigured = U(n.token_configured, r.security.tokenConfigured), r.security.tokenHint = String(n.token_hint || "").trim(), !String(r.security.apiToken || "").trim()) try {
+		let r = q();
+		if (r.security = r.security || {}, r.security.safeMode = W(n.safe_mode, r.security.safeMode), r.security.allowWrite = W(n.allow_write, r.security.allowWrite), r.security.requireAuth = W(n.require_auth, r.security.requireAuth), r.security.allowRemoteWrite = W(n.allow_remote_write, r.security.allowRemoteWrite), r.security.allowInsecureTokenTransport = W(n.allow_insecure_token_transport, r.security.allowInsecureTokenTransport), r.security.allowDelete = W(n.allow_delete, r.security.allowDelete), r.security.allowRename = W(n.allow_rename, r.security.allowRename), r.security.allowOpenInFolder = W(n.allow_open_in_folder, r.security.allowOpenInFolder), r.security.allowResetIndex = W(n.allow_reset_index, r.security.allowResetIndex), r.security.tokenConfigured = W(n.token_configured, r.security.tokenConfigured), r.security.tokenHint = String(n.token_hint || "").trim(), !String(r.security.apiToken || "").trim()) try {
 			let e = await c(), t = String(e?.data?.token || "").trim();
 			e?.ok && t && w(t);
 		} catch (e) {
 			console.debug?.(e);
 		}
-		q(r), J(r), ke("mjr-settings-changed", { key: "security" }, { warnPrefix: "[Majoor]" });
+		J(r), Y(r), Oe("mjr-settings-changed", { key: "security" }, { warnPrefix: "[Majoor]" });
 	} catch (e) {
 		console.warn("[Majoor] failed to sync backend security settings", e);
 	}
 }
 async function At() {
 	try {
-		let e = await le();
+		let e = await ce();
 		if (!e?.ok) return;
 		let t = e.data?.prefs;
 		if (!t || typeof t != "object") return;
-		let n = K();
-		n.ai = n.ai || {}, n.ai.vectorSearchEnabled = U(t.enabled, n.ai.vectorSearchEnabled ?? !0), n.ai.vectorCaptionOnIndex = U(t.caption_on_index ?? t.captionOnIndex, n.ai.vectorCaptionOnIndex ?? !1), n.ai.vectorIndexOnScan = U(t.index_on_scan ?? t.indexOnScan, n.ai.vectorIndexOnScan ?? !1), n.ai.vectorUnloadAfterUse = U(t.unload_after_use ?? t.unloadAfterUse, n.ai.vectorUnloadAfterUse ?? !1), n.ai.vectorConcurrency = Math.max(1, Math.min(16, Math.floor(Number(t.concurrency ?? n.ai.vectorConcurrency ?? 1) || 1))), q(n), J(n), ke("mjr-settings-changed", { key: "ai.vectorSearch" }, { warnPrefix: "[Majoor]" });
+		let n = q();
+		n.ai = n.ai || {}, n.ai.vectorSearchEnabled = W(t.enabled, n.ai.vectorSearchEnabled ?? !0), n.ai.vectorCaptionOnIndex = W(t.caption_on_index ?? t.captionOnIndex, n.ai.vectorCaptionOnIndex ?? !1), n.ai.vectorIndexOnScan = W(t.index_on_scan ?? t.indexOnScan, n.ai.vectorIndexOnScan ?? !1), n.ai.vectorUnloadAfterUse = W(t.unload_after_use ?? t.unloadAfterUse, n.ai.vectorUnloadAfterUse ?? !1), n.ai.vectorConcurrency = Math.max(1, Math.min(16, Math.floor(Number(t.concurrency ?? n.ai.vectorConcurrency ?? 1) || 1))), J(n), Y(n), Oe("mjr-settings-changed", { key: "ai.vectorSearch" }, { warnPrefix: "[Majoor]" });
 	} catch (e) {
 		console.warn("[Majoor] failed to sync backend vector search settings", e);
 	}
@@ -330,8 +330,8 @@ async function jt() {
 		if (!e?.ok) return;
 		let t = e.data?.prefs;
 		if (!t || typeof t != "object") return;
-		let n = K();
-		n.executionGrouping = n.executionGrouping || {}, n.executionGrouping.enabled = U(t.enabled, n.executionGrouping.enabled ?? A.EXECUTION_GROUPING_ENABLED), q(n), J(n), ke("mjr-settings-changed", { key: "executionGrouping.enabled" }, { warnPrefix: "[Majoor]" });
+		let n = q();
+		n.executionGrouping = n.executionGrouping || {}, n.executionGrouping.enabled = W(t.enabled, n.executionGrouping.enabled ?? j.EXECUTION_GROUPING_ENABLED), J(n), Y(n), Oe("mjr-settings-changed", { key: "executionGrouping.enabled" }, { warnPrefix: "[Majoor]" });
 	} catch (e) {
 		console.warn("[Majoor] failed to sync backend execution grouping settings", e);
 	}
@@ -341,7 +341,7 @@ async function jt() {
 var Mt = "mjr-runtime-status-dashboard", Nt = 3e4;
 function Pt() {
 	try {
-		let e = K(), t = String(e?.observability?.runtimeDashboardMode || G.observability.runtimeDashboardMode);
+		let e = q(), t = String(e?.observability?.runtimeDashboardMode || K.observability.runtimeDashboardMode);
 		return [
 			"autoHide30",
 			"always",
@@ -374,22 +374,22 @@ function Lt(e, t) {
 function Rt(e) {
 	let t = String(e?.token_hint || "").trim(), n = f(), r = t || (n ? "(session)" : ""), i = e?.allow_write !== !1, a = e?.require_auth === !0, o = e?.token_configured === !0;
 	return i ? n ? {
-		text: j("runtime.writeAuthActive", "Write auth: active {tokenHint}", { tokenHint: r || "(session)" }),
+		text: M("runtime.writeAuthActive", "Write auth: active {tokenHint}", { tokenHint: r || "(session)" }),
 		color: "#7ee0a0"
 	} : a && o ? {
-		text: j("runtime.writeAuthMissing", "Write auth: missing in this browser {tokenHint}", { tokenHint: r || "(server token configured)" }),
+		text: M("runtime.writeAuthMissing", "Write auth: missing in this browser {tokenHint}", { tokenHint: r || "(server token configured)" }),
 		color: "#f1c36d"
 	} : a ? {
-		text: j("runtime.writeAuthRequired", "Write auth: required"),
+		text: M("runtime.writeAuthRequired", "Write auth: required"),
 		color: "#f1c36d"
 	} : e && typeof e == "object" ? {
-		text: j("runtime.writeAuthNotRequired", "Write auth: not required"),
+		text: M("runtime.writeAuthNotRequired", "Write auth: not required"),
 		color: "#8fd0ff"
 	} : {
-		text: j("runtime.writeAuthUnknown", "Write auth: unknown"),
+		text: M("runtime.writeAuthUnknown", "Write auth: unknown"),
 		color: "#c8ced8"
 	} : {
-		text: j("runtime.writeAuthBlocked", "Write auth: writes blocked by server"),
+		text: M("runtime.writeAuthBlocked", "Write auth: writes blocked by server"),
 		color: "#ff9b9b"
 	};
 }
@@ -422,15 +422,15 @@ async function Bt() {
 	if (!t) return !1;
 	let n = Lt(t, "metrics"), r = Lt(t, "auth");
 	try {
-		let [i, a] = await Promise.all([b(), e()]), o = j("runtime.unavailable", "Runtime: unavailable");
+		let [i, a] = await Promise.all([b(), e()]), o = M("runtime.unavailable", "Runtime: unavailable");
 		if (!i?.ok || !i?.data) n.textContent = o;
 		else {
 			let e = i.data.db || {}, t = i.data.index || {}, r = i.data.watcher || {}, a = Number(e.active_connections || 0), s = Number(t.enrichment_queue_length || 0), c = Number(r.pending_files || 0);
-			n.textContent = j("runtime.metricsLine", "DB active: {active} | Enrich Q: {enrichQ} | Watcher pending: {pending}", {
+			n.textContent = M("runtime.metricsLine", "DB active: {active} | Enrich Q: {enrichQ} | Watcher pending: {pending}", {
 				active: a,
 				enrichQ: s,
 				pending: c
-			}), o = j("runtime.metricsTitle", "Runtime Metrics\nDB active connections: {active}\nEnrichment queue: {enrichQ}\nWatcher pending files: {pending}", {
+			}), o = M("runtime.metricsTitle", "Runtime Metrics\nDB active connections: {active}\nEnrichment queue: {enrichQ}\nWatcher pending files: {pending}", {
 				active: a,
 				enrichQ: s,
 				pending: c
@@ -439,7 +439,7 @@ async function Bt() {
 		let s = Rt(a?.data?.prefs || null);
 		return r.textContent = s.text, r.style.color = s.color, t.title = `${o}\n${s.text}`, !0;
 	} catch {
-		return n.textContent = j("runtime.unavailable", "Runtime: unavailable"), r.textContent = j("runtime.writeAuthUnknown", "Write auth: unknown"), r.style.color = "#c8ced8", t.title = `${j("runtime.unavailable", "Runtime: unavailable")}\n${r.textContent}`, !0;
+		return n.textContent = M("runtime.unavailable", "Runtime: unavailable"), r.textContent = M("runtime.writeAuthUnknown", "Write auth: unknown"), r.style.color = "#c8ced8", t.title = `${M("runtime.unavailable", "Runtime: unavailable")}\n${r.textContent}`, !0;
 	}
 }
 function Vt() {
@@ -485,7 +485,7 @@ function Ut(e, t = Ht) {
 }
 //#endregion
 //#region ui/app/settings/settingsGrid.ts
-var Y = "Majoor", Wt = "Majoor Assets Manager";
+var X = "Majoor", Wt = "Majoor Assets Manager";
 function Gt(e, t, n) {
 	let r = (e, t) => [
 		Wt,
@@ -493,46 +493,46 @@ function Gt(e, t, n) {
 		t
 	], i = (e) => [
 		Wt,
-		j("cat.cards", "Cards"),
+		M("cat.cards", "Cards"),
 		e
 	], a = (e) => [
 		Wt,
-		j("cat.badges", "Badges"),
+		M("cat.badges", "Badges"),
 		e
 	], o = (e) => [
 		Wt,
-		j("cat.badges", "Badges"),
+		M("cat.badges", "Badges"),
 		e
 	], s = (e, t) => {
 		let n = String(e || "").trim();
 		return /^[0-9a-fA-F]{6}$/.test(n) && (n = `#${n}`), /^#[0-9a-fA-F]{6}$/.test(n) ? n.toUpperCase() : t;
 	};
-	t.grid?.minSizePreset || (t.grid = t.grid || {}, t.grid.minSizePreset = Ot(t.grid.minSize), q(t)), e({
-		id: `${Y}.Cards.ThumbSize`,
-		category: i(j("setting.grid.cardSize.group", "Card size")),
-		name: j("setting.grid.cardSize.name", "Majoor: Card Size"),
-		tooltip: j("setting.grid.cardSize.desc", "Choose the card size preset used by the grid layout."),
+	t.grid?.minSizePreset || (t.grid = t.grid || {}, t.grid.minSizePreset = Ot(t.grid.minSize), J(t)), e({
+		id: `${X}.Cards.ThumbSize`,
+		category: i(M("setting.grid.cardSize.group", "Card size")),
+		name: M("setting.grid.cardSize.name", "Majoor: Card Size"),
+		tooltip: M("setting.grid.cardSize.desc", "Choose the card size preset used by the grid layout."),
 		type: "combo",
 		defaultValue: (() => {
 			let e = bt(String(t.grid?.minSizePreset || "").toLowerCase(), wt, Ot(t.grid?.minSize)), n = {
-				small: j("setting.grid.cardSize.small", "Small"),
-				medium: j("setting.grid.cardSize.medium", "Medium"),
-				large: j("setting.grid.cardSize.large", "Large")
+				small: M("setting.grid.cardSize.small", "Small"),
+				medium: M("setting.grid.cardSize.medium", "Medium"),
+				large: M("setting.grid.cardSize.large", "Large")
 			};
 			return n[e] || n.medium;
 		})(),
 		options: [
-			j("setting.grid.cardSize.small", "Small"),
-			j("setting.grid.cardSize.medium", "Medium"),
-			j("setting.grid.cardSize.large", "Large")
+			M("setting.grid.cardSize.small", "Small"),
+			M("setting.grid.cardSize.medium", "Medium"),
+			M("setting.grid.cardSize.large", "Large")
 		],
 		onChange: (e) => {
-			let r = String(e || "").trim().toLowerCase(), i = j("setting.grid.cardSize.small", "Small").toLowerCase(), a = j("setting.grid.cardSize.medium", "Medium").toLowerCase(), o = j("setting.grid.cardSize.large", "Large").toLowerCase(), s = "medium";
-			r === i || r === "small" || r === "petit" ? s = "small" : r === o || r === "large" || r === "grand" ? s = "large" : (r === a || r === "medium" || r === "moyen") && (s = "medium"), t.grid.minSizePreset = s, t.grid.minSize = Ct[s], q(t), J(t), n("grid.minSizePreset");
+			let r = String(e || "").trim().toLowerCase(), i = M("setting.grid.cardSize.small", "Small").toLowerCase(), a = M("setting.grid.cardSize.medium", "Medium").toLowerCase(), o = M("setting.grid.cardSize.large", "Large").toLowerCase(), s = "medium";
+			r === i || r === "small" || r === "petit" ? s = "small" : r === o || r === "large" || r === "grand" ? s = "large" : (r === a || r === "medium" || r === "moyen") && (s = "medium"), t.grid.minSizePreset = s, t.grid.minSize = Ct[s], J(t), Y(t), n("grid.minSizePreset");
 		}
 	}), e({
-		id: `${Y}.Cards.CustomThumbSize`,
-		category: i(j("setting.grid.cardSize.group", "Card size")),
+		id: `${X}.Cards.CustomThumbSize`,
+		category: i(M("setting.grid.cardSize.group", "Card size")),
 		name: "Majoor: Custom Card Size (px)",
 		tooltip: "Set the minimum card width used by the main grid layout (60-600 px).",
 		type: "number",
@@ -544,192 +544,192 @@ function Gt(e, t, n) {
 		},
 		onChange: (e) => {
 			let r = Math.max(60, Math.min(600, Math.round(Number(e) || 120)));
-			t.grid.minSize = r, t.grid.minSizePreset = Ot(r), q(t), J(t), n("grid.minSize");
+			t.grid.minSize = r, t.grid.minSizePreset = Ot(r), J(t), Y(t), n("grid.minSize");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowDetails`,
+		id: `${X}.Grid.ShowDetails`,
 		category: i("Show card details"),
 		name: "Show metadata panel",
 		tooltip: "Show the bottom details panel on asset cards (filename, date, etc.)",
 		type: "boolean",
 		defaultValue: !!t.grid?.showDetails,
 		onChange: (e) => {
-			t.grid.showDetails = !!e, q(t), J(t), n("grid.showDetails");
+			t.grid.showDetails = !!e, J(t), Y(t), n("grid.showDetails");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowFilename`,
+		id: `${X}.Grid.ShowFilename`,
 		category: i("Show filename"),
 		name: "Show filename",
 		tooltip: "Display filename in details panel",
 		type: "boolean",
 		defaultValue: !!t.grid?.showFilename,
 		onChange: (e) => {
-			t.grid.showFilename = !!e, q(t), J(t), n("grid.showFilename");
+			t.grid.showFilename = !!e, J(t), Y(t), n("grid.showFilename");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowDate`,
+		id: `${X}.Grid.ShowDate`,
 		category: i("Show date/time"),
 		name: "Show date/time",
 		tooltip: "Display date and time in details panel",
 		type: "boolean",
 		defaultValue: !!t.grid?.showDate,
 		onChange: (e) => {
-			t.grid.showDate = !!e, q(t), J(t), n("grid.showDate");
+			t.grid.showDate = !!e, J(t), Y(t), n("grid.showDate");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowDimensions`,
+		id: `${X}.Grid.ShowDimensions`,
 		category: i("Show dimensions"),
 		name: "Show dimensions",
 		tooltip: "Display resolution (WxH) in details panel",
 		type: "boolean",
 		defaultValue: !!t.grid?.showDimensions,
 		onChange: (e) => {
-			t.grid.showDimensions = !!e, q(t), J(t), n("grid.showDimensions");
+			t.grid.showDimensions = !!e, J(t), Y(t), n("grid.showDimensions");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowGenTime`,
+		id: `${X}.Grid.ShowGenTime`,
 		category: i("Show generation time"),
 		name: "Show generation time",
 		tooltip: "Display seconds taken to generate the asset (if available)",
 		type: "boolean",
-		defaultValue: !!(t.grid?.showGenTime ?? A.GRID_SHOW_DETAILS_GENTIME),
+		defaultValue: !!(t.grid?.showGenTime ?? j.GRID_SHOW_DETAILS_GENTIME),
 		onChange: (e) => {
-			t.grid.showGenTime = !!e, q(t), J(t), n("grid.showGenTime");
+			t.grid.showGenTime = !!e, J(t), Y(t), n("grid.showGenTime");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowHoverInfo`,
+		id: `${X}.Grid.ShowHoverInfo`,
 		category: i("Show prompt on hover"),
 		name: "Show prompt on hover",
 		tooltip: "Show positive prompt and generation time as a tooltip overlay when hovering over a card thumbnail. Does not block video play-on-hover.",
 		type: "boolean",
-		defaultValue: !!(t.grid?.showHoverInfo ?? A.GRID_SHOW_HOVER_INFO),
+		defaultValue: !!(t.grid?.showHoverInfo ?? j.GRID_SHOW_HOVER_INFO),
 		onChange: (e) => {
-			t.grid.showHoverInfo = !!e, q(t), J(t), n("grid.showHoverInfo");
+			t.grid.showHoverInfo = !!e, J(t), Y(t), n("grid.showHoverInfo");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowWorkflowDot`,
+		id: `${X}.Grid.ShowWorkflowDot`,
 		category: i("Show workflow dot"),
 		name: "Show workflow indicator",
 		tooltip: "Display the green dot indicating workflow metadata availability (bottom right of card)",
 		type: "boolean",
 		defaultValue: !!t.grid?.showWorkflowDot,
 		onChange: (e) => {
-			t.grid.showWorkflowDot = !!e, q(t), J(t), n("grid.showWorkflowDot");
+			t.grid.showWorkflowDot = !!e, J(t), Y(t), n("grid.showWorkflowDot");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowExtBadge`,
+		id: `${X}.Grid.ShowExtBadge`,
 		category: a("Show format badges"),
 		name: "Show format badges",
 		tooltip: "Display format badges (e.g. JPG, MP4) on thumbnails",
 		type: "boolean",
 		defaultValue: !!t.grid?.showExtBadge,
 		onChange: (e) => {
-			t.grid.showExtBadge = !!e, q(t), J(t), n("grid.showExtBadge");
+			t.grid.showExtBadge = !!e, J(t), Y(t), n("grid.showExtBadge");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowRatingBadge`,
+		id: `${X}.Grid.ShowRatingBadge`,
 		category: a("Show rating badges"),
 		name: "Show ratings",
 		tooltip: "Display star ratings on thumbnails",
 		type: "boolean",
 		defaultValue: !!t.grid?.showRatingBadge,
 		onChange: (e) => {
-			t.grid.showRatingBadge = !!e, q(t), J(t), n("grid.showRatingBadge");
+			t.grid.showRatingBadge = !!e, J(t), Y(t), n("grid.showRatingBadge");
 		}
 	}), e({
-		id: `${Y}.Grid.ShowTagsBadge`,
+		id: `${X}.Grid.ShowTagsBadge`,
 		category: a("Show tags badges"),
 		name: "Show tags",
 		tooltip: "Display a small indicator if an asset has tags",
 		type: "boolean",
 		defaultValue: !!t.grid?.showTagsBadge,
 		onChange: (e) => {
-			t.grid.showTagsBadge = !!e, q(t), J(t), n("grid.showTagsBadge");
+			t.grid.showTagsBadge = !!e, J(t), Y(t), n("grid.showTagsBadge");
 		}
 	}), e({
-		id: `${Y}.Badges.StarColor`,
-		category: o(j("setting.starColor", "Star color")),
-		name: j("setting.starColor", "Majoor: Star color"),
-		tooltip: j("setting.starColor.tooltip", "Color of rating stars on thumbnails (hex, e.g. #FFD45A)"),
+		id: `${X}.Badges.StarColor`,
+		category: o(M("setting.starColor", "Star color")),
+		name: M("setting.starColor", "Majoor: Star color"),
+		tooltip: M("setting.starColor.tooltip", "Color of rating stars on thumbnails (hex, e.g. #FFD45A)"),
 		type: "color",
-		defaultValue: s(t.grid?.starColor, A.BADGE_STAR_COLOR),
+		defaultValue: s(t.grid?.starColor, j.BADGE_STAR_COLOR),
 		onChange: (e) => {
-			t.grid.starColor = s(e, A.BADGE_STAR_COLOR), q(t), J(t), n("grid.starColor");
+			t.grid.starColor = s(e, j.BADGE_STAR_COLOR), J(t), Y(t), n("grid.starColor");
 		}
 	}), e({
-		id: `${Y}.Badges.ImageColor`,
-		category: o(j("setting.badgeImageColor", "Image badge color")),
-		name: j("setting.badgeImageColor", "Majoor: Image badge color"),
-		tooltip: j("setting.badgeImageColor.tooltip", "Color for image badges: PNG, JPG, WEBP, GIF, BMP, TIF (hex)"),
+		id: `${X}.Badges.ImageColor`,
+		category: o(M("setting.badgeImageColor", "Image badge color")),
+		name: M("setting.badgeImageColor", "Majoor: Image badge color"),
+		tooltip: M("setting.badgeImageColor.tooltip", "Color for image badges: PNG, JPG, WEBP, GIF, BMP, TIF (hex)"),
 		type: "color",
-		defaultValue: s(t.grid?.badgeImageColor, A.BADGE_IMAGE_COLOR),
+		defaultValue: s(t.grid?.badgeImageColor, j.BADGE_IMAGE_COLOR),
 		onChange: (e) => {
-			t.grid.badgeImageColor = s(e, A.BADGE_IMAGE_COLOR), q(t), J(t), n("grid.badgeImageColor");
+			t.grid.badgeImageColor = s(e, j.BADGE_IMAGE_COLOR), J(t), Y(t), n("grid.badgeImageColor");
 		}
 	}), e({
-		id: `${Y}.Badges.VideoColor`,
-		category: o(j("setting.badgeVideoColor", "Video badge color")),
-		name: j("setting.badgeVideoColor", "Majoor: Video badge color"),
-		tooltip: j("setting.badgeVideoColor.tooltip", "Color for video badges: MP4, WEBM, MOV, AVI, MKV (hex)"),
+		id: `${X}.Badges.VideoColor`,
+		category: o(M("setting.badgeVideoColor", "Video badge color")),
+		name: M("setting.badgeVideoColor", "Majoor: Video badge color"),
+		tooltip: M("setting.badgeVideoColor.tooltip", "Color for video badges: MP4, WEBM, MOV, AVI, MKV (hex)"),
 		type: "color",
-		defaultValue: s(t.grid?.badgeVideoColor, A.BADGE_VIDEO_COLOR),
+		defaultValue: s(t.grid?.badgeVideoColor, j.BADGE_VIDEO_COLOR),
 		onChange: (e) => {
-			t.grid.badgeVideoColor = s(e, A.BADGE_VIDEO_COLOR), q(t), J(t), n("grid.badgeVideoColor");
+			t.grid.badgeVideoColor = s(e, j.BADGE_VIDEO_COLOR), J(t), Y(t), n("grid.badgeVideoColor");
 		}
 	}), e({
-		id: `${Y}.Badges.AudioColor`,
-		category: o(j("setting.badgeAudioColor", "Audio badge color")),
-		name: j("setting.badgeAudioColor", "Majoor: Audio badge color"),
-		tooltip: j("setting.badgeAudioColor.tooltip", "Color for audio badges: MP3, WAV, OGG, FLAC (hex)"),
+		id: `${X}.Badges.AudioColor`,
+		category: o(M("setting.badgeAudioColor", "Audio badge color")),
+		name: M("setting.badgeAudioColor", "Majoor: Audio badge color"),
+		tooltip: M("setting.badgeAudioColor.tooltip", "Color for audio badges: MP3, WAV, OGG, FLAC (hex)"),
 		type: "color",
-		defaultValue: s(t.grid?.badgeAudioColor, A.BADGE_AUDIO_COLOR),
+		defaultValue: s(t.grid?.badgeAudioColor, j.BADGE_AUDIO_COLOR),
 		onChange: (e) => {
-			t.grid.badgeAudioColor = s(e, A.BADGE_AUDIO_COLOR), q(t), J(t), n("grid.badgeAudioColor");
+			t.grid.badgeAudioColor = s(e, j.BADGE_AUDIO_COLOR), J(t), Y(t), n("grid.badgeAudioColor");
 		}
 	}), e({
-		id: `${Y}.Badges.Model3dColor`,
-		category: o(j("setting.badgeModel3dColor", "3D model badge color")),
-		name: j("setting.badgeModel3dColor", "Majoor: 3D model badge color"),
-		tooltip: j("setting.badgeModel3dColor.tooltip", "Color for 3D model badges: OBJ, FBX, GLB, GLTF (hex)"),
+		id: `${X}.Badges.Model3dColor`,
+		category: o(M("setting.badgeModel3dColor", "3D model badge color")),
+		name: M("setting.badgeModel3dColor", "Majoor: 3D model badge color"),
+		tooltip: M("setting.badgeModel3dColor.tooltip", "Color for 3D model badges: OBJ, FBX, GLB, GLTF (hex)"),
 		type: "color",
-		defaultValue: s(t.grid?.badgeModel3dColor, A.BADGE_MODEL3D_COLOR),
+		defaultValue: s(t.grid?.badgeModel3dColor, j.BADGE_MODEL3D_COLOR),
 		onChange: (e) => {
-			t.grid.badgeModel3dColor = s(e, A.BADGE_MODEL3D_COLOR), q(t), J(t), n("grid.badgeModel3dColor");
+			t.grid.badgeModel3dColor = s(e, j.BADGE_MODEL3D_COLOR), J(t), Y(t), n("grid.badgeModel3dColor");
 		}
 	}), e({
-		id: `${Y}.Badges.DuplicateAlertColor`,
-		category: o(j("setting.badgeDuplicateAlertColor", "Duplicate alert badge color")),
-		name: j("setting.badgeDuplicateAlertColor", "Majoor: Duplicate alert badge color"),
-		tooltip: j("setting.badgeDuplicateAlertColor.tooltip", "Color for duplicate extension badges (PNG+, JPG+, etc)."),
+		id: `${X}.Badges.DuplicateAlertColor`,
+		category: o(M("setting.badgeDuplicateAlertColor", "Duplicate alert badge color")),
+		name: M("setting.badgeDuplicateAlertColor", "Majoor: Duplicate alert badge color"),
+		tooltip: M("setting.badgeDuplicateAlertColor.tooltip", "Color for duplicate extension badges (PNG+, JPG+, etc)."),
 		type: "color",
-		defaultValue: s(t.grid?.badgeDuplicateAlertColor, A.BADGE_DUPLICATE_ALERT_COLOR),
+		defaultValue: s(t.grid?.badgeDuplicateAlertColor, j.BADGE_DUPLICATE_ALERT_COLOR),
 		onChange: (e) => {
-			t.grid.badgeDuplicateAlertColor = s(e, A.BADGE_DUPLICATE_ALERT_COLOR), q(t), J(t), n("grid.badgeDuplicateAlertColor");
+			t.grid.badgeDuplicateAlertColor = s(e, j.BADGE_DUPLICATE_ALERT_COLOR), J(t), Y(t), n("grid.badgeDuplicateAlertColor");
 		}
 	}), e({
-		id: `${Y}.Grid.PageSize`,
-		category: r(j("cat.grid"), j("setting.grid.pagesize.name").replace("Majoor: ", "")),
-		name: j("setting.grid.pagesize.name"),
-		tooltip: j("setting.grid.pagesize.desc"),
+		id: `${X}.Grid.PageSize`,
+		category: r(M("cat.grid"), M("setting.grid.pagesize.name").replace("Majoor: ", "")),
+		name: M("setting.grid.pagesize.name"),
+		tooltip: M("setting.grid.pagesize.desc"),
 		type: "number",
 		defaultValue: t.grid.pageSize,
 		attrs: {
 			min: 50,
-			max: Number(k.MAX_PAGE_SIZE) || 2e3,
+			max: Number(A.MAX_PAGE_SIZE) || 2e3,
 			step: 50
 		},
 		onChange: (e) => {
-			let r = Number(k.MAX_PAGE_SIZE) || 2e3;
-			t.grid.pageSize = Math.max(50, Math.min(r, Number(e) || A.DEFAULT_PAGE_SIZE)), q(t), J(t), n("grid.pageSize");
+			let r = Number(A.MAX_PAGE_SIZE) || 2e3;
+			t.grid.pageSize = Math.max(50, Math.min(r, Number(e) || j.DEFAULT_PAGE_SIZE)), J(t), Y(t), n("grid.pageSize");
 		}
 	}), e({
-		id: `${Y}.Grid.WorkflowGroupBy`,
-		category: r(j("cat.grid"), "Workflow grouping"),
+		id: `${X}.Grid.WorkflowGroupBy`,
+		category: r(M("cat.grid"), "Workflow grouping"),
 		name: "Workflow grid grouping",
 		tooltip: "In Workflow scope, insert titled separators and group cards by Task, Model, or Category.",
 		type: "combo",
 		defaultValue: (() => {
-			let e = String(t.grid?.workflowGroupBy || A.WORKFLOW_GRID_GROUP_BY).trim().toLowerCase(), n = {
+			let e = String(t.grid?.workflowGroupBy || j.WORKFLOW_GRID_GROUP_BY).trim().toLowerCase(), n = {
 				none: "None",
 				task: "Task",
 				model: "Model",
@@ -750,52 +750,52 @@ function Gt(e, t, n) {
 				Model: "model",
 				Category: "category"
 			}[String(e || "")] || "none";
-			t.grid = t.grid || {}, t.grid.workflowGroupBy = r, q(t), J(t), n("grid.workflowGroupBy");
+			t.grid = t.grid || {}, t.grid.workflowGroupBy = r, J(t), Y(t), n("grid.workflowGroupBy");
 		}
 	}), e({
-		id: `${Y}.InfiniteScroll.Enabled`,
-		category: r(j("cat.grid"), j("setting.nav.infinite.name").replace("Majoor: ", "")),
-		name: j("setting.nav.infinite.name"),
-		tooltip: j("setting.nav.infinite.desc"),
+		id: `${X}.InfiniteScroll.Enabled`,
+		category: r(M("cat.grid"), M("setting.nav.infinite.name").replace("Majoor: ", "")),
+		name: M("setting.nav.infinite.name"),
+		tooltip: M("setting.nav.infinite.desc"),
 		type: "boolean",
 		defaultValue: !!t.infiniteScroll?.enabled,
 		onChange: (e) => {
-			t.infiniteScroll = t.infiniteScroll || {}, t.infiniteScroll.enabled = !!e, q(t), J(t), n("infiniteScroll.enabled");
+			t.infiniteScroll = t.infiniteScroll || {}, t.infiniteScroll.enabled = !!e, J(t), Y(t), n("infiniteScroll.enabled");
 		}
 	}), e({
-		id: `${Y}.Sidebar.Position`,
-		category: r(j("cat.grid"), j("setting.sidebar.pos.name").replace("Majoor: ", "")),
-		name: j("setting.sidebar.pos.name"),
-		tooltip: j("setting.sidebar.pos.desc"),
+		id: `${X}.Sidebar.Position`,
+		category: r(M("cat.grid"), M("setting.sidebar.pos.name").replace("Majoor: ", "")),
+		name: M("setting.sidebar.pos.name"),
+		tooltip: M("setting.sidebar.pos.desc"),
 		type: "combo",
 		defaultValue: t.sidebar?.position || "right",
 		options: ["left", "right"],
 		onChange: (e) => {
-			t.sidebar = t.sidebar || {}, t.sidebar.position = e === "left" ? "left" : "right", q(t), n("sidebar.position");
+			t.sidebar = t.sidebar || {}, t.sidebar.position = e === "left" ? "left" : "right", J(t), n("sidebar.position");
 		}
 	}), e({
-		id: `${Y}.Sidebar.ShowPreviewThumb`,
-		category: r(j("cat.grid"), "Sidebar preview"),
+		id: `${X}.Sidebar.ShowPreviewThumb`,
+		category: r(M("cat.grid"), "Sidebar preview"),
 		name: "Show sidebar preview thumb",
 		tooltip: "Show/hide the large media preview at the top of the sidebar metadata panel.",
 		type: "boolean",
 		defaultValue: !!(t.sidebar?.showPreviewThumb ?? !0),
 		onChange: (e) => {
-			t.sidebar = t.sidebar || {}, t.sidebar.showPreviewThumb = !!e, q(t), n("sidebar.showPreviewThumb");
+			t.sidebar = t.sidebar || {}, t.sidebar.showPreviewThumb = !!e, J(t), n("sidebar.showPreviewThumb");
 		}
 	}), e({
-		id: `${Y}.Sidebar.AssetBadgeEnabled`,
-		category: r(j("cat.grid"), "Sidebar asset notification badge"),
+		id: `${X}.Sidebar.AssetBadgeEnabled`,
+		category: r(M("cat.grid"), "Sidebar asset notification badge"),
 		name: "Show new asset badge on sidebar icon",
 		tooltip: "Display a small counter on the Majoor sidebar icon only when a new asset is indexed by Assets Manager.",
 		type: "boolean",
-		defaultValue: !!(t.sidebar?.assetBadgeEnabled ?? A.SIDEBAR_ASSET_BADGE_ENABLED),
+		defaultValue: !!(t.sidebar?.assetBadgeEnabled ?? j.SIDEBAR_ASSET_BADGE_ENABLED),
 		onChange: (e) => {
-			t.sidebar = t.sidebar || {}, t.sidebar.assetBadgeEnabled = !!e, q(t), J(t), n("sidebar.assetBadgeEnabled");
+			t.sidebar = t.sidebar || {}, t.sidebar.assetBadgeEnabled = !!e, J(t), Y(t), n("sidebar.assetBadgeEnabled");
 		}
 	}), e({
-		id: `${Y}.Sidebar.WidthPx`,
-		category: r(j("cat.grid"), "Sidebar width"),
+		id: `${X}.Sidebar.WidthPx`,
+		category: r(M("cat.grid"), "Sidebar width"),
 		name: "Sidebar width (px)",
 		tooltip: "Set the details sidebar width in pixels (240-640).",
 		type: "number",
@@ -806,86 +806,86 @@ function Gt(e, t, n) {
 			step: 10
 		},
 		onChange: (e) => {
-			t.sidebar = t.sidebar || {}, t.sidebar.widthPx = Math.max(240, Math.min(640, Math.round(Number(e) || 360))), q(t), n("sidebar.widthPx");
+			t.sidebar = t.sidebar || {}, t.sidebar.widthPx = Math.max(240, Math.min(640, Math.round(Number(e) || 360))), J(t), n("sidebar.widthPx");
 		}
 	}), e({
-		id: `${Y}.General.HideSiblings`,
-		category: r(j("cat.grid"), j("setting.siblings.hide.name").replace("Majoor: ", "")),
-		name: j("setting.siblings.hide.name"),
-		tooltip: j("setting.siblings.hide.desc"),
+		id: `${X}.General.HideSiblings`,
+		category: r(M("cat.grid"), M("setting.siblings.hide.name").replace("Majoor: ", "")),
+		name: M("setting.siblings.hide.name"),
+		tooltip: M("setting.siblings.hide.desc"),
 		type: "boolean",
 		defaultValue: !!t.siblings?.hidePngSiblings,
 		onChange: (e) => {
-			t.siblings = t.siblings || {}, t.siblings.hidePngSiblings = !!e, q(t), n("siblings.hidePngSiblings");
+			t.siblings = t.siblings || {}, t.siblings.hidePngSiblings = !!e, J(t), n("siblings.hidePngSiblings");
 		}
 	}), e({
-		id: `${Y}.Grid.VideoAutoplayMode`,
-		category: r(j("cat.grid"), j("setting.grid.videoAutoplayMode.name", "Video autoplay").replace("Majoor: ", "")),
-		name: j("setting.grid.videoAutoplayMode.name", "Majoor: Video autoplay"),
-		tooltip: j("setting.grid.videoAutoplayMode.desc", "Controls video thumbnail playback in the grid. Off: static frame. Hover: play on mouse hover. Always: loop while visible."),
+		id: `${X}.Grid.VideoAutoplayMode`,
+		category: r(M("cat.grid"), M("setting.grid.videoAutoplayMode.name", "Video autoplay").replace("Majoor: ", "")),
+		name: M("setting.grid.videoAutoplayMode.name", "Majoor: Video autoplay"),
+		tooltip: M("setting.grid.videoAutoplayMode.desc", "Controls video thumbnail playback in the grid. Off: static frame. Hover: play on mouse hover. Always: loop while visible."),
 		type: "combo",
 		defaultValue: (() => {
 			let e = t.grid?.videoAutoplayMode;
 			e ??= t.grid?.videoHoverAutoplay === !1 ? "off" : "hover", e === !0 && (e = "hover"), e === !1 && (e = "off"), e !== "hover" && e !== "always" && e !== "off" && (e = "hover");
 			let n = {
-				off: j("setting.grid.videoAutoplayMode.off", "Off"),
-				hover: j("setting.grid.videoAutoplayMode.hover", "Hover"),
-				always: j("setting.grid.videoAutoplayMode.always", "Always")
+				off: M("setting.grid.videoAutoplayMode.off", "Off"),
+				hover: M("setting.grid.videoAutoplayMode.hover", "Hover"),
+				always: M("setting.grid.videoAutoplayMode.always", "Always")
 			};
 			return n[e] || n.off;
 		})(),
 		options: [
-			j("setting.grid.videoAutoplayMode.off", "Off"),
-			j("setting.grid.videoAutoplayMode.hover", "Hover"),
-			j("setting.grid.videoAutoplayMode.always", "Always")
+			M("setting.grid.videoAutoplayMode.off", "Off"),
+			M("setting.grid.videoAutoplayMode.hover", "Hover"),
+			M("setting.grid.videoAutoplayMode.always", "Always")
 		],
 		onChange: (e) => {
 			let r = {
-				[j("setting.grid.videoAutoplayMode.off", "Off")]: "off",
-				[j("setting.grid.videoAutoplayMode.hover", "Hover")]: "hover",
-				[j("setting.grid.videoAutoplayMode.always", "Always")]: "always"
+				[M("setting.grid.videoAutoplayMode.off", "Off")]: "off",
+				[M("setting.grid.videoAutoplayMode.hover", "Hover")]: "hover",
+				[M("setting.grid.videoAutoplayMode.always", "Always")]: "always"
 			}[e] || "off";
-			t.grid = t.grid || {}, t.grid.videoAutoplayMode = r, delete t.grid.videoHoverAutoplay, q(t), J(t), n("grid.videoAutoplayMode");
+			t.grid = t.grid || {}, t.grid.videoAutoplayMode = r, delete t.grid.videoHoverAutoplay, J(t), Y(t), n("grid.videoAutoplayMode");
 		}
 	}), e({
-		id: `${Y}.Cards.HoverColor`,
+		id: `${X}.Cards.HoverColor`,
 		category: i("Hover color"),
 		name: "Majoor: Card hover color",
 		tooltip: "Background tint used when hovering a card (hex, e.g. #3D3D3D).",
 		type: "color",
-		defaultValue: s(t.ui?.cardHoverColor, A.UI_CARD_HOVER_COLOR),
+		defaultValue: s(t.ui?.cardHoverColor, j.UI_CARD_HOVER_COLOR),
 		onChange: (e) => {
-			t.ui = t.ui || {}, t.ui.cardHoverColor = s(e, A.UI_CARD_HOVER_COLOR), q(t), J(t), n("ui.cardHoverColor");
+			t.ui = t.ui || {}, t.ui.cardHoverColor = s(e, j.UI_CARD_HOVER_COLOR), J(t), Y(t), n("ui.cardHoverColor");
 		}
 	}), e({
-		id: `${Y}.Cards.SelectionColor`,
+		id: `${X}.Cards.SelectionColor`,
 		category: i("Selection color"),
 		name: "Majoor: Card selection color",
 		tooltip: "Outline/accent color used for selected cards (hex, e.g. #4A90E2).",
 		type: "color",
-		defaultValue: s(t.ui?.cardSelectionColor, A.UI_CARD_SELECTION_COLOR),
+		defaultValue: s(t.ui?.cardSelectionColor, j.UI_CARD_SELECTION_COLOR),
 		onChange: (e) => {
-			t.ui = t.ui || {}, t.ui.cardSelectionColor = s(e, A.UI_CARD_SELECTION_COLOR), q(t), J(t), n("ui.cardSelectionColor");
+			t.ui = t.ui || {}, t.ui.cardSelectionColor = s(e, j.UI_CARD_SELECTION_COLOR), J(t), Y(t), n("ui.cardSelectionColor");
 		}
 	}), e({
-		id: `${Y}.Badges.RatingColor`,
+		id: `${X}.Badges.RatingColor`,
 		category: a("Rating color"),
 		name: "Majoor: Rating badge color",
 		tooltip: "Color used for rating badge text/accent (hex, e.g. #FF9500).",
 		type: "color",
-		defaultValue: s(t.ui?.ratingColor, A.UI_RATING_COLOR),
+		defaultValue: s(t.ui?.ratingColor, j.UI_RATING_COLOR),
 		onChange: (e) => {
-			t.ui = t.ui || {}, t.ui.ratingColor = s(e, A.UI_RATING_COLOR), q(t), J(t), n("ui.ratingColor");
+			t.ui = t.ui || {}, t.ui.ratingColor = s(e, j.UI_RATING_COLOR), J(t), Y(t), n("ui.ratingColor");
 		}
 	}), e({
-		id: `${Y}.Badges.TagColor`,
+		id: `${X}.Badges.TagColor`,
 		category: a("Tag color"),
 		name: "Majoor: Tags badge color",
 		tooltip: "Color used for tags badge text/accent (hex, e.g. #4A90E2).",
 		type: "color",
-		defaultValue: s(t.ui?.tagColor, A.UI_TAG_COLOR),
+		defaultValue: s(t.ui?.tagColor, j.UI_TAG_COLOR),
 		onChange: (e) => {
-			t.ui = t.ui || {}, t.ui.tagColor = s(e, A.UI_TAG_COLOR), q(t), J(t), n("ui.tagColor");
+			t.ui = t.ui || {}, t.ui.tagColor = s(e, j.UI_TAG_COLOR), J(t), Y(t), n("ui.tagColor");
 		}
 	});
 }
@@ -897,16 +897,16 @@ function Jt(e, t, n) {
 		qt,
 		e,
 		t
-	], i = (e) => r(j("cat.viewer", "Viewer"), e), a = (e) => r(j("cat.floatingViewer", "Floating Viewer"), e);
+	], i = (e) => r(M("cat.viewer", "Viewer"), e), a = (e) => r(M("cat.floatingViewer", "Floating Viewer"), e);
 	e({
 		id: `${Kt}.Viewer.AllowPanAtZoom1`,
-		category: i(j("setting.viewer.pan.name").replace("Majoor: ", "")),
-		name: j("setting.viewer.pan.name"),
-		tooltip: j("setting.viewer.pan.desc"),
+		category: i(M("setting.viewer.pan.name").replace("Majoor: ", "")),
+		name: M("setting.viewer.pan.name"),
+		tooltip: M("setting.viewer.pan.desc"),
 		type: "boolean",
 		defaultValue: !!t.viewer?.allowPanAtZoom1,
 		onChange: (e) => {
-			t.viewer = t.viewer || {}, t.viewer.allowPanAtZoom1 = !!e, q(t), J(t), n("viewer.allowPanAtZoom1");
+			t.viewer = t.viewer || {}, t.viewer.allowPanAtZoom1 = !!e, J(t), Y(t), n("viewer.allowPanAtZoom1");
 		}
 	}), e({
 		id: `${Kt}.Viewer.DisableWebGL`,
@@ -916,47 +916,47 @@ function Jt(e, t, n) {
 		type: "boolean",
 		defaultValue: !!t.viewer?.disableWebGL,
 		onChange: (e) => {
-			t.viewer = t.viewer || {}, t.viewer.disableWebGL = !!e, q(t), J(t), n("viewer.disableWebGL");
+			t.viewer = t.viewer || {}, t.viewer.disableWebGL = !!e, J(t), Y(t), n("viewer.disableWebGL");
 		}
 	}), e({
 		id: `${Kt}.Viewer.PauseDuringExecution`,
-		category: i(j("setting.viewer.pauseExecution.name").replace("Majoor: ", "")),
-		name: j("setting.viewer.pauseExecution.name"),
-		tooltip: j("setting.viewer.pauseExecution.desc"),
+		category: i(M("setting.viewer.pauseExecution.name").replace("Majoor: ", "")),
+		name: M("setting.viewer.pauseExecution.name"),
+		tooltip: M("setting.viewer.pauseExecution.desc"),
 		type: "boolean",
 		defaultValue: !!t.viewer?.pauseDuringExecution,
 		onChange: (e) => {
-			t.viewer = t.viewer || {}, t.viewer.pauseDuringExecution = !!e, q(t), J(t), n("viewer.pauseDuringExecution");
+			t.viewer = t.viewer || {}, t.viewer.pauseDuringExecution = !!e, J(t), Y(t), n("viewer.pauseDuringExecution");
 		}
 	}), e({
 		id: `${Kt}.Viewer.FloatingPauseDuringExecution`,
-		category: a(j("setting.viewer.floatingPauseExecution.name").replace("Majoor: ", "")),
-		name: j("setting.viewer.floatingPauseExecution.name"),
-		tooltip: j("setting.viewer.floatingPauseExecution.desc"),
+		category: a(M("setting.viewer.floatingPauseExecution.name").replace("Majoor: ", "")),
+		name: M("setting.viewer.floatingPauseExecution.name"),
+		tooltip: M("setting.viewer.floatingPauseExecution.desc"),
 		type: "boolean",
 		defaultValue: !!t.viewer?.floatingPauseDuringExecution,
 		onChange: (e) => {
-			t.viewer = t.viewer || {}, t.viewer.floatingPauseDuringExecution = !!e, q(t), J(t), n("viewer.floatingPauseDuringExecution");
+			t.viewer = t.viewer || {}, t.viewer.floatingPauseDuringExecution = !!e, J(t), Y(t), n("viewer.floatingPauseDuringExecution");
 		}
 	}), e({
 		id: `${Kt}.Viewer.MfvLiveDefault`,
-		category: a(j("setting.viewer.mfvLiveDefault.name").replace("Majoor: ", "")),
-		name: j("setting.viewer.mfvLiveDefault.name"),
-		tooltip: j("setting.viewer.mfvLiveDefault.desc"),
+		category: a(M("setting.viewer.mfvLiveDefault.name").replace("Majoor: ", "")),
+		name: M("setting.viewer.mfvLiveDefault.name"),
+		tooltip: M("setting.viewer.mfvLiveDefault.desc"),
 		type: "boolean",
-		defaultValue: !!(t.viewer?.mfvLiveDefault ?? A.MFV_LIVE_DEFAULT),
+		defaultValue: !!(t.viewer?.mfvLiveDefault ?? j.MFV_LIVE_DEFAULT),
 		onChange: (e) => {
-			t.viewer = t.viewer || {}, t.viewer.mfvLiveDefault = !!e, q(t), J(t), n("viewer.mfvLiveDefault");
+			t.viewer = t.viewer || {}, t.viewer.mfvLiveDefault = !!e, J(t), Y(t), n("viewer.mfvLiveDefault");
 		}
 	}), e({
 		id: `${Kt}.Viewer.MfvPreviewDefault`,
-		category: a(j("setting.viewer.mfvPreviewDefault.name").replace("Majoor: ", "")),
-		name: j("setting.viewer.mfvPreviewDefault.name"),
-		tooltip: j("setting.viewer.mfvPreviewDefault.desc"),
+		category: a(M("setting.viewer.mfvPreviewDefault.name").replace("Majoor: ", "")),
+		name: M("setting.viewer.mfvPreviewDefault.name"),
+		tooltip: M("setting.viewer.mfvPreviewDefault.desc"),
 		type: "boolean",
-		defaultValue: !!(t.viewer?.mfvPreviewDefault ?? A.MFV_PREVIEW_DEFAULT),
+		defaultValue: !!(t.viewer?.mfvPreviewDefault ?? j.MFV_PREVIEW_DEFAULT),
 		onChange: (e) => {
-			t.viewer = t.viewer || {}, t.viewer.mfvPreviewDefault = !!e, q(t), J(t), n("viewer.mfvPreviewDefault");
+			t.viewer = t.viewer || {}, t.viewer.mfvPreviewDefault = !!e, J(t), Y(t), n("viewer.mfvPreviewDefault");
 		}
 	}), e({
 		id: `${Kt}.Viewer.MfvSidebarPosition`,
@@ -976,15 +976,15 @@ function Jt(e, t, n) {
 				"right",
 				"bottom"
 			].includes(e) ? e : "right";
-			t.viewer = t.viewer || {}, t.viewer.mfvSidebarPosition = r, q(t), J(t), n("viewer.mfvSidebarPosition");
+			t.viewer = t.viewer || {}, t.viewer.mfvSidebarPosition = r, J(t), Y(t), n("viewer.mfvSidebarPosition");
 		}
 	}), e({
 		id: `${Kt}.Viewer.MfvPreviewMethod`,
-		category: a(j("setting.viewer.mfvPreviewMethod.name").replace("Majoor: ", "")),
-		name: j("setting.viewer.mfvPreviewMethod.name"),
-		tooltip: j("setting.viewer.mfvPreviewMethod.desc"),
+		category: a(M("setting.viewer.mfvPreviewMethod.name").replace("Majoor: ", "")),
+		name: M("setting.viewer.mfvPreviewMethod.name"),
+		tooltip: M("setting.viewer.mfvPreviewMethod.desc"),
 		type: "combo",
-		defaultValue: t.viewer?.mfvPreviewMethod || A.MFV_PREVIEW_METHOD,
+		defaultValue: t.viewer?.mfvPreviewMethod || j.MFV_PREVIEW_METHOD,
 		options: [
 			"taesd",
 			"latent2rgb",
@@ -999,8 +999,8 @@ function Jt(e, t, n) {
 				"auto",
 				"default",
 				"none"
-			].includes(e) ? e : A.MFV_PREVIEW_METHOD;
-			t.viewer = t.viewer || {}, t.viewer.mfvPreviewMethod = r, q(t), J(t), n("viewer.mfvPreviewMethod");
+			].includes(e) ? e : j.MFV_PREVIEW_METHOD;
+			t.viewer = t.viewer || {}, t.viewer.mfvPreviewMethod = r, J(t), Y(t), n("viewer.mfvPreviewMethod");
 		}
 	}), e({
 		id: `${Kt}.Viewer.LtxavRgbFallback`,
@@ -1011,20 +1011,20 @@ function Jt(e, t, n) {
 		defaultValue: !!t.viewer?.ltxavRgbFallback,
 		onChange: async (e) => {
 			let r = !!e, i = !!t.viewer?.ltxavRgbFallback;
-			t.viewer = t.viewer || {}, t.viewer.ltxavRgbFallback = r, q(t), J(t), n("viewer.ltxavRgbFallback");
+			t.viewer = t.viewer || {}, t.viewer.ltxavRgbFallback = r, J(t), Y(t), n("viewer.ltxavRgbFallback");
 			try {
 				let e = await re(r);
 				if (!e?.ok) throw Error(e?.error || "Failed to update LTXAV RGB preview fallback setting");
 			} catch (e) {
-				t.viewer.ltxavRgbFallback = i, q(t), J(t), n("viewer.ltxavRgbFallback"), T(e?.message || "Failed to update LTXAV RGB preview fallback setting", "error");
+				t.viewer.ltxavRgbFallback = i, J(t), Y(t), n("viewer.ltxavRgbFallback"), T(e?.message || "Failed to update LTXAV RGB preview fallback setting", "error");
 			}
 		}
 	});
 	try {
 		m().then((e) => {
 			if (!e?.ok) return;
-			let r = !!e?.data?.prefs?.enabled, i = K();
-			i.viewer = i.viewer || {}, !!i.viewer.ltxavRgbFallback !== r && (i.viewer.ltxavRgbFallback = r, Object.assign(t, i), q(i), J(i), n("viewer.ltxavRgbFallback"));
+			let r = !!e?.data?.prefs?.enabled, i = q();
+			i.viewer = i.viewer || {}, !!i.viewer.ltxavRgbFallback !== r && (i.viewer.ltxavRgbFallback = r, Object.assign(t, i), J(i), Y(i), n("viewer.ltxavRgbFallback"));
 		}).catch(() => {});
 	} catch (e) {
 		console.debug?.(e);
@@ -1032,13 +1032,13 @@ function Jt(e, t, n) {
 	((r, a, o, s) => {
 		e({
 			id: `${Kt}.WorkflowMinimap.${r}`,
-			category: i(j(o).replace("Majoor: ", "")),
-			name: j(o),
-			tooltip: j(s),
+			category: i(M(o).replace("Majoor: ", "")),
+			name: M(o),
+			tooltip: M(s),
 			type: "boolean",
 			defaultValue: !!t.workflowMinimap?.[a],
 			onChange: (e) => {
-				t.workflowMinimap = t.workflowMinimap || {}, t.workflowMinimap[a] = !!e, q(t), n(`workflowMinimap.${a}`);
+				t.workflowMinimap = t.workflowMinimap || {}, t.workflowMinimap[a] = !!e, J(t), n(`workflowMinimap.${a}`);
 			}
 		});
 	})("Enabled", "enabled", "setting.minimap.enabled.name", "setting.minimap.enabled.desc");
@@ -1054,60 +1054,60 @@ function Zt(e, t, n) {
 	];
 	e({
 		id: `${Yt}.ExecutionGrouping.Enabled`,
-		category: r(j("cat.scanning"), "Execution grouping"),
+		category: r(M("cat.scanning"), "Execution grouping"),
 		name: "Execution job/stack grouping",
 		tooltip: "Enable or disable all live job_id / stack_id tracking, grouping, and stack finalization logic.",
 		type: "boolean",
-		defaultValue: !!(t.executionGrouping?.enabled ?? A.EXECUTION_GROUPING_ENABLED),
+		defaultValue: !!(t.executionGrouping?.enabled ?? j.EXECUTION_GROUPING_ENABLED),
 		onChange: async (e) => {
-			let r = !!(t.executionGrouping?.enabled ?? A.EXECUTION_GROUPING_ENABLED), i = !!e;
-			t.executionGrouping = t.executionGrouping || {}, t.executionGrouping.enabled = i, q(t), J(t), n("executionGrouping.enabled");
+			let r = !!(t.executionGrouping?.enabled ?? j.EXECUTION_GROUPING_ENABLED), i = !!e;
+			t.executionGrouping = t.executionGrouping || {}, t.executionGrouping.enabled = i, J(t), Y(t), n("executionGrouping.enabled");
 			try {
 				let e = await te(i);
 				if (!e?.ok) throw Error(e?.error || "Failed to update execution grouping setting");
-				t.executionGrouping.enabled = !!e?.data?.prefs?.enabled, q(t), J(t), n("executionGrouping.enabled");
+				t.executionGrouping.enabled = !!e?.data?.prefs?.enabled, J(t), Y(t), n("executionGrouping.enabled");
 			} catch (e) {
-				t.executionGrouping.enabled = r, q(t), J(t), n("executionGrouping.enabled"), T(e?.message || "Failed to update execution grouping setting", "error");
+				t.executionGrouping.enabled = r, J(t), Y(t), n("executionGrouping.enabled"), T(e?.message || "Failed to update execution grouping setting", "error");
 			}
 		}
 	}), e({
 		id: `${Yt}.AutoScan.OnStartup`,
-		category: r(j("cat.scanning"), j("setting.scan.startup.name").replace("Majoor: ", "")),
-		name: j("setting.scan.startup.name"),
-		tooltip: j("setting.scan.startup.desc"),
+		category: r(M("cat.scanning"), M("setting.scan.startup.name").replace("Majoor: ", "")),
+		name: M("setting.scan.startup.name"),
+		tooltip: M("setting.scan.startup.desc"),
 		type: "boolean",
 		defaultValue: !!t.autoScan?.onStartup,
 		onChange: (e) => {
-			t.autoScan = t.autoScan || {}, t.autoScan.onStartup = !!e, q(t), J(t), n("autoScan.onStartup");
+			t.autoScan = t.autoScan || {}, t.autoScan.onStartup = !!e, J(t), Y(t), n("autoScan.onStartup");
 		}
 	}), e({
 		id: `${Yt}.Scan.FastMode`,
-		category: r(j("cat.scanning"), "Scan mode"),
+		category: r(M("cat.scanning"), "Scan mode"),
 		name: "Fast scan mode",
 		tooltip: "Use fast scan mode for manual backfill scans (skip heavier metadata work during scan).",
 		type: "boolean",
 		defaultValue: !!(t.scan?.fastMode ?? !0),
 		onChange: (e) => {
-			t.scan = t.scan || {}, t.scan.fastMode = !!e, q(t), n("scan.fastMode");
+			t.scan = t.scan || {}, t.scan.fastMode = !!e, J(t), n("scan.fastMode");
 		}
 	}), e({
 		id: `${Yt}.RtHydrate.Concurrency`,
-		category: r(j("cat.scanning"), "Hydration"),
+		category: r(M("cat.scanning"), "Hydration"),
 		name: "Hydrate Concurrency",
 		tooltip: "Maximum concurrent hydration requests for rating/tags.",
 		type: "number",
-		defaultValue: Number(t.rtHydrate?.concurrency || A.RT_HYDRATE_CONCURRENCY || 5),
+		defaultValue: Number(t.rtHydrate?.concurrency || j.RT_HYDRATE_CONCURRENCY || 5),
 		attrs: {
 			min: 1,
 			max: 20,
 			step: 1
 		},
 		onChange: (e) => {
-			t.rtHydrate = t.rtHydrate || {}, t.rtHydrate.concurrency = Math.max(1, Math.min(20, Math.round(W(e, A.RT_HYDRATE_CONCURRENCY || 5)))), q(t), J(t), n("rtHydrate.concurrency");
+			t.rtHydrate = t.rtHydrate || {}, t.rtHydrate.concurrency = Math.max(1, Math.min(20, Math.round(G(e, j.RT_HYDRATE_CONCURRENCY || 5)))), J(t), Y(t), n("rtHydrate.concurrency");
 		}
 	});
 	let i = (e, t, n, r) => {
-		let i = Math.round(W(e, t));
+		let i = Math.round(G(e, t));
 		return Math.max(n, Math.min(r, i));
 	}, a = (e = {}) => {
 		let r = [];
@@ -1119,10 +1119,10 @@ function Zt(e, t, n) {
 			let n = Math.max(100, Math.min(3e4, Math.round(e.dedupe_ttl_ms)));
 			t.watcher.dedupeTtlMs !== n && (t.watcher.dedupeTtlMs = n, r.push("watcher.dedupeTtlMs"));
 		}
-		r.length && (q(t), r.forEach((e) => n(e)));
+		r.length && (J(t), r.forEach((e) => n(e)));
 	}, o = async () => {
 		try {
-			let e = await de();
+			let e = await ue();
 			if (!e?.ok) return;
 			a(e.data || {});
 		} catch (e) {
@@ -1131,75 +1131,75 @@ function Zt(e, t, n) {
 	};
 	e({
 		id: `${Yt}.Watcher.Enabled`,
-		category: r(j("cat.scanning"), j("setting.watcher.enabled.label", "Enable watcher")),
-		name: j("setting.watcher.name"),
-		tooltip: j("setting.watcher.desc") + " (env: MJR_ENABLE_WATCHER)",
+		category: r(M("cat.scanning"), M("setting.watcher.enabled.label", "Enable watcher")),
+		name: M("setting.watcher.name"),
+		tooltip: M("setting.watcher.desc") + " (env: MJR_ENABLE_WATCHER)",
 		type: "boolean",
 		defaultValue: !!t.watcher?.enabled,
 		onChange: async (e) => {
-			t.watcher = t.watcher || {}, t.watcher.enabled = !!e, q(t), n("watcher.enabled");
+			t.watcher = t.watcher || {}, t.watcher.enabled = !!e, J(t), n("watcher.enabled");
 			try {
-				let r = await se(!!e);
-				r?.ok || (t.watcher.enabled = !e, q(t), n("watcher.enabled"), T(r?.error || j("toast.failedToggleWatcher", "Failed to toggle watcher"), "error"));
+				let r = await k(!!e);
+				r?.ok || (t.watcher.enabled = !e, J(t), n("watcher.enabled"), T(r?.error || M("toast.failedToggleWatcher", "Failed to toggle watcher"), "error"));
 			} catch {
-				t.watcher.enabled = !e, q(t), n("watcher.enabled");
+				t.watcher.enabled = !e, J(t), n("watcher.enabled");
 			}
 		}
 	}), e({
 		id: `${Yt}.Watcher.DebounceDelay`,
-		category: r(j("cat.scanning"), j("setting.watcher.debounce.label", "Watcher debounce delay")),
-		name: j("setting.watcher.debounce.name"),
-		tooltip: j("setting.watcher.debounce.desc") + " (env: MJR_WATCHER_DEBOUNCE_MS)",
+		category: r(M("cat.scanning"), M("setting.watcher.debounce.label", "Watcher debounce delay")),
+		name: M("setting.watcher.debounce.name"),
+		tooltip: M("setting.watcher.debounce.desc") + " (env: MJR_WATCHER_DEBOUNCE_MS)",
 		type: "number",
-		defaultValue: t.watcher?.debounceMs ?? A.WATCHER_DEBOUNCE_MS,
+		defaultValue: t.watcher?.debounceMs ?? j.WATCHER_DEBOUNCE_MS,
 		attrs: {
 			min: 50,
 			max: 6e4,
 			step: 50
 		},
 		onChange: async (e) => {
-			let r = A.WATCHER_DEBOUNCE_MS, a = i(e, r, 50, 6e4), o = t.watcher?.debounceMs ?? r;
+			let r = j.WATCHER_DEBOUNCE_MS, a = i(e, r, 50, 6e4), o = t.watcher?.debounceMs ?? r;
 			if (a !== o) {
-				t.watcher = t.watcher || {}, t.watcher.debounceMs = a, q(t);
+				t.watcher = t.watcher || {}, t.watcher.debounceMs = a, J(t);
 				try {
 					let e = await v({ debounce_ms: a });
-					if (!e?.ok) throw Error(e?.error || j("setting.watcher.debounce.error"));
+					if (!e?.ok) throw Error(e?.error || M("setting.watcher.debounce.error"));
 					let r = Math.round(Number(e?.data?.debounce_ms ?? a));
-					t.watcher.debounceMs = r, q(t), n("watcher.debounceMs");
+					t.watcher.debounceMs = r, J(t), n("watcher.debounceMs");
 				} catch (e) {
-					t.watcher.debounceMs = o, q(t), n("watcher.debounceMs"), T(e?.message || j("setting.watcher.debounce.error"), "error");
+					t.watcher.debounceMs = o, J(t), n("watcher.debounceMs"), T(e?.message || M("setting.watcher.debounce.error"), "error");
 				}
 			}
 		}
 	}), e({
 		id: `${Yt}.Watcher.DedupeWindow`,
-		category: r(j("cat.scanning"), j("setting.watcher.dedupe.label", "Watcher dedupe window")),
-		name: j("setting.watcher.dedupe.name"),
-		tooltip: j("setting.watcher.dedupe.desc") + " (env: MJR_WATCHER_DEDUPE_TTL_MS)",
+		category: r(M("cat.scanning"), M("setting.watcher.dedupe.label", "Watcher dedupe window")),
+		name: M("setting.watcher.dedupe.name"),
+		tooltip: M("setting.watcher.dedupe.desc") + " (env: MJR_WATCHER_DEDUPE_TTL_MS)",
 		type: "number",
-		defaultValue: t.watcher?.dedupeTtlMs ?? A.WATCHER_DEDUPE_TTL_MS,
+		defaultValue: t.watcher?.dedupeTtlMs ?? j.WATCHER_DEDUPE_TTL_MS,
 		attrs: {
 			min: 100,
 			max: 12e4,
 			step: 100
 		},
 		onChange: async (e) => {
-			let r = A.WATCHER_DEDUPE_TTL_MS, a = i(e, r, 100, 12e4), o = t.watcher?.dedupeTtlMs ?? r;
+			let r = j.WATCHER_DEDUPE_TTL_MS, a = i(e, r, 100, 12e4), o = t.watcher?.dedupeTtlMs ?? r;
 			if (a !== o) {
-				t.watcher = t.watcher || {}, t.watcher.dedupeTtlMs = a, q(t);
+				t.watcher = t.watcher || {}, t.watcher.dedupeTtlMs = a, J(t);
 				try {
 					let e = await v({ dedupe_ttl_ms: a });
-					if (!e?.ok) throw Error(e?.error || j("setting.watcher.dedupe.error"));
+					if (!e?.ok) throw Error(e?.error || M("setting.watcher.dedupe.error"));
 					let r = Math.round(Number(e?.data?.dedupe_ttl_ms ?? a));
-					t.watcher.dedupeTtlMs = r, q(t), n("watcher.dedupeTtlMs");
+					t.watcher.dedupeTtlMs = r, J(t), n("watcher.dedupeTtlMs");
 				} catch (e) {
-					t.watcher.dedupeTtlMs = o, q(t), n("watcher.dedupeTtlMs"), T(e?.message || j("setting.watcher.dedupe.error"), "error");
+					t.watcher.dedupeTtlMs = o, J(t), n("watcher.dedupeTtlMs"), T(e?.message || M("setting.watcher.dedupe.error"), "error");
 				}
 			}
 		}
 	}), e({
 		id: `${Yt}.Watcher.MaxPending`,
-		category: r(j("cat.scanning"), "Watcher queue"),
+		category: r(M("cat.scanning"), "Watcher queue"),
 		name: "Watcher: max pending files",
 		tooltip: "Maximum number of pending watcher files kept in memory.",
 		type: "number",
@@ -1210,11 +1210,11 @@ function Zt(e, t, n) {
 			step: 10
 		},
 		onChange: (e) => {
-			t.watcher = t.watcher || {}, t.watcher.maxPending = Math.max(10, Math.min(5e3, Math.round(W(e, 500)))), q(t), J(t), n("watcher.maxPending");
+			t.watcher = t.watcher || {}, t.watcher.maxPending = Math.max(10, Math.min(5e3, Math.round(G(e, 500)))), J(t), Y(t), n("watcher.maxPending");
 		}
 	}), e({
 		id: `${Yt}.Watcher.MinSize`,
-		category: r(j("cat.scanning"), "Watcher file size"),
+		category: r(M("cat.scanning"), "Watcher file size"),
 		name: "Watcher: min size (bytes)",
 		tooltip: "Minimum file size indexed by watcher.",
 		type: "number",
@@ -1225,11 +1225,11 @@ function Zt(e, t, n) {
 			step: 100
 		},
 		onChange: (e) => {
-			t.watcher = t.watcher || {}, t.watcher.minSize = Math.max(0, Math.min(1e6, Math.round(W(e, 100)))), q(t), J(t), n("watcher.minSize");
+			t.watcher = t.watcher || {}, t.watcher.minSize = Math.max(0, Math.min(1e6, Math.round(G(e, 100)))), J(t), Y(t), n("watcher.minSize");
 		}
 	}), e({
 		id: `${Yt}.Watcher.MaxSize`,
-		category: r(j("cat.scanning"), "Watcher file size"),
+		category: r(M("cat.scanning"), "Watcher file size"),
 		name: "Watcher: max size (bytes)",
 		tooltip: "Maximum file size indexed by watcher.",
 		type: "number",
@@ -1240,7 +1240,7 @@ function Zt(e, t, n) {
 			step: 1e5
 		},
 		onChange: (e) => {
-			t.watcher = t.watcher || {}, t.watcher.maxSize = Math.max(1e5, Math.min(17179869184, Math.round(W(e, 4294967296)))), q(t), J(t), n("watcher.maxSize");
+			t.watcher = t.watcher || {}, t.watcher.maxSize = Math.max(1e5, Math.min(17179869184, Math.round(G(e, 4294967296)))), J(t), Y(t), n("watcher.maxSize");
 		}
 	});
 	try {
@@ -1250,13 +1250,13 @@ function Zt(e, t, n) {
 	}
 	e({
 		id: `${Yt}.RatingTagsSync.Enabled`,
-		category: r(j("cat.scanning"), j("setting.sync.rating.name").replace("Majoor: ", "")),
-		name: j("setting.sync.rating.name"),
-		tooltip: j("setting.sync.rating.desc"),
+		category: r(M("cat.scanning"), M("setting.sync.rating.name").replace("Majoor: ", "")),
+		name: M("setting.sync.rating.name"),
+		tooltip: M("setting.sync.rating.desc"),
 		type: "boolean",
 		defaultValue: !!t.ratingTagsSync?.enabled,
 		onChange: (e) => {
-			t.ratingTagsSync = t.ratingTagsSync || {}, t.ratingTagsSync.enabled = !!e, q(t), n("ratingTagsSync.enabled");
+			t.ratingTagsSync = t.ratingTagsSync || {}, t.ratingTagsSync.enabled = !!e, J(t), n("ratingTagsSync.enabled");
 		}
 	});
 }
@@ -1266,7 +1266,7 @@ var Qt = "Majoor", $t = "Majoor Assets Manager";
 function en(e, t, n) {
 	let r = (e) => [
 		$t,
-		j("cat.feed", "Generated Feed"),
+		M("cat.feed", "Generated Feed"),
 		e
 	], i = () => {
 		t.feed = t.feed || {};
@@ -1284,7 +1284,7 @@ function en(e, t, n) {
 			step: 10
 		},
 		onChange: (e) => {
-			i(), t.feed.minSize = Math.max(60, Math.min(600, Math.round(Number(e) || 120))), q(t), J(t), n("feed.minSize");
+			i(), t.feed.minSize = Math.max(60, Math.min(600, Math.round(Number(e) || 120))), J(t), Y(t), n("feed.minSize");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowInfo`,
@@ -1292,9 +1292,9 @@ function en(e, t, n) {
 		name: "Show card info section",
 		tooltip: "Show or hide the entire info section (filename, metadata, dots) below thumbnails in the Generated Feed.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showInfo ?? A.FEED_SHOW_INFO),
+		defaultValue: !!(t.feed?.showInfo ?? j.FEED_SHOW_INFO),
 		onChange: (e) => {
-			i(), t.feed.showInfo = !!e, q(t), J(t), n("feed.showInfo");
+			i(), t.feed.showInfo = !!e, J(t), Y(t), n("feed.showInfo");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowFilename`,
@@ -1302,9 +1302,9 @@ function en(e, t, n) {
 		name: "Show filename",
 		tooltip: "Display the filename on feed cards.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showFilename ?? A.FEED_SHOW_FILENAME),
+		defaultValue: !!(t.feed?.showFilename ?? j.FEED_SHOW_FILENAME),
 		onChange: (e) => {
-			i(), t.feed.showFilename = !!e, q(t), J(t), n("feed.showFilename");
+			i(), t.feed.showFilename = !!e, J(t), Y(t), n("feed.showFilename");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowDimensions`,
@@ -1312,9 +1312,9 @@ function en(e, t, n) {
 		name: "Show dimensions",
 		tooltip: "Display resolution (WxH) and duration on feed cards.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showDimensions ?? A.FEED_SHOW_DIMENSIONS),
+		defaultValue: !!(t.feed?.showDimensions ?? j.FEED_SHOW_DIMENSIONS),
 		onChange: (e) => {
-			i(), t.feed.showDimensions = !!e, q(t), J(t), n("feed.showDimensions");
+			i(), t.feed.showDimensions = !!e, J(t), Y(t), n("feed.showDimensions");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowDate`,
@@ -1322,9 +1322,9 @@ function en(e, t, n) {
 		name: "Show date/time",
 		tooltip: "Display date and time on feed cards.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showDate ?? A.FEED_SHOW_DATE),
+		defaultValue: !!(t.feed?.showDate ?? j.FEED_SHOW_DATE),
 		onChange: (e) => {
-			i(), t.feed.showDate = !!e, q(t), J(t), n("feed.showDate");
+			i(), t.feed.showDate = !!e, J(t), Y(t), n("feed.showDate");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowGenTime`,
@@ -1332,9 +1332,9 @@ function en(e, t, n) {
 		name: "Show generation time",
 		tooltip: "Display the generation time badge on feed cards.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showGenTime ?? A.FEED_SHOW_GENTIME),
+		defaultValue: !!(t.feed?.showGenTime ?? j.FEED_SHOW_GENTIME),
 		onChange: (e) => {
-			i(), t.feed.showGenTime = !!e, q(t), J(t), n("feed.showGenTime");
+			i(), t.feed.showGenTime = !!e, J(t), Y(t), n("feed.showGenTime");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowWorkflowDot`,
@@ -1342,9 +1342,9 @@ function en(e, t, n) {
 		name: "Show workflow indicator",
 		tooltip: "Display the workflow availability dot on feed cards.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showWorkflowDot ?? A.FEED_SHOW_WORKFLOW_DOT),
+		defaultValue: !!(t.feed?.showWorkflowDot ?? j.FEED_SHOW_WORKFLOW_DOT),
 		onChange: (e) => {
-			i(), t.feed.showWorkflowDot = !!e, q(t), J(t), n("feed.showWorkflowDot");
+			i(), t.feed.showWorkflowDot = !!e, J(t), Y(t), n("feed.showWorkflowDot");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowExtBadge`,
@@ -1352,9 +1352,9 @@ function en(e, t, n) {
 		name: "Show format badges",
 		tooltip: "Display format badges (e.g. JPG, MP4) on feed card thumbnails.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showExtBadge ?? A.FEED_SHOW_BADGES_EXTENSION),
+		defaultValue: !!(t.feed?.showExtBadge ?? j.FEED_SHOW_BADGES_EXTENSION),
 		onChange: (e) => {
-			i(), t.feed.showExtBadge = !!e, q(t), J(t), n("feed.showExtBadge");
+			i(), t.feed.showExtBadge = !!e, J(t), Y(t), n("feed.showExtBadge");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowRatingBadge`,
@@ -1362,9 +1362,9 @@ function en(e, t, n) {
 		name: "Show ratings",
 		tooltip: "Display star ratings on feed card thumbnails.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showRatingBadge ?? A.FEED_SHOW_BADGES_RATING),
+		defaultValue: !!(t.feed?.showRatingBadge ?? j.FEED_SHOW_BADGES_RATING),
 		onChange: (e) => {
-			i(), t.feed.showRatingBadge = !!e, q(t), J(t), n("feed.showRatingBadge");
+			i(), t.feed.showRatingBadge = !!e, J(t), Y(t), n("feed.showRatingBadge");
 		}
 	}), e({
 		id: `${Qt}.Feed.ShowTagsBadge`,
@@ -1372,9 +1372,9 @@ function en(e, t, n) {
 		name: "Show tags",
 		tooltip: "Display tag indicators on feed card thumbnails.",
 		type: "boolean",
-		defaultValue: !!(t.feed?.showTagsBadge ?? A.FEED_SHOW_BADGES_TAGS),
+		defaultValue: !!(t.feed?.showTagsBadge ?? j.FEED_SHOW_BADGES_TAGS),
 		onChange: (e) => {
-			i(), t.feed.showTagsBadge = !!e, q(t), J(t), n("feed.showTagsBadge");
+			i(), t.feed.showTagsBadge = !!e, J(t), Y(t), n("feed.showTagsBadge");
 		}
 	});
 }
@@ -1423,7 +1423,7 @@ function mn() {
 	return `mjr_${pn(18)}`;
 }
 function hn(e) {
-	return String(e?.apiToken || "").trim().length >= rn && U(e?.allowWrite, !0) && U(e?.requireAuth, !1) && !U(e?.allowRemoteWrite, !1);
+	return String(e?.apiToken || "").trim().length >= rn && W(e?.allowWrite, !0) && W(e?.requireAuth, !1) && !W(e?.allowRemoteWrite, !1);
 }
 function gn(e) {
 	let t = String((e && typeof e == "object" ? e : {}).apiToken || "").trim();
@@ -1438,15 +1438,15 @@ function gn(e) {
 function _n(e) {
 	let t = e || {};
 	return {
-		safe_mode: U(t.safeMode, !1),
-		allow_write: U(t.allowWrite, !0),
-		require_auth: U(t.requireAuth, !1),
-		allow_remote_write: U(t.allowRemoteWrite, !1),
-		allow_insecure_token_transport: U(t.allowInsecureTokenTransport, !1),
-		allow_delete: U(t.allowDelete, !0),
-		allow_rename: U(t.allowRename, !0),
-		allow_open_in_folder: U(t.allowOpenInFolder, !0),
-		allow_reset_index: U(t.allowResetIndex, !0),
+		safe_mode: W(t.safeMode, !1),
+		allow_write: W(t.allowWrite, !0),
+		require_auth: W(t.requireAuth, !1),
+		allow_remote_write: W(t.allowRemoteWrite, !1),
+		allow_insecure_token_transport: W(t.allowInsecureTokenTransport, !1),
+		allow_delete: W(t.allowDelete, !0),
+		allow_rename: W(t.allowRename, !0),
+		allow_open_in_folder: W(t.allowOpenInFolder, !0),
+		allow_reset_index: W(t.allowResetIndex, !0),
 		...String(t.apiToken || "").trim() ? { api_token: String(t.apiToken || "").trim() } : {}
 	};
 }
@@ -1455,7 +1455,7 @@ function vn(e) {
 }
 function yn(e) {
 	let t = String(e?.security?.tokenHint || "").trim();
-	return t ? j("setting.sec.token.placeholderConfigured", "Token configured on server ({tokenHint}). Leave blank to keep the current server token.", { tokenHint: t }) : e?.security?.tokenConfigured ? j("setting.sec.token.placeholderConfiguredGeneric", "Token configured on server. Leave blank to keep the current server token.") : j("setting.sec.token.placeholder", "Auto-generated for this browser session.");
+	return t ? M("setting.sec.token.placeholderConfigured", "Token configured on server ({tokenHint}). Leave blank to keep the current server token.", { tokenHint: t }) : e?.security?.tokenConfigured ? M("setting.sec.token.placeholderConfiguredGeneric", "Token configured on server. Leave blank to keep the current server token.") : M("setting.sec.token.placeholder", "Auto-generated for this browser session.");
 }
 function bn(e, t, n) {
 	let r = (e, t) => [
@@ -1465,26 +1465,26 @@ function bn(e, t, n) {
 	];
 	e({
 		id: `${tn}.Safety.ConfirmDeletion`,
-		category: r(j("cat.security"), "Confirm before deleting"),
+		category: r(M("cat.security"), "Confirm before deleting"),
 		name: "Confirm before deleting",
 		tooltip: "Show a confirmation dialog before deleting files. Disabling this allows instant deletion.",
 		type: "boolean",
 		defaultValue: t.safety?.confirmDeletion !== !1,
 		onChange: (e) => {
-			sn(t.safety?.confirmDeletion !== !1, e) || (t.safety = t.safety || {}, t.safety.confirmDeletion = !!e, q(t), J(t), n("safety.confirmDeletion"));
+			sn(t.safety?.confirmDeletion !== !1, e) || (t.safety = t.safety || {}, t.safety.confirmDeletion = !!e, J(t), Y(t), n("safety.confirmDeletion"));
 		}
 	});
 	let i = (i, a, o, s = "cat.security") => {
 		e({
 			id: `${tn}.Security.${i}`,
-			category: r(j(s), j(a).replace("Majoor: ", "")),
-			name: j(a),
-			tooltip: j(o),
+			category: r(M(s), M(a).replace("Majoor: ", "")),
+			name: M(a),
+			tooltip: M(o),
 			type: "boolean",
-			defaultValue: U(t.security?.[i], an[i] ?? !1),
+			defaultValue: W(t.security?.[i], an[i] ?? !1),
 			onChange: (e) => {
 				if (!sn(t.security?.[i], e)) {
-					t.security = t.security || {}, t.security[i] = !!e, q(t), n(`security.${i}`);
+					t.security = t.security || {}, t.security[i] = !!e, J(t), n(`security.${i}`);
 					try {
 						vn(t.security).then((e) => {
 							e?.ok && e.data?.prefs ? kt() : e && e.ok === !1 && console.warn("[Majoor] backend security settings update failed", e.error || e);
@@ -1498,30 +1498,30 @@ function bn(e, t, n) {
 	};
 	i("safeMode", "setting.sec.safe.name", "setting.sec.safe.desc"), i("allowWrite", "setting.sec.write.name", "setting.sec.write.desc"), i("allowDelete", "setting.sec.del.name", "setting.sec.del.desc"), i("allowRename", "setting.sec.ren.name", "setting.sec.ren.desc"), i("allowOpenInFolder", "setting.sec.open.name", "setting.sec.open.desc"), i("allowResetIndex", "setting.sec.reset.name", "setting.sec.reset.desc"), e({
 		id: `${tn}.Security.RemoteLanPreset`,
-		category: r(j("cat.remote"), j("setting.sec.remoteLanPreset.name").replace("Majoor: ", "")),
-		name: j("setting.sec.remoteLanPreset.name"),
-		tooltip: j("setting.sec.remoteLanPreset.desc"),
+		category: r(M("cat.remote"), M("setting.sec.remoteLanPreset.name").replace("Majoor: ", "")),
+		name: M("setting.sec.remoteLanPreset.name"),
+		tooltip: M("setting.sec.remoteLanPreset.desc"),
 		type: "boolean",
 		defaultValue: hn(t.security),
 		onChange: (e) => {
 			if (t.security = t.security || {}, sn(t.security.remoteLanPreset, e)) return;
 			if (t.security.remoteLanPreset = !!e, !e) {
-				q(t), n("security.remoteLanPreset");
+				J(t), n("security.remoteLanPreset");
 				return;
 			}
 			let r;
 			try {
 				r = gn(t.security);
 			} catch (e) {
-				T(e?.message || j("toast.remoteLanPresetFailed", "Failed to apply the recommended remote LAN setup."), "error");
+				T(e?.message || M("toast.remoteLanPresetFailed", "Failed to apply the recommended remote LAN setup."), "error");
 				return;
 			}
-			Object.assign(t.security, r), t.security.tokenConfigured = !0, t.security.tokenHint = String(r.apiToken || "").trim() ? `...${String(r.apiToken).trim().slice(-4)}` : "", r.apiToken && w(r.apiToken), q(t), n("security.remoteLanPreset"), n("security.apiToken"), n("security.allowWrite"), n("security.requireAuth"), n("security.allowRemoteWrite"), n("security.allowInsecureTokenTransport");
+			Object.assign(t.security, r), t.security.tokenConfigured = !0, t.security.tokenHint = String(r.apiToken || "").trim() ? `...${String(r.apiToken).trim().slice(-4)}` : "", r.apiToken && w(r.apiToken), J(t), n("security.remoteLanPreset"), n("security.apiToken"), n("security.allowWrite"), n("security.requireAuth"), n("security.allowRemoteWrite"), n("security.allowInsecureTokenTransport");
 			try {
 				vn(t.security).then((e) => {
-					e?.ok && e.data?.prefs ? (kt(), T(j("toast.remoteLanPresetApplied", "Recommended remote LAN setup applied. This browser session is now authorized for Majoor write operations."), "success")) : e && e.ok === !1 && (T(e.error || j("toast.remoteLanPresetFailed", "Failed to apply the recommended remote LAN setup."), "error"), console.warn("[Majoor] backend remote LAN preset update failed", e.error || e));
+					e?.ok && e.data?.prefs ? (kt(), T(M("toast.remoteLanPresetApplied", "Recommended remote LAN setup applied. This browser session is now authorized for Majoor write operations."), "success")) : e && e.ok === !1 && (T(e.error || M("toast.remoteLanPresetFailed", "Failed to apply the recommended remote LAN setup."), "error"), console.warn("[Majoor] backend remote LAN preset update failed", e.error || e));
 				}).catch((e) => {
-					T(e?.message || j("toast.remoteLanPresetFailed", "Failed to apply the recommended remote LAN setup."), "error");
+					T(e?.message || M("toast.remoteLanPresetFailed", "Failed to apply the recommended remote LAN setup."), "error");
 				});
 			} catch (e) {
 				console.debug?.(e);
@@ -1529,16 +1529,16 @@ function bn(e, t, n) {
 		}
 	}), e({
 		id: `${tn}.Security.ApiToken`,
-		category: r(j("cat.remote"), j("setting.sec.token.name").replace("Majoor: ", "")),
-		name: j("setting.sec.token.name", "Majoor: API Token"),
-		tooltip: j("setting.sec.token.desc", "Store the API token used for write operations. Majoor sends it via X-MJR-Token and Authorization headers."),
+		category: r(M("cat.remote"), M("setting.sec.token.name").replace("Majoor: ", "")),
+		name: M("setting.sec.token.name", "Majoor: API Token"),
+		tooltip: M("setting.sec.token.desc", "Store the API token used for write operations. Majoor sends it via X-MJR-Token and Authorization headers."),
 		type: "text",
 		defaultValue: t.security?.apiToken || "",
 		attrs: { placeholder: yn(t) },
 		onChange: (e) => {
 			t.security = t.security || {};
 			let r = cn(e);
-			if (cn(t.security.apiToken) !== r && (t.security.apiToken = r, t.security.apiToken && (t.security.tokenConfigured = !0, t.security.tokenHint = `...${t.security.apiToken.slice(-4)}`, w(t.security.apiToken)), q(t), n("security.apiToken"), t.security.apiToken)) try {
+			if (cn(t.security.apiToken) !== r && (t.security.apiToken = r, t.security.apiToken && (t.security.tokenConfigured = !0, t.security.tokenHint = `...${t.security.apiToken.slice(-4)}`, w(t.security.apiToken)), J(t), n("security.apiToken"), t.security.apiToken)) try {
 				C({ api_token: t.security.apiToken }).then((e) => {
 					e?.ok && e.data?.prefs ? kt() : e && e.ok === !1 && console.warn("[Majoor] backend token update failed", e.error || e);
 				}).catch(() => {});
@@ -1550,7 +1550,7 @@ function bn(e, t, n) {
 }
 //#endregion
 //#region ui/app/settings/settingsAdvanced.ts
-var X = "Majoor", xn = "Majoor Assets Manager";
+var Z = "Majoor", xn = "Majoor Assets Manager";
 function Sn(e, t, r, a) {
 	let o = (e, t) => [
 		xn,
@@ -1558,8 +1558,8 @@ function Sn(e, t, r, a) {
 		t
 	], c = String(t.paths?.outputDirectory || ""), l = null, f = 0, p = null;
 	e({
-		id: `${X}.Paths.OutputDirectory`,
-		category: o(j("cat.advanced"), "Paths / Output"),
+		id: `${Z}.Paths.OutputDirectory`,
+		category: o(M("cat.advanced"), "Paths / Output"),
 		name: "Majoor: Generation Output Directory",
 		tooltip: "Override the ComfyUI generation output directory used by Majoor (equivalent to --output-directory). Leave empty to keep the current backend default.",
 		type: "text",
@@ -1567,7 +1567,7 @@ function Sn(e, t, r, a) {
 		attrs: { placeholder: "D:\\\\____COMFY_OUTPUTS" },
 		onChange: async (e) => {
 			let n = String(e || "").trim();
-			t.paths = t.paths || {}, t.paths.outputDirectory = n, q(t);
+			t.paths = t.paths || {}, t.paths.outputDirectory = n, J(t);
 			try {
 				l &&= (clearTimeout(l), null);
 			} catch (e) {
@@ -1585,12 +1585,12 @@ function Sn(e, t, r, a) {
 				try {
 					let i = await S(n, p ? { signal: p.signal } : {});
 					if (e !== f) return;
-					if (!i?.ok) throw Error(i?.error || j("toast.failedSetOutputDirectory", "Failed to set output directory"));
+					if (!i?.ok) throw Error(i?.error || M("toast.failedSetOutputDirectory", "Failed to set output directory"));
 					let a = String(i?.data?.output_directory || n).trim();
-					t.paths.outputDirectory = a, c = a, q(t), r("paths.outputDirectory");
+					t.paths.outputDirectory = a, c = a, J(t), r("paths.outputDirectory");
 				} catch (n) {
 					if (e !== f || String(n?.name || "") === "AbortError" || String(n?.code || "") === "ABORTED") return;
-					t.paths.outputDirectory = c, q(t), r("paths.outputDirectory"), T(n?.message || j("toast.failedSetOutputDirectory", "Failed to set output directory"), "error");
+					t.paths.outputDirectory = c, J(t), r("paths.outputDirectory"), T(n?.message || M("toast.failedSetOutputDirectory", "Failed to set output directory"), "error");
 				}
 			}, 700);
 		}
@@ -1599,15 +1599,15 @@ function Sn(e, t, r, a) {
 		E().then((e) => {
 			if (!e?.ok) return;
 			let n = String(e?.data?.output_directory || "").trim();
-			t.paths = t.paths || {}, t.paths.outputDirectory !== n && (t.paths.outputDirectory = n, c = n, q(t), r("paths.outputDirectory"));
+			t.paths = t.paths || {}, t.paths.outputDirectory !== n && (t.paths.outputDirectory = n, c = n, J(t), r("paths.outputDirectory"));
 		}).catch(() => {});
 	} catch (e) {
 		console.debug?.(e);
 	}
 	let m = String(t.paths?.indexDirectory || ""), g = null, _ = 0, v = null;
 	e({
-		id: `${X}.Paths.IndexDirectory`,
-		category: o(j("cat.advanced"), "Paths / Index"),
+		id: `${Z}.Paths.IndexDirectory`,
+		category: o(M("cat.advanced"), "Paths / Index"),
 		name: "Majoor: Index Database Directory",
 		tooltip: "Override the Majoor index database directory. Use this to keep the SQLite index on a different local disk. Requires restart.",
 		type: "text",
@@ -1615,7 +1615,7 @@ function Sn(e, t, r, a) {
 		attrs: { placeholder: "D:\\MajoorIndex" },
 		onChange: async (e) => {
 			let n = String(e || "").trim();
-			t.paths = t.paths || {}, t.paths.indexDirectory = n, q(t);
+			t.paths = t.paths || {}, t.paths.indexDirectory = n, J(t);
 			try {
 				g &&= (clearTimeout(g), null);
 			} catch (e) {
@@ -1631,31 +1631,31 @@ function Sn(e, t, r, a) {
 				}
 				v = typeof AbortController < "u" ? new AbortController() : null;
 				try {
-					let i = await ge(n, v ? { signal: v.signal } : {});
+					let i = await he(n, v ? { signal: v.signal } : {});
 					if (e !== _) return;
-					if (!i?.ok) throw Error(i?.error || j("toast.failedSetIndexDirectory", "Failed to set index directory"));
+					if (!i?.ok) throw Error(i?.error || M("toast.failedSetIndexDirectory", "Failed to set index directory"));
 					let a = String(i?.data?.index_directory || n).trim(), o = a !== m;
-					t.paths.indexDirectory = a, m = a, q(t), r("paths.indexDirectory"), o && T(j("toast.indexDirectorySavedRestart", "Index directory saved. Restart ComfyUI to apply."), "success", void 0, { history: { trackId: "settings:index-directory-saved" } });
+					t.paths.indexDirectory = a, m = a, J(t), r("paths.indexDirectory"), o && T(M("toast.indexDirectorySavedRestart", "Index directory saved. Restart ComfyUI to apply."), "success", void 0, { history: { trackId: "settings:index-directory-saved" } });
 				} catch (n) {
 					if (e !== _ || String(n?.name || "") === "AbortError" || String(n?.code || "") === "ABORTED") return;
-					t.paths.indexDirectory = m, q(t), r("paths.indexDirectory"), T(n?.message || j("toast.failedSetIndexDirectory", "Failed to set index directory"), "error");
+					t.paths.indexDirectory = m, J(t), r("paths.indexDirectory"), T(n?.message || M("toast.failedSetIndexDirectory", "Failed to set index directory"), "error");
 				}
 			}, 700);
 		}
 	});
 	try {
-		ue().then((e) => {
+		le().then((e) => {
 			if (!e?.ok) return;
 			let n = String(e?.data?.index_directory || "").trim();
-			t.paths = t.paths || {}, t.paths.indexDirectory !== n && (t.paths.indexDirectory = n, m = n, q(t), r("paths.indexDirectory"));
+			t.paths = t.paths || {}, t.paths.indexDirectory !== n && (t.paths.indexDirectory = n, m = n, J(t), r("paths.indexDirectory"));
 		}).catch(() => {});
 	} catch (e) {
 		console.debug?.(e);
 	}
 	let b = String(t.paths?.workflowRoots || ""), x = null, C = 0, w = null;
 	e({
-		id: `${X}.Paths.WorkflowRoots`,
-		category: o(j("cat.advanced"), "Paths / Workflows"),
+		id: `${Z}.Paths.WorkflowRoots`,
+		category: o(M("cat.advanced"), "Paths / Workflows"),
 		name: "Majoor: Workflow Roots",
 		tooltip: "Folders scanned by the Workflow tab. Use one folder per line, or separate folders with semicolons. Leave empty to use ComfyUI defaults and MJR_AM_WORKFLOW_DIRECTORY.",
 		type: "text",
@@ -1663,7 +1663,7 @@ function Sn(e, t, r, a) {
 		attrs: { placeholder: "D:\\\\ComfyUI\\\\user\\\\default\\\\workflows" },
 		onChange: async (e) => {
 			let n = String(e || "").trim();
-			t.paths = t.paths || {}, t.paths.workflowRoots = n, q(t);
+			t.paths = t.paths || {}, t.paths.workflowRoots = n, J(t);
 			try {
 				x &&= (clearTimeout(x), null);
 			} catch (e) {
@@ -1679,14 +1679,14 @@ function Sn(e, t, r, a) {
 				}
 				w = typeof AbortController < "u" ? new AbortController() : null;
 				try {
-					let i = await ce(n, w ? { signal: w.signal } : {});
+					let i = await se(n, w ? { signal: w.signal } : {});
 					if (e !== C) return;
-					if (!i?.ok) throw Error(i?.error || j("toast.failedSetWorkflowRoots", "Failed to set workflow roots"));
+					if (!i?.ok) throw Error(i?.error || M("toast.failedSetWorkflowRoots", "Failed to set workflow roots"));
 					let a = String(i?.data?.workflow_roots_text || n).trim();
-					t.paths.workflowRoots = a, b = a, q(t), r("paths.workflowRoots"), T(j("toast.workflowRootsSaved", "Workflow roots saved"), "success", 1800);
+					t.paths.workflowRoots = a, b = a, J(t), r("paths.workflowRoots"), T(M("toast.workflowRootsSaved", "Workflow roots saved"), "success", 1800);
 				} catch (n) {
 					if (e !== C || String(n?.name || "") === "AbortError" || String(n?.code || "") === "ABORTED") return;
-					t.paths.workflowRoots = b, q(t), r("paths.workflowRoots"), T(n?.message || j("toast.failedSetWorkflowRoots", "Failed to set workflow roots"), "error");
+					t.paths.workflowRoots = b, J(t), r("paths.workflowRoots"), T(n?.message || M("toast.failedSetWorkflowRoots", "Failed to set workflow roots"), "error");
 				}
 			}, 700);
 		}
@@ -1695,34 +1695,34 @@ function Sn(e, t, r, a) {
 		ne().then((e) => {
 			if (!e?.ok) return;
 			let n = String(e?.data?.workflow_roots_text || "").trim();
-			t.paths = t.paths || {}, t.paths.workflowRoots !== n && (t.paths.workflowRoots = n, b = n, q(t), r("paths.workflowRoots"));
+			t.paths = t.paths || {}, t.paths.workflowRoots !== n && (t.paths.workflowRoots = n, b = n, J(t), r("paths.workflowRoots"));
 		}).catch(() => {});
 	} catch (e) {
 		console.debug?.(e);
 	}
-	let te = ye().map((e) => e.code), re = ["auto", ...te];
+	let te = ve().map((e) => e.code), re = ["auto", ...te];
 	e({
-		id: `${X}.Language`,
-		category: o(j("cat.advanced"), j("setting.language.name", "Language")),
-		name: j("setting.language.name", "Majoor: Language"),
+		id: `${Z}.Language`,
+		category: o(M("cat.advanced"), M("setting.language.name", "Language")),
+		name: M("setting.language.name", "Majoor: Language"),
 		tooltip: "Use auto to detect and follow ComfyUI language. Or choose a fixed language for Majoor only.",
 		type: "combo",
-		defaultValue: t.i18n?.followComfyLanguage ? "auto" : Te(),
+		defaultValue: t.i18n?.followComfyLanguage ? "auto" : we(),
 		options: re,
 		onChange: (e) => {
 			if (t.i18n = t.i18n || {}, e === "auto") {
-				t.i18n.followComfyLanguage = !0, Ee(!0), Ce(a), q(t), r("language");
+				t.i18n.followComfyLanguage = !0, Te(!0), Se(a), J(t), r("language");
 				return;
 			}
-			te.includes(e) && (t.i18n.followComfyLanguage = !1, Ee(!1), be(e), q(t), r("language"));
+			te.includes(e) && (t.i18n.followComfyLanguage = !1, Te(!1), ye(e), J(t), r("language"));
 		}
 	}), e({
-		id: `${X}.ProbeBackend.Mode`,
-		category: o(j("cat.advanced"), j("setting.probe.mode.name").replace("Majoor: ", "")),
-		name: j("setting.probe.mode.name"),
-		tooltip: j("setting.probe.mode.desc") + " (env: MAJOOR_MEDIA_PROBE_BACKEND)",
+		id: `${Z}.ProbeBackend.Mode`,
+		category: o(M("cat.advanced"), M("setting.probe.mode.name").replace("Majoor: ", "")),
+		name: M("setting.probe.mode.name"),
+		tooltip: M("setting.probe.mode.desc") + " (env: MAJOOR_MEDIA_PROBE_BACKEND)",
 		type: "combo",
-		defaultValue: t.probeBackend?.mode || G.probeBackend.mode,
+		defaultValue: t.probeBackend?.mode || K.probeBackend.mode,
 		options: [
 			"auto",
 			"exiftool",
@@ -1735,64 +1735,64 @@ function Sn(e, t, r, a) {
 				"exiftool",
 				"ffprobe",
 				"both"
-			], G.probeBackend.mode);
-			t.probeBackend = t.probeBackend || {}, t.probeBackend.mode = n, q(t), J(t), r("probeBackend.mode"), i(n).catch(() => {});
+			], K.probeBackend.mode);
+			t.probeBackend = t.probeBackend || {}, t.probeBackend.mode = n, J(t), Y(t), r("probeBackend.mode"), i(n).catch(() => {});
 		}
 	}), e({
-		id: `${X}.MetadataFallback.Image`,
-		category: o(j("cat.advanced"), "Metadata"),
+		id: `${Z}.MetadataFallback.Image`,
+		category: o(M("cat.advanced"), "Metadata"),
 		name: "Majoor: Metadata Fallback (Images)",
 		tooltip: "Enable Pillow fallback when ExifTool is missing or fails.",
 		type: "boolean",
-		defaultValue: t.metadataFallback?.image ?? G.metadataFallback.image,
+		defaultValue: t.metadataFallback?.image ?? K.metadataFallback.image,
 		onChange: async (e) => {
-			let n = !!e, i = !!(t.metadataFallback?.image ?? G.metadataFallback.image);
-			t.metadataFallback = t.metadataFallback || {}, t.metadataFallback.image = n, q(t), r("metadataFallback.image");
+			let n = !!e, i = !!(t.metadataFallback?.image ?? K.metadataFallback.image);
+			t.metadataFallback = t.metadataFallback || {}, t.metadataFallback.image = n, J(t), r("metadataFallback.image");
 			try {
-				let e = await he({
+				let e = await me({
 					image: n,
-					media: t.metadataFallback?.media ?? G.metadataFallback.media
+					media: t.metadataFallback?.media ?? K.metadataFallback.media
 				});
-				if (!e?.ok) throw Error(e?.error || j("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"));
+				if (!e?.ok) throw Error(e?.error || M("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"));
 			} catch (e) {
-				t.metadataFallback.image = i, q(t), r("metadataFallback.image"), T(e?.message || j("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"), "error");
+				t.metadataFallback.image = i, J(t), r("metadataFallback.image"), T(e?.message || M("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"), "error");
 			}
 		}
 	}), e({
-		id: `${X}.MetadataFallback.Media`,
-		category: o(j("cat.advanced"), "Metadata"),
+		id: `${Z}.MetadataFallback.Media`,
+		category: o(M("cat.advanced"), "Metadata"),
 		name: "Majoor: Metadata Fallback (Audio/Video)",
 		tooltip: "Enable hachoir fallback when ffprobe is missing or fails.",
 		type: "boolean",
-		defaultValue: t.metadataFallback?.media ?? G.metadataFallback.media,
+		defaultValue: t.metadataFallback?.media ?? K.metadataFallback.media,
 		onChange: async (e) => {
-			let n = !!e, i = !!(t.metadataFallback?.media ?? G.metadataFallback.media);
-			t.metadataFallback = t.metadataFallback || {}, t.metadataFallback.media = n, q(t), r("metadataFallback.media");
+			let n = !!e, i = !!(t.metadataFallback?.media ?? K.metadataFallback.media);
+			t.metadataFallback = t.metadataFallback || {}, t.metadataFallback.media = n, J(t), r("metadataFallback.media");
 			try {
-				let e = await he({
-					image: t.metadataFallback?.image ?? G.metadataFallback.image,
+				let e = await me({
+					image: t.metadataFallback?.image ?? K.metadataFallback.image,
 					media: n
 				});
-				if (!e?.ok) throw Error(e?.error || j("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"));
+				if (!e?.ok) throw Error(e?.error || M("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"));
 			} catch (e) {
-				t.metadataFallback.media = i, q(t), r("metadataFallback.media"), T(e?.message || j("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"), "error");
+				t.metadataFallback.media = i, J(t), r("metadataFallback.media"), T(e?.message || M("toast.failedUpdateMetadataFallback", "Failed to update metadata fallback settings"), "error");
 			}
 		}
 	});
 	try {
 		D().then((e) => {
 			if (!e?.ok || !e?.data?.prefs) return;
-			let n = e.data.prefs || {}, i = !!(n.image ?? G.metadataFallback.image), a = !!(n.media ?? G.metadataFallback.media);
+			let n = e.data.prefs || {}, i = !!(n.image ?? K.metadataFallback.image), a = !!(n.media ?? K.metadataFallback.media);
 			t.metadataFallback = t.metadataFallback || {};
 			let o = !1;
-			t.metadataFallback.image !== i && (t.metadataFallback.image = i, o = !0), t.metadataFallback.media !== a && (t.metadataFallback.media = a, o = !0), o && (q(t), r("metadataFallback"));
+			t.metadataFallback.image !== i && (t.metadataFallback.image = i, o = !0), t.metadataFallback.media !== a && (t.metadataFallback.media = a, o = !0), o && (J(t), r("metadataFallback"));
 		}).catch(() => {});
 	} catch (e) {
 		console.debug?.(e);
 	}
 	e({
-		id: `${X}.Db.Timeout`,
-		category: o(j("cat.advanced"), "Database"),
+		id: `${Z}.Db.Timeout`,
+		category: o(M("cat.advanced"), "Database"),
 		name: "DB Timeout (ms)",
 		tooltip: "Client-side DB timeout preference (stored locally).",
 		type: "number",
@@ -1803,11 +1803,11 @@ function Sn(e, t, r, a) {
 			step: 1e3
 		},
 		onChange: (e) => {
-			t.db = t.db || {}, t.db.timeoutMs = Math.max(1e3, Math.min(3e4, Math.round(W(e, 5e3)))), q(t), J(t), r("db.timeoutMs");
+			t.db = t.db || {}, t.db.timeoutMs = Math.max(1e3, Math.min(3e4, Math.round(G(e, 5e3)))), J(t), Y(t), r("db.timeoutMs");
 		}
 	}), e({
-		id: `${X}.Db.MaxConnections`,
-		category: o(j("cat.advanced"), "Database"),
+		id: `${Z}.Db.MaxConnections`,
+		category: o(M("cat.advanced"), "Database"),
 		name: "DB Max Connections",
 		tooltip: "Client-side DB max connections preference (stored locally).",
 		type: "number",
@@ -1818,11 +1818,11 @@ function Sn(e, t, r, a) {
 			step: 1
 		},
 		onChange: (e) => {
-			t.db = t.db || {}, t.db.maxConnections = Math.max(1, Math.min(100, Math.round(W(e, 10)))), q(t), J(t), r("db.maxConnections");
+			t.db = t.db || {}, t.db.maxConnections = Math.max(1, Math.min(100, Math.round(G(e, 10)))), J(t), Y(t), r("db.maxConnections");
 		}
 	}), e({
-		id: `${X}.Db.QueryTimeout`,
-		category: o(j("cat.advanced"), "Database"),
+		id: `${Z}.Db.QueryTimeout`,
+		category: o(M("cat.advanced"), "Database"),
 		name: "DB Query Timeout (ms)",
 		tooltip: "Client-side DB query timeout preference (stored locally).",
 		type: "number",
@@ -1833,25 +1833,25 @@ function Sn(e, t, r, a) {
 			step: 500
 		},
 		onChange: (e) => {
-			t.db = t.db || {}, t.db.queryTimeoutMs = Math.max(500, Math.min(1e4, Math.round(W(e, 1e3)))), q(t), J(t), r("db.queryTimeoutMs");
+			t.db = t.db || {}, t.db.queryTimeoutMs = Math.max(500, Math.min(1e4, Math.round(G(e, 1e3)))), J(t), Y(t), r("db.queryTimeoutMs");
 		}
 	}), e({
-		id: `${X}.Observability.Enabled`,
-		category: o(j("cat.advanced"), j("setting.obs.enabled.name").replace("Majoor: ", "")),
-		name: j("setting.obs.enabled.name"),
-		tooltip: j("setting.obs.enabled.desc"),
+		id: `${Z}.Observability.Enabled`,
+		category: o(M("cat.advanced"), M("setting.obs.enabled.name").replace("Majoor: ", "")),
+		name: M("setting.obs.enabled.name"),
+		tooltip: M("setting.obs.enabled.desc"),
 		type: "boolean",
 		defaultValue: !!t.observability?.enabled,
 		onChange: (e) => {
-			t.observability = t.observability || {}, t.observability.enabled = !!e, q(t), J(t), r("observability.enabled");
+			t.observability = t.observability || {}, t.observability.enabled = !!e, J(t), Y(t), r("observability.enabled");
 		}
 	}), e({
-		id: `${X}.Observability.RuntimeDashboardMode`,
-		category: o(j("cat.advanced"), "Runtime metrics badge"),
+		id: `${Z}.Observability.RuntimeDashboardMode`,
+		category: o(M("cat.advanced"), "Runtime metrics badge"),
 		name: "Majoor: Runtime metrics badge",
 		tooltip: "Controls the small DB/enrichment/watcher metrics badge in the Assets Manager panel.",
 		type: "combo",
-		defaultValue: t.observability?.runtimeDashboardMode || G.observability.runtimeDashboardMode,
+		defaultValue: t.observability?.runtimeDashboardMode || K.observability.runtimeDashboardMode,
 		options: [
 			"autoHide30",
 			"always",
@@ -1862,64 +1862,64 @@ function Sn(e, t, r, a) {
 				"autoHide30",
 				"always",
 				"hidden"
-			], G.observability.runtimeDashboardMode);
-			t.observability = t.observability || {}, t.observability.runtimeDashboardMode = n, q(t), r("observability.runtimeDashboardMode");
+			], K.observability.runtimeDashboardMode);
+			t.observability = t.observability || {}, t.observability.runtimeDashboardMode = n, J(t), r("observability.runtimeDashboardMode");
 		}
 	}), e({
-		id: `${X}.Observability.VerboseErrors`,
-		category: o(j("cat.advanced"), "Verbose error logging"),
+		id: `${Z}.Observability.VerboseErrors`,
+		category: o(M("cat.advanced"), "Verbose error logging"),
 		name: "Verbose error logging",
 		tooltip: "Show detailed error messages in toasts and console. Useful for debugging.",
 		type: "boolean",
 		defaultValue: !!t.observability?.verboseErrors,
 		onChange: (e) => {
-			t.observability = t.observability || {}, t.observability.verboseErrors = !!e, q(t), J(t), r("observability.verboseErrors");
+			t.observability = t.observability || {}, t.observability.verboseErrors = !!e, J(t), Y(t), r("observability.verboseErrors");
 		}
 	}), e({
-		id: `${X}.Observability.VerboseRouteRegistrationLogs`,
-		category: o(j("cat.advanced"), "Logs"),
+		id: `${Z}.Observability.VerboseRouteRegistrationLogs`,
+		category: o(M("cat.advanced"), "Logs"),
 		name: "Majoor: Verbose route registration logs",
 		tooltip: "When disabled, Majoor prints a compact startup summary instead of listing every registered API route. Takes effect on the next backend restart.",
 		type: "boolean",
-		defaultValue: !!(t.observability?.verboseRouteRegistrationLogs ?? G.observability?.verboseRouteRegistrationLogs ?? !1),
+		defaultValue: !!(t.observability?.verboseRouteRegistrationLogs ?? K.observability?.verboseRouteRegistrationLogs ?? !1),
 		onChange: async (e) => {
-			let n = !!e, i = !!(t.observability?.verboseRouteRegistrationLogs ?? G.observability?.verboseRouteRegistrationLogs ?? !1);
-			t.observability = t.observability || {}, t.observability.verboseRouteRegistrationLogs = n, q(t), r("observability.verboseRouteRegistrationLogs");
+			let n = !!e, i = !!(t.observability?.verboseRouteRegistrationLogs ?? K.observability?.verboseRouteRegistrationLogs ?? !1);
+			t.observability = t.observability || {}, t.observability.verboseRouteRegistrationLogs = n, J(t), r("observability.verboseRouteRegistrationLogs");
 			try {
-				let e = await pe(n);
+				let e = await fe(n);
 				if (!e?.ok) throw Error(e?.error || "Failed to update route logging settings");
 			} catch (e) {
-				t.observability.verboseRouteRegistrationLogs = i, q(t), r("observability.verboseRouteRegistrationLogs"), T(e?.message || "Failed to update route logging settings", "error");
+				t.observability.verboseRouteRegistrationLogs = i, J(t), r("observability.verboseRouteRegistrationLogs"), T(e?.message || "Failed to update route logging settings", "error");
 			}
 		}
 	}), (async () => {
 		try {
 			let e = !!(await ee())?.data?.prefs?.enabled;
-			t.observability = t.observability || {}, t.observability.verboseRouteRegistrationLogs !== e && (t.observability.verboseRouteRegistrationLogs = e, q(t), r("observability.verboseRouteRegistrationLogs"));
+			t.observability = t.observability || {}, t.observability.verboseRouteRegistrationLogs !== e && (t.observability.verboseRouteRegistrationLogs = e, J(t), r("observability.verboseRouteRegistrationLogs"));
 		} catch (e) {
 			console.debug?.(e);
 		}
 	})(), e({
-		id: `${X}.Observability.VerboseStartupLogs`,
-		category: o(j("cat.advanced"), "Logs"),
+		id: `${Z}.Observability.VerboseStartupLogs`,
+		category: o(M("cat.advanced"), "Logs"),
 		name: "Majoor: Verbose startup logs",
 		tooltip: "When disabled, Majoor suppresses most informational bootstrap logs during backend startup while keeping warnings and errors. Takes effect on the next backend restart.",
 		type: "boolean",
-		defaultValue: !!(t.observability?.verboseStartupLogs ?? G.observability?.verboseStartupLogs ?? !1),
+		defaultValue: !!(t.observability?.verboseStartupLogs ?? K.observability?.verboseStartupLogs ?? !1),
 		onChange: async (e) => {
-			let n = !!e, i = !!(t.observability?.verboseStartupLogs ?? G.observability?.verboseStartupLogs ?? !1);
-			t.observability = t.observability || {}, t.observability.verboseStartupLogs = n, q(t), r("observability.verboseStartupLogs");
+			let n = !!e, i = !!(t.observability?.verboseStartupLogs ?? K.observability?.verboseStartupLogs ?? !1);
+			t.observability = t.observability || {}, t.observability.verboseStartupLogs = n, J(t), r("observability.verboseStartupLogs");
 			try {
 				let e = await s(n);
 				if (!e?.ok) throw Error(e?.error || "Failed to update startup logging settings");
 			} catch (e) {
-				t.observability.verboseStartupLogs = i, q(t), r("observability.verboseStartupLogs"), T(e?.message || "Failed to update startup logging settings", "error");
+				t.observability.verboseStartupLogs = i, J(t), r("observability.verboseStartupLogs"), T(e?.message || "Failed to update startup logging settings", "error");
 			}
 		}
 	}), (async () => {
 		try {
 			let e = !!(await O())?.data?.prefs?.enabled;
-			t.observability = t.observability || {}, t.observability.verboseStartupLogs !== e && (t.observability.verboseStartupLogs = e, q(t), r("observability.verboseStartupLogs"));
+			t.observability = t.observability || {}, t.observability.verboseStartupLogs !== e && (t.observability.verboseStartupLogs = e, J(t), r("observability.verboseStartupLogs"));
 		} catch (e) {
 			console.debug?.(e);
 		}
@@ -1951,19 +1951,19 @@ function Sn(e, t, r, a) {
 			}
 		};
 		e({
-			id: `${X}.AI.HuggingFaceTokenVisible`,
-			category: o(j("cat.advanced"), n),
+			id: `${Z}.AI.HuggingFaceTokenVisible`,
+			category: o(M("cat.advanced"), n),
 			name: "Show HuggingFace token",
 			tooltip: "Show or hide the HuggingFace token while editing.",
 			type: "boolean",
 			defaultValue: c,
 			onChange: (e) => {
 				let n = !!e;
-				c = n, t.ai = t.ai || {}, t.ai.huggingFaceTokenVisible = n, q(t), r("ai.huggingFaceTokenVisible"), setTimeout(l, 0);
+				c = n, t.ai = t.ai || {}, t.ai.huggingFaceTokenVisible = n, J(t), r("ai.huggingFaceTokenVisible"), setTimeout(l, 0);
 			}
 		}), e({
-			id: `${X}.AI.HuggingFaceToken`,
-			category: o(j("cat.advanced"), n),
+			id: `${Z}.AI.HuggingFaceToken`,
+			category: o(M("cat.advanced"), n),
 			name: "HuggingFace Token",
 			tooltip: [
 				"Optional token for HuggingFace Hub downloads (higher rate limits).",
@@ -1991,7 +1991,7 @@ function Sn(e, t, r, a) {
 						a = null;
 						let e = ++s;
 						try {
-							let n = await fe(t);
+							let n = await de(t);
 							if (e !== s) return;
 							if (!n?.ok) throw Error(n?.error || "Failed to update HuggingFace token");
 							i = t, r("ai.huggingFaceToken"), t ? T("HuggingFace token saved", "success") : T("HuggingFace token cleared", "success", void 0, { noHistory: !0 });
@@ -2010,34 +2010,34 @@ function Sn(e, t, r, a) {
 				console.debug?.(e);
 			}
 		})(), e({
-			id: `${X}.AI.VerboseLogs`,
-			category: o(j("cat.advanced"), n),
+			id: `${Z}.AI.VerboseLogs`,
+			category: o(M("cat.advanced"), n),
 			name: "Majoor: Verbose AI logs",
 			tooltip: "Enable detailed HuggingFace/SigLIP2/X-CLIP logs and progress bars during model download/loading.",
 			type: "boolean",
-			defaultValue: !!(t.ai?.verboseAiLogs ?? G.ai?.verboseAiLogs ?? !1),
+			defaultValue: !!(t.ai?.verboseAiLogs ?? K.ai?.verboseAiLogs ?? !1),
 			onChange: async (e) => {
-				let n = !!e, i = !!(t.ai?.verboseAiLogs ?? G.ai?.verboseAiLogs ?? !1);
-				t.ai = t.ai || {}, t.ai.verboseAiLogs = n, q(t), r("ai.verboseAiLogs");
+				let n = !!e, i = !!(t.ai?.verboseAiLogs ?? K.ai?.verboseAiLogs ?? !1);
+				t.ai = t.ai || {}, t.ai.verboseAiLogs = n, J(t), r("ai.verboseAiLogs");
 				try {
 					let e = await ie(n);
 					if (!e?.ok) throw Error(e?.error || "Failed to update AI logging settings");
 				} catch (e) {
-					t.ai.verboseAiLogs = i, q(t), r("ai.verboseAiLogs"), T(e?.message || "Failed to update AI logging settings", "error");
+					t.ai.verboseAiLogs = i, J(t), r("ai.verboseAiLogs"), T(e?.message || "Failed to update AI logging settings", "error");
 				}
 			}
 		}), (async () => {
 			try {
 				let e = !!(await d())?.data?.prefs?.enabled;
-				t.ai = t.ai || {}, t.ai.verboseAiLogs !== e && (t.ai.verboseAiLogs = e, q(t), r("ai.verboseAiLogs"));
+				t.ai = t.ai || {}, t.ai.verboseAiLogs !== e && (t.ai.verboseAiLogs = e, J(t), r("ai.verboseAiLogs"));
 			} catch (e) {
 				console.debug?.(e);
 			}
 		})();
 	}
 	e({
-		id: `${X}.AI.VectorStats`,
-		category: o(j("cat.advanced"), "AI / Vector Search"),
+		id: `${Z}.AI.VectorStats`,
+		category: o(M("cat.advanced"), "AI / Vector Search"),
 		name: "Vector Index Status",
 		tooltip: "Current status of the SigLIP2/X-CLIP vector index used for semantic search",
 		type: "text",
@@ -2050,8 +2050,8 @@ function Sn(e, t, r, a) {
 			console.debug?.("[Majoor] Vector status fetch failed", e);
 		}
 	})(), e({
-		id: `${X}.AI.VectorBackfillAction`,
-		category: o(j("cat.advanced"), "AI / Vector Search"),
+		id: `${Z}.AI.VectorBackfillAction`,
+		category: o(M("cat.advanced"), "AI / Vector Search"),
 		name: "Vector Index Action",
 		tooltip: [
 			"Compute CLIP embeddings for all assets that don't have them yet.",
@@ -2075,7 +2075,7 @@ function Sn(e, t, r, a) {
 				forceStore: !0
 			} };
 			try {
-				T(j("toast.vectorBackfillStarting", "Starting vector backfill... This may take a while."), "info", void 0, { history: {
+				T(M("toast.vectorBackfillStarting", "Starting vector backfill... This may take a while."), "info", void 0, { history: {
 					...t.history,
 					status: "started",
 					detail: "Starting vector backfill... This may take a while."
@@ -2108,7 +2108,7 @@ function Sn(e, t, r, a) {
 					].includes(i), o = r?.progress || {}, s = Number(r?.processed ?? o?.candidates ?? 0), c = Number(r?.indexed ?? o?.indexed ?? 0), l = Number(r?.skipped ?? o?.skipped ?? 0);
 					if (a) {
 						let e = String(r?.job_id || "").trim();
-						T(j("toast.vectorBackfillRunning", "Vector backfill still running in background{job}.", { job: e ? ` (job ${e.slice(0, 8)})` : "" }), "info", void 0, { history: {
+						T(M("toast.vectorBackfillRunning", "Vector backfill still running in background{job}.", { job: e ? ` (job ${e.slice(0, 8)})` : "" }), "info", void 0, { history: {
 							...t.history,
 							status: "running",
 							detail: `Vector backfill still running in background${e ? ` (${e.slice(0, 8)})` : ""}.`,
@@ -2121,7 +2121,7 @@ function Sn(e, t, r, a) {
 								label: "running"
 							}
 						} });
-					} else T(j("toast.vectorBackfillComplete", "Vector backfill complete! Processed: {processed}, Indexed: {indexed}, Skipped: {skipped}", {
+					} else T(M("toast.vectorBackfillComplete", "Vector backfill complete! Processed: {processed}, Indexed: {indexed}, Skipped: {skipped}", {
 						processed: s,
 						indexed: c,
 						skipped: l
@@ -2144,10 +2144,10 @@ function Sn(e, t, r, a) {
 					} catch (e) {
 						console.debug?.("[Majoor] Failed to refresh vector stats:", e);
 					}
-				} else throw Error(e?.error || j("toast.vectorBackfillFailedGeneric", "Backfill failed"));
+				} else throw Error(e?.error || M("toast.vectorBackfillFailedGeneric", "Backfill failed"));
 			} catch (e) {
-				let n = e?.message || String(e || j("status.unknown", "unknown"));
-				T(j("toast.vectorBackfillFailedDetail", "Vector backfill failed: {error}", { error: n }), "error", void 0, { history: {
+				let n = e?.message || String(e || M("status.unknown", "unknown"));
+				T(M("toast.vectorBackfillFailedDetail", "Vector backfill failed: {error}", { error: n }), "error", void 0, { history: {
 					...t.history,
 					status: "failed",
 					detail: n
@@ -2167,75 +2167,75 @@ function Tn(e, t, n) {
 	];
 	e({
 		id: `${Cn}.AI.VectorSearchEnabled`,
-		category: r(j("cat.search", "Search"), "AI"),
-		name: j("setting.ai.vector.enabled.name", "Enable AI semantic search"),
-		tooltip: j("setting.ai.vector.enabled.desc", "Enable/disable AI vector search features (SigLIP2/X-CLIP: description search, prompt alignment, AI tag suggestions, smart collections)."),
+		category: r(M("cat.search", "Search"), "AI"),
+		name: M("setting.ai.vector.enabled.name", "Enable AI semantic search"),
+		tooltip: M("setting.ai.vector.enabled.desc", "Enable/disable AI vector search features (SigLIP2/X-CLIP: description search, prompt alignment, AI tag suggestions, smart collections)."),
 		type: "boolean",
 		defaultValue: !!(t.ai?.vectorSearchEnabled ?? !0),
 		onChange: async (e) => {
 			t.ai = t.ai || {};
 			let r = !!(t.ai.vectorSearchEnabled ?? !0), i = !!e;
-			t.ai.vectorSearchEnabled = i, q(t), J(t), n("ai.vectorSearchEnabled");
+			t.ai.vectorSearchEnabled = i, J(t), Y(t), n("ai.vectorSearchEnabled");
 			try {
 				let e = await a(i);
 				if (!e?.ok) {
-					t.ai.vectorSearchEnabled = r, q(t), J(t), n("ai.vectorSearchEnabled"), T(e?.error || "Failed to update AI vector search setting", "error");
+					t.ai.vectorSearchEnabled = r, J(t), Y(t), n("ai.vectorSearchEnabled"), T(e?.error || "Failed to update AI vector search setting", "error");
 					return;
 				}
 				T(i ? "AI semantic search enabled" : "AI semantic search disabled", "info", 2200);
 			} catch (e) {
-				t.ai.vectorSearchEnabled = r, q(t), J(t), n("ai.vectorSearchEnabled"), T(e?.message || "Failed to update AI vector search setting", "error");
+				t.ai.vectorSearchEnabled = r, J(t), Y(t), n("ai.vectorSearchEnabled"), T(e?.message || "Failed to update AI vector search setting", "error");
 			}
 		}
 	}), e({
 		id: `${Cn}.AI.VectorCaptionOnIndex`,
-		category: r(j("cat.search", "Search"), "AI"),
-		name: j("setting.ai.vector.captionOnIndex.name", "Generate AI captions during indexing"),
-		tooltip: j("setting.ai.vector.captionOnIndex.desc", "Allow automatic vector indexing and backfill to run Florence-2 captions for image assets. This is slower and can use significant VRAM/CPU; leave it off for faster grid startup."),
+		category: r(M("cat.search", "Search"), "AI"),
+		name: M("setting.ai.vector.captionOnIndex.name", "Generate AI captions during indexing"),
+		tooltip: M("setting.ai.vector.captionOnIndex.desc", "Allow automatic vector indexing and backfill to run Florence-2 captions for image assets. This is slower and can use significant VRAM/CPU; leave it off for faster grid startup."),
 		type: "boolean",
 		defaultValue: !!(t.ai?.vectorCaptionOnIndex ?? !1),
 		onChange: async (e) => {
 			t.ai = t.ai || {};
 			let r = !!(t.ai.vectorCaptionOnIndex ?? !1), i = !!e;
-			t.ai.vectorCaptionOnIndex = i, q(t), J(t), n("ai.vectorCaptionOnIndex");
+			t.ai.vectorCaptionOnIndex = i, J(t), Y(t), n("ai.vectorCaptionOnIndex");
 			try {
 				let e = await a({ caption_on_index: i });
 				if (!e?.ok) {
-					t.ai.vectorCaptionOnIndex = r, q(t), J(t), n("ai.vectorCaptionOnIndex"), T(e?.error || "Failed to update AI caption indexing setting", "error");
+					t.ai.vectorCaptionOnIndex = r, J(t), Y(t), n("ai.vectorCaptionOnIndex"), T(e?.error || "Failed to update AI caption indexing setting", "error");
 					return;
 				}
 				i && T("AI captions during indexing enabled", "info", 2600);
 			} catch (e) {
-				t.ai.vectorCaptionOnIndex = r, q(t), J(t), n("ai.vectorCaptionOnIndex"), T(e?.message || "Failed to update AI caption indexing setting", "error");
+				t.ai.vectorCaptionOnIndex = r, J(t), Y(t), n("ai.vectorCaptionOnIndex"), T(e?.message || "Failed to update AI caption indexing setting", "error");
 			}
 		}
 	}), e({
 		id: `${Cn}.AI.VectorIndexOnScan`,
-		category: r(j("cat.search", "Search"), "AI"),
-		name: j("setting.ai.vector.indexOnScan.name", "Index vectors during scans"),
-		tooltip: j("setting.ai.vector.indexOnScan.desc", "Compute SigLIP/X-CLIP embeddings while assets are scanned. Disable to avoid surprise VRAM use; run vector backfill manually when needed."),
+		category: r(M("cat.search", "Search"), "AI"),
+		name: M("setting.ai.vector.indexOnScan.name", "Index vectors during scans"),
+		tooltip: M("setting.ai.vector.indexOnScan.desc", "Compute SigLIP/X-CLIP embeddings while assets are scanned. Disable to avoid surprise VRAM use; run vector backfill manually when needed."),
 		type: "boolean",
 		defaultValue: !!(t.ai?.vectorIndexOnScan ?? !1),
 		onChange: async (e) => {
 			t.ai = t.ai || {};
 			let r = !!(t.ai.vectorIndexOnScan ?? !1), i = !!e;
-			t.ai.vectorIndexOnScan = i, q(t), J(t), n("ai.vectorIndexOnScan");
+			t.ai.vectorIndexOnScan = i, J(t), Y(t), n("ai.vectorIndexOnScan");
 			try {
 				let e = await a({ index_on_scan: i });
 				if (!e?.ok) {
-					t.ai.vectorIndexOnScan = r, q(t), J(t), n("ai.vectorIndexOnScan"), T(e?.error || "Failed to update vector scan indexing", "error");
+					t.ai.vectorIndexOnScan = r, J(t), Y(t), n("ai.vectorIndexOnScan"), T(e?.error || "Failed to update vector scan indexing", "error");
 					return;
 				}
 				T(i ? "Vector indexing during scans enabled" : "Vector indexing during scans disabled", "info", 2400);
 			} catch (e) {
-				t.ai.vectorIndexOnScan = r, q(t), J(t), n("ai.vectorIndexOnScan"), T(e?.message || "Failed to update vector scan indexing", "error");
+				t.ai.vectorIndexOnScan = r, J(t), Y(t), n("ai.vectorIndexOnScan"), T(e?.message || "Failed to update vector scan indexing", "error");
 			}
 		}
 	}), e({
 		id: `${Cn}.AI.VectorConcurrency`,
-		category: r(j("cat.search", "Search"), "AI"),
-		name: j("setting.ai.vector.concurrency.name", "Vector indexing concurrency"),
-		tooltip: j("setting.ai.vector.concurrency.desc", "Maximum concurrent vector embedding workers. Use 1 to minimize transient VRAM spikes."),
+		category: r(M("cat.search", "Search"), "AI"),
+		name: M("setting.ai.vector.concurrency.name", "Vector indexing concurrency"),
+		tooltip: M("setting.ai.vector.concurrency.desc", "Maximum concurrent vector embedding workers. Use 1 to minimize transient VRAM spikes."),
 		type: "number",
 		defaultValue: Number(t.ai?.vectorConcurrency || 1),
 		attrs: {
@@ -2246,41 +2246,41 @@ function Tn(e, t, n) {
 		onChange: async (e) => {
 			t.ai = t.ai || {};
 			let r = Number(t.ai.vectorConcurrency || 1), i = Math.max(1, Math.min(16, Math.floor(Number(e) || 1)));
-			t.ai.vectorConcurrency = i, q(t), J(t), n("ai.vectorConcurrency");
+			t.ai.vectorConcurrency = i, J(t), Y(t), n("ai.vectorConcurrency");
 			try {
 				let e = await a({ concurrency: i });
-				e?.ok || (t.ai.vectorConcurrency = r, q(t), J(t), n("ai.vectorConcurrency"), T(e?.error || "Failed to update vector concurrency", "error"));
+				e?.ok || (t.ai.vectorConcurrency = r, J(t), Y(t), n("ai.vectorConcurrency"), T(e?.error || "Failed to update vector concurrency", "error"));
 			} catch (e) {
-				t.ai.vectorConcurrency = r, q(t), J(t), n("ai.vectorConcurrency"), T(e?.message || "Failed to update vector concurrency", "error");
+				t.ai.vectorConcurrency = r, J(t), Y(t), n("ai.vectorConcurrency"), T(e?.message || "Failed to update vector concurrency", "error");
 			}
 		}
 	}), e({
 		id: `${Cn}.AI.VectorUnloadAfterUse`,
-		category: r(j("cat.search", "Search"), "AI"),
-		name: j("setting.ai.vector.unloadAfterUse.name", "Unload AI models after use"),
-		tooltip: j("setting.ai.vector.unloadAfterUse.desc", "Unload Majoor SigLIP/X-CLIP/Florence models after heavy AI actions and call torch CUDA cache cleanup. This frees VRAM but makes the next AI action slower."),
+		category: r(M("cat.search", "Search"), "AI"),
+		name: M("setting.ai.vector.unloadAfterUse.name", "Unload AI models after use"),
+		tooltip: M("setting.ai.vector.unloadAfterUse.desc", "Unload Majoor SigLIP/X-CLIP/Florence models after heavy AI actions and call torch CUDA cache cleanup. This frees VRAM but makes the next AI action slower."),
 		type: "boolean",
 		defaultValue: !!(t.ai?.vectorUnloadAfterUse ?? !1),
 		onChange: async (e) => {
 			t.ai = t.ai || {};
 			let r = !!(t.ai.vectorUnloadAfterUse ?? !1), i = !!e;
-			t.ai.vectorUnloadAfterUse = i, q(t), J(t), n("ai.vectorUnloadAfterUse");
+			t.ai.vectorUnloadAfterUse = i, J(t), Y(t), n("ai.vectorUnloadAfterUse");
 			try {
 				let e = await a({ unload_after_use: i });
 				if (!e?.ok) {
-					t.ai.vectorUnloadAfterUse = r, q(t), J(t), n("ai.vectorUnloadAfterUse"), T(e?.error || "Failed to update model unload setting", "error");
+					t.ai.vectorUnloadAfterUse = r, J(t), Y(t), n("ai.vectorUnloadAfterUse"), T(e?.error || "Failed to update model unload setting", "error");
 					return;
 				}
 				T(i ? "AI model unload after use enabled" : "AI model unload after use disabled", "info", 2400);
 			} catch (e) {
-				t.ai.vectorUnloadAfterUse = r, q(t), J(t), n("ai.vectorUnloadAfterUse"), T(e?.message || "Failed to update model unload setting", "error");
+				t.ai.vectorUnloadAfterUse = r, J(t), Y(t), n("ai.vectorUnloadAfterUse"), T(e?.message || "Failed to update model unload setting", "error");
 			}
 		}
 	}), e({
 		id: `${Cn}.AI.VectorUnloadNow`,
-		category: r(j("cat.search", "Search"), "AI"),
-		name: j("setting.ai.vector.unloadNow.name", "Memory purge now"),
-		tooltip: j("setting.ai.vector.unloadNow.desc", "Immediately unload Majoor AI vector/caption models, ask ComfyUI to unload loaded models, and clear torch CUDA cache when idle."),
+		category: r(M("cat.search", "Search"), "AI"),
+		name: M("setting.ai.vector.unloadNow.name", "Memory purge now"),
+		tooltip: M("setting.ai.vector.unloadNow.desc", "Immediately unload Majoor AI vector/caption models, ask ComfyUI to unload loaded models, and clear torch CUDA cache when idle."),
 		type: "combo",
 		options: ["Idle", "Unload now"],
 		defaultValue: "Idle",
@@ -2294,22 +2294,22 @@ function Tn(e, t, n) {
 		}
 	}), e({
 		id: `${Cn}.Search.MaxResults`,
-		category: r(j("cat.search", "Search")),
-		name: j("setting.search.maxResults.name", "Max search results (client)"),
-		tooltip: j("setting.search.maxResults.desc", "Maximum number of results requested per search. The backend still enforces MAJOOR_SEARCH_MAX_LIMIT; increase that env var if you need a higher hard cap."),
+		category: r(M("cat.search", "Search")),
+		name: M("setting.search.maxResults.name", "Max search results (client)"),
+		tooltip: M("setting.search.maxResults.desc", "Maximum number of results requested per search. The backend still enforces MAJOOR_SEARCH_MAX_LIMIT; increase that env var if you need a higher hard cap."),
 		type: "number",
-		defaultValue: Number(t.search?.maxResults || A.SEARCH_DEFAULT_LIMIT),
+		defaultValue: Number(t.search?.maxResults || j.SEARCH_DEFAULT_LIMIT),
 		attrs: {
 			min: 10,
-			max: A.MAX_PAGE_SIZE || 2e3,
+			max: j.MAX_PAGE_SIZE || 2e3,
 			step: 1
 		},
 		onChange: (e) => {
-			t.search = t.search || {}, t.search.maxResults = Math.max(10, Math.min(A.MAX_PAGE_SIZE || 2e3, Number(e) || A.SEARCH_DEFAULT_LIMIT)), q(t), J(t), n("search.maxResults");
+			t.search = t.search || {}, t.search.maxResults = Math.max(10, Math.min(j.MAX_PAGE_SIZE || 2e3, Number(e) || j.SEARCH_DEFAULT_LIMIT)), J(t), Y(t), n("search.maxResults");
 		}
 	}), e({
 		id: `${Cn}.EnvVars.Reference`,
-		category: r(j("cat.advanced"), "Environment variables"),
+		category: r(M("cat.advanced"), "Environment variables"),
 		name: "Environment variables reference",
 		tooltip: [
 			"Set these env vars before starting ComfyUI to override defaults:",
@@ -2398,7 +2398,7 @@ function Hn(e, t, n) {
 	if (!r || Bn.has(r)) return !1;
 	Bn.add(r);
 	try {
-		return _e(e, r, n);
+		return ge(e, r, n);
 	} finally {
 		Bn.delete(r);
 	}
@@ -2417,7 +2417,7 @@ function Wn(e) {
 	try {
 		return JSON.parse(JSON.stringify(e || {}));
 	} catch {
-		return { ...G };
+		return { ...K };
 	}
 }
 function Gn(e, t, n, { wrapForComfy: r = !0 } = {}) {
@@ -2446,7 +2446,7 @@ function Yn(e, t, n) {
 	String(e?.id || "").trim() && (Hn(n, e, t), typeof e?.onChange == "function" && e.onChange(t));
 }
 function Xn(e, t, n, r) {
-	let i = !Kn(ve(r, t.id, t.defaultValue), n);
+	let i = !Kn(_e(r, t.id, t.defaultValue), n);
 	e.disabled = !i, e.style.opacity = i ? "1" : "0.45";
 }
 function Zn() {
@@ -2489,27 +2489,27 @@ function Qn(e, t, n) {
 function $n(e, t, { initRuntime: n = !1 } = {}) {
 	if (Rn) typeof t == "function" && Rn.onAppliedListeners.add(t), e && !Rn.app && (Rn.app = e);
 	else {
-		let n = K();
-		n.i18n = n.i18n || {}, typeof n.i18n.followComfyLanguage == "boolean" ? Ee(!!n.i18n.followComfyLanguage) : (n.i18n.followComfyLanguage = !0, Ee(!0), q(n));
+		let n = q();
+		n.i18n = n.i18n || {}, typeof n.i18n.followComfyLanguage == "boolean" ? Te(!!n.i18n.followComfyLanguage) : (n.i18n.followComfyLanguage = !0, Te(!0), J(n));
 		let r = /* @__PURE__ */ new Set();
 		typeof t == "function" && r.add(t);
 		let i = /* @__PURE__ */ new Set(), a = /* @__PURE__ */ new Set(), o = () => {
 			if (!i.size) return;
 			let e = Array.from(i);
 			i.clear();
-			for (let t of e) ke("mjr-settings-changed", { key: t }, { warnPrefix: "[Majoor]" });
+			for (let t of e) Oe("mjr-settings-changed", { key: t }, { warnPrefix: "[Majoor]" });
 		}, s = () => {
 			if (!a.size) return;
 			let e = Array.from(a);
 			a.clear();
-			for (let t of e) ke("mjr-settings-changed", { key: t }, { warnPrefix: "[Majoor]" });
+			for (let t of e) Oe("mjr-settings-changed", { key: t }, { warnPrefix: "[Majoor]" });
 		}, c = Ut(o, 120), l = Ut(s, 450), u = (e) => {
 			typeof e == "string" && i.add(e), c();
 		}, d = (e) => {
 			typeof e == "string" && a.add(e), l();
 		}, f = () => {
-			let e = K();
-			Object.assign(n, e), J(n), u("storage");
+			let e = q();
+			Object.assign(n, e), Y(n), u("storage");
 		}, p = (e) => {
 			!e || e.key !== "mjrSettings" || e.newValue !== e.oldValue && f();
 		};
@@ -2542,14 +2542,14 @@ function $n(e, t, { initRuntime: n = !1 } = {}) {
 	}
 	if (n && !zn) {
 		let t = e || Rn.app, n = Rn.settings;
-		Ce(t), J(n), Se(t), kt(), At(), jt(), n?.watcher && typeof n.watcher.enabled == "boolean" && se(!!n.watcher.enabled).catch(() => {}), Vt(), zn = !0;
+		Se(t), Y(n), xe(t), kt(), At(), jt(), n?.watcher && typeof n.watcher.enabled == "boolean" && k(!!n.watcher.enabled).catch(() => {}), Vt(), zn = !0;
 	}
 	return Rn;
 }
 var er = (e, t) => $n(e, t, { initRuntime: !0 }).settings, tr = (e, t) => {
 	let n = $n(e, t, { initRuntime: !1 });
-	Object.assign(n.settings, K());
-	let r = e || n.app, i = Gn(n.settings, r, n.notifyApplied), a = Gn(Wn(G), r, () => {}, { wrapForComfy: !1 });
+	Object.assign(n.settings, q());
+	let r = e || n.app, i = Gn(n.settings, r, n.notifyApplied), a = Gn(Wn(K), r, () => {}, { wrapForComfy: !1 });
 	return i.unshift(Un(r, {
 		id: An,
 		category: [
@@ -2564,17 +2564,17 @@ var er = (e, t) => $n(e, t, { initRuntime: !0 }).settings, tr = (e, t) => {
 	})), Qn(r, i, a), i;
 };
 try {
-	let e = K();
+	let e = q();
 	e?.watcher && typeof e.watcher.enabled == "boolean" && ae().then((e) => {
-		let t = !!e?.ok && !!e?.data?.enabled, n = K();
-		n.watcher = n.watcher || {}, typeof t == "boolean" && t !== !!n.watcher.enabled && (n.watcher.enabled = t, q(n), ke("mjr-settings-changed", { key: "watcher.enabled" }, { warnPrefix: "[Majoor]" }));
+		let t = !!e?.ok && !!e?.data?.enabled, n = q();
+		n.watcher = n.watcher || {}, typeof t == "boolean" && t !== !!n.watcher.enabled && (n.watcher.enabled = t, J(n), Oe("mjr-settings-changed", { key: "watcher.enabled" }, { warnPrefix: "[Majoor]" }));
 	}).catch(() => {});
 } catch (e) {
 	console.debug?.(e);
 }
 //#endregion
 //#region ui/features/workflows/workflowPickerState.ts
-var Z = Le({
+var Q = ut({
 	open: !1,
 	mode: "workflow",
 	title: "",
@@ -2584,18 +2584,18 @@ var Z = Le({
 	resolve: null
 });
 function nr({ title: e = "Select workflow", sourceAsset: t = null } = {}) {
-	return ir(null), Z.open = !0, Z.mode = "workflow", Z.title = String(e || "Select workflow"), Z.sourceAsset = t || null, Z.workflow = null, Z.items = [], new Promise((e) => {
-		Z.resolve = e;
+	return ir(null), Q.open = !0, Q.mode = "workflow", Q.title = String(e || "Select workflow"), Q.sourceAsset = t || null, Q.workflow = null, Q.items = [], new Promise((e) => {
+		Q.resolve = e;
 	});
 }
 function rr({ title: e = "Select asset", workflow: t = null, items: n = [] } = {}) {
-	return ir(null), Z.open = !0, Z.mode = "asset", Z.title = String(e || "Select asset"), Z.sourceAsset = null, Z.workflow = t || null, Z.items = Array.isArray(n) ? n.filter(Boolean) : [], new Promise((e) => {
-		Z.resolve = e;
+	return ir(null), Q.open = !0, Q.mode = "asset", Q.title = String(e || "Select asset"), Q.sourceAsset = null, Q.workflow = t || null, Q.items = Array.isArray(n) ? n.filter(Boolean) : [], new Promise((e) => {
+		Q.resolve = e;
 	});
 }
 function ir(e = null) {
-	let t = Z.resolve;
-	if (Z.open = !1, Z.mode = "workflow", Z.title = "", Z.sourceAsset = null, Z.workflow = null, Z.items = [], Z.resolve = null, typeof t == "function") try {
+	let t = Q.resolve;
+	if (Q.open = !1, Q.mode = "workflow", Q.title = "", Q.sourceAsset = null, Q.workflow = null, Q.items = [], Q.resolve = null, typeof t == "function") try {
 		t(e || null);
 	} catch (e) {
 		console.debug?.(e);
@@ -2605,31 +2605,32 @@ function ir(e = null) {
 //#region ui/vue/majoorPrimeVue.ts
 var ar = {
 	Button: Ye,
-	Checkbox: ut,
-	InputText: tt,
-	Select: st,
+	Checkbox: Je,
+	InputText: dt,
+	Textarea: et,
+	Select: ct,
 	ToggleButton: it,
-	Badge: Xe,
-	Tag: Ke,
-	Dialog: $e,
-	Menu: ot,
+	Badge: at,
+	Tag: Ge,
+	Dialog: Qe,
+	Menu: st,
 	Listbox: rt,
 	Tree: lt,
-	VirtualScroller: Je
+	VirtualScroller: qe
 };
 function or(e) {
-	return e.use(Qe, {
+	return e.use(Xe, {
 		ripple: !1,
 		unstyled: !0,
 		zIndex: { overlay: 10100 }
-	}), e.use(nt), e.use(at), Object.entries(ar).forEach(([t, n]) => {
+	}), e.use(Ze), e.use(nt), Object.entries(ar).forEach(([t, n]) => {
 		e.component(`M${t}`, n);
 	}), e;
 }
 //#endregion
 //#region ui/vue/createVueApp.ts
 function sr(e, t = void 0) {
-	let n = pt(), r = Ze(e, t);
+	let n = pt(), r = We(e, t);
 	return r.use(n), or(r), {
 		app: r,
 		pinia: n
@@ -2744,7 +2745,7 @@ var vr = {
 			let n = e?.[t] ?? e?.file_info?.[t];
 			return n != null && n !== "" ? n : t === "workflow_id" ? e?.user_metadata?.workflow?.id ?? e?.metadata?.workflow_id ?? "" : "";
 		}
-		let a = N(() => {
+		let a = R(() => {
 			let e = t.asset || {}, a = [];
 			if (e.width && e.height && a.push({
 				label: "Dimensions",
@@ -2755,25 +2756,25 @@ var vr = {
 				value: _r(e.duration),
 				tooltip: "Video duration"
 			}), r(e)) {
-				let t = Pe(e);
+				let t = Ne(e);
 				t != null && a.push({
 					label: "FPS",
-					value: Fe(t),
+					value: Pe(t),
 					tooltip: "Native frame rate"
 				});
-				let n = je(e, t);
+				let n = Ae(e, t);
 				n != null && a.push({
 					label: "Length",
 					value: `${Math.max(0, Math.floor(n))} frames`,
 					tooltip: "Total frame count"
 				});
 			}
-			let o = Me(e.generation_time_ms ?? e.metadata?.generation_time_ms ?? 0);
+			let o = je(e.generation_time_ms ?? e.metadata?.generation_time_ms ?? 0);
 			o > 0 && a.push({
 				label: "Generation Time",
 				value: `${(Number(o) / 1e3).toFixed(1)}s`,
 				tooltip: "Time taken to generate this asset (workflow execution time)",
-				valueStyle: `color: ${Ne(o)}; font-weight: 600;`
+				valueStyle: `color: ${Me(o)}; font-weight: 600;`
 			});
 			let s = e.generation_time || e.file_creation_time || e.mtime || e.created_at;
 			if (s) {
@@ -2822,14 +2823,14 @@ var vr = {
 				tooltip: "ComfyUI workflow identifier (from workflow.id in extra_data)"
 			}), a;
 		});
-		return (e, t) => a.value.length ? (I(), P("div", vr, [t[0] ||= V("div", { style: {
+		return (e, t) => a.value.length ? (N(), V("div", vr, [t[0] ||= F("div", { style: {
 			"font-size": "12px",
 			"font-weight": "700",
 			color: "#607d8b",
 			"margin-bottom": "8px",
 			"text-transform": "uppercase",
 			"letter-spacing": "0.4px"
-		} }, " File Info ", -1), V("div", yr, [(I(!0), P(H, null, M(a.value, (e) => (I(), P("div", {
+		} }, " File Info ", -1), F("div", yr, [(N(!0), V(P, null, I(a.value, (e) => (N(), V("div", {
 			key: e.label,
 			style: {
 				display: "flex",
@@ -2837,17 +2838,17 @@ var vr = {
 				"align-items": "flex-start",
 				"justify-content": "space-between"
 			}
-		}, [V("div", {
+		}, [F("div", {
 			title: e.tooltip || "",
 			style: {
 				"font-size": "12px",
 				opacity: "0.68",
 				"min-width": "92px"
 			}
-		}, z(e.label), 9, br), V("div", {
-			style: L(e.valueStyle || "font-size: 12px; text-align: right; word-break: break-word"),
+		}, B(e.label), 9, br), F("div", {
+			style: U(e.valueStyle || "font-size: 12px; text-align: right; word-break: break-word"),
 			title: String(e.value || "")
-		}, z(e.value), 13, xr)]))), 128))])])) : F("", !0);
+		}, B(e.value), 13, xr)]))), 128))])])) : L("", !0);
 	}
 }, Cr = new Set([
 	"png",
@@ -2878,7 +2879,7 @@ function Er(e) {
 }
 function Dr() {
 	try {
-		return !!(K()?.ai?.vectorSearchEnabled ?? !0);
+		return !!(q()?.ai?.vectorSearchEnabled ?? !0);
 	} catch {
 		return !0;
 	}
@@ -2904,7 +2905,7 @@ function jr(e) {
 	if (!t) return [];
 	let n = String(e?.subfolder || "").trim(), r = String(e?.folder_type || "input").trim().toLowerCase(), i = [], a = (e) => {
 		if (!e) return;
-		let r = xe(t, n, e);
+		let r = be(t, n, e);
 		r && !i.includes(r) && i.push(r);
 	};
 	return (r === "input" || r === "output") && a(r), a("input"), a("output"), i;
@@ -2920,20 +2921,20 @@ function Mr(e) {
 		return !1;
 	}
 }
-function Q(e) {
+function $(e) {
 	return e == null || e === "" ? "-" : String(e);
 }
 function Nr(e, t) {
 	let n = String(e?.pass_stage || e?.stage || e?.kind || "").trim().toLowerCase();
-	if (n === "txt2img" || n === "text_to_image" || n === "text-to-image") return j("sidebar.generation.stageTextToImage", "Text-to-Image");
-	if (n === "img2img" || n === "image_to_image" || n === "image-to-image") return j("sidebar.generation.stageImageToImage", "Image-to-Image");
-	if (n === "inpaint" || n === "inpainting") return j("sidebar.generation.stageInpaint", "Inpaint");
-	if (n === "upscale" || n === "upscaling") return j("sidebar.generation.stageUpscale", "Upscale");
-	if (n === "refine" || n === "refiner") return j("sidebar.generation.stageRefine", "Refine");
+	if (n === "txt2img" || n === "text_to_image" || n === "text-to-image") return M("sidebar.generation.stageTextToImage", "Text-to-Image");
+	if (n === "img2img" || n === "image_to_image" || n === "image-to-image") return M("sidebar.generation.stageImageToImage", "Image-to-Image");
+	if (n === "inpaint" || n === "inpainting") return M("sidebar.generation.stageInpaint", "Inpaint");
+	if (n === "upscale" || n === "upscaling") return M("sidebar.generation.stageUpscale", "Upscale");
+	if (n === "refine" || n === "refiner") return M("sidebar.generation.stageRefine", "Refine");
 	let r = String(e?.pass_name || "").trim();
 	if (r && r.toLowerCase() !== "base") return r;
 	let i = Number(e?.denoise);
-	return t === 0 || i === 1 ? j("sidebar.generation.stageBase", "Base") : Number.isFinite(i) && i < 1 ? j("sidebar.generation.stageRefineUpscale", "Refine / Upscale") : j("sidebar.generation.stagePassN", "Pass {n}", { n: t + 1 });
+	return t === 0 || i === 1 ? M("sidebar.generation.stageBase", "Base") : Number.isFinite(i) && i < 1 ? M("sidebar.generation.stageRefineUpscale", "Refine / Upscale") : M("sidebar.generation.stagePassN", "Pass {n}", { n: t + 1 });
 }
 function Pr(e) {
 	return e?.geninfo && typeof e.geninfo == "object" ? { geninfo: e.geninfo } : e?.metadata && (typeof e.metadata == "object" || typeof e.metadata == "string") ? e.metadata : e?.prompt && (typeof e.prompt == "object" || typeof e.prompt == "string") ? e.prompt : e?.metadata_raw ? e.metadata_raw : e?.exif ? e.exif : null;
@@ -2978,11 +2979,11 @@ function zr(e) {
 	let r = e.models && typeof e.models == "object" ? e.models : null, i = Array.isArray(e.loras) ? e.loras : [];
 	return r && [{
 		key: "high_noise",
-		label: j("sidebar.generation.highNoise", "High Noise"),
+		label: M("sidebar.generation.highNoise", "High Noise"),
 		model: Ir(r.unet_high_noise)
 	}, {
 		key: "low_noise",
-		label: j("sidebar.generation.lowNoise", "Low Noise"),
+		label: M("sidebar.generation.lowNoise", "Low Noise"),
 		model: Ir(r.unet_low_noise)
 	}].forEach((e) => {
 		let n = i.filter((t) => Rr(t) === e.key).map((e) => gt(e)).filter(Boolean);
@@ -2995,7 +2996,7 @@ function zr(e) {
 function Br(e, t) {
 	return t == null ? null : {
 		label: e,
-		value: t ? j("state.on", "on") : j("state.off", "off")
+		value: t ? M("state.on", "on") : M("state.off", "off")
 	};
 }
 function Vr(e) {
@@ -3004,20 +3005,20 @@ function Vr(e) {
 function Hr(e) {
 	return new Set(Array.isArray(e.override_fields) ? e.override_fields.map((e) => String(e || "").trim()).filter(Boolean) : []);
 }
-function $(e, ...t) {
+function Ur(e, ...t) {
 	return t.some((t) => e.has(t));
 }
-function Ur(e) {
+function Wr(e) {
 	return Array.isArray(e) ? e.filter((e) => e && typeof e == "object").map((e, t) => ({
-		title: String(e.title || j("sidebar.generation.customInfoN", "Custom Info {n}", { n: t + 1 })).trim(),
+		title: String(e.title || M("sidebar.generation.customInfoN", "Custom Info {n}", { n: t + 1 })).trim(),
 		content: String(e.content ?? e.value ?? "").trim(),
 		color: /^#[0-9a-fA-F]{6}$/.test(String(e.color || "").trim()) ? String(e.color).trim() : "#2196F3"
 	})).filter((e) => e.content) : [];
 }
-function Wr(e) {
+function Gr(e) {
 	let t = ht(Pr(e)), n = {
 		kind: "empty",
-		title: j("sidebar.generation.title", "Generation"),
+		title: M("sidebar.generation.title", "Generation"),
 		workflowType: "",
 		workflowLabel: "",
 		workflowBadge: "",
@@ -3029,8 +3030,8 @@ function Wr(e) {
 		promptTabs: [],
 		mediaOnlyMessage: "",
 		showAlignment: !1,
-		captionLabel: j("sidebar.generation.imageDescription", "Image Description"),
-		emptyCaptionText: j("sidebar.generation.noImageDescription", "No image description yet."),
+		captionLabel: M("sidebar.generation.imageDescription", "Image Description"),
+		emptyCaptionText: M("sidebar.generation.noImageDescription", "No image description yet."),
 		isImageAsset: Tr(e),
 		lyrics: "",
 		modelFields: [],
@@ -3055,7 +3056,7 @@ function Wr(e) {
 		return t && typeof t == "object" && t.kind === "media_pipeline" ? {
 			...n,
 			kind: "media-only",
-			mediaOnlyMessage: j("sidebar.generation.mediaOnlyPipeline", "This file looks like a media-only pipeline (e.g. LoadVideo/VideoCombine) and does not contain generation parameters.")
+			mediaOnlyMessage: M("sidebar.generation.mediaOnlyPipeline", "This file looks like a media-only pipeline (e.g. LoadVideo/VideoCombine) and does not contain generation parameters.")
 		} : Tr(e) || Er(e) ? {
 			...n,
 			kind: "caption-only",
@@ -3065,7 +3066,7 @@ function Wr(e) {
 	let r = t, i = Hr(r), a = r.engine && typeof r.engine == "object" ? r.engine : null, o = !!(r.is_override || a?.mode === "override" || a?.parser_version === "geninfo-override-v1" || a?.source === "majoor_geninfo"), s = yt(r), c = mt(typeof r.prompt == "string" ? r.prompt : null, typeof (r.negative_prompt || r.negativePrompt) == "string" ? r.negative_prompt || r.negativePrompt : null), l = Array.isArray(r.all_positive_prompts) && r.all_positive_prompts.length > 1 ? r.all_positive_prompts.map((e, t) => {
 		let n = mt(typeof e == "string" ? e : "", typeof r.all_negative_prompts?.[t] == "string" ? r.all_negative_prompts[t] : "");
 		return {
-			label: j("sidebar.generation.promptN", "Prompt {n}", { n: t + 1 }),
+			label: M("sidebar.generation.promptN", "Prompt {n}", { n: t + 1 }),
 			positive: _t(n.positive),
 			negative: _t(n.negative)
 		};
@@ -3078,139 +3079,139 @@ function Wr(e) {
 		].filter(Boolean));
 		if (h) h.forEach((e, t) => {
 			let n = Ir(e);
-			Lr(u, d, j("sidebar.generation.checkpointN", "Checkpoint {n}", { n: t + 1 }), n);
+			Lr(u, d, M("sidebar.generation.checkpointN", "Checkpoint {n}", { n: t + 1 }), n);
 		});
 		else {
 			let t = Ir(f.checkpoint);
-			t && !e.has(t) && Lr(u, d, j("sidebar.generation.checkpoint", "Checkpoint"), t);
+			t && !e.has(t) && Lr(u, d, M("sidebar.generation.checkpoint", "Checkpoint"), t);
 		}
 		[
 			["UNet", Ir(f.unet)],
 			["Diffusion", Ir(f.diffusion)],
-			[j("sidebar.generation.upscaler", "Upscaler"), Ir(f.upscaler)],
+			[M("sidebar.generation.upscaler", "Upscaler"), Ir(f.upscaler)],
 			["CLIP", Ir(f.clip)],
 			["VAE", Ir(f.vae)]
 		].forEach(([t, n]) => {
 			e.has(n) || Lr(u, d, t, n);
 		});
-	} else (r.model || r.checkpoint) && Lr(u, d, j("sidebar.generation.model", "Model"), vt(r.model || r.checkpoint));
+	} else (r.model || r.checkpoint) && Lr(u, d, M("sidebar.generation.model", "Model"), vt(r.model || r.checkpoint));
 	if (Array.isArray(r.loras) && r.loras.length > 0) {
 		let e = r.loras.map((e) => gt(e)).filter(Boolean).join("\n");
-		e && Lr(u, d, r.loras.length > 1 ? j("sidebar.generation.loras", "LoRAs") : "LoRA", e);
+		e && Lr(u, d, r.loras.length > 1 ? M("sidebar.generation.loras", "LoRAs") : "LoRA", e);
 	}
 	!f && r.clip && Lr(u, d, "CLIP", vt(r.clip)), !f && r.vae && Lr(u, d, "VAE", vt(r.vae)), !f && r.unet && Lr(u, d, "UNet", vt(r.unet)), !f && r.diffusion && Lr(u, d, "Diffusion", vt(r.diffusion)), f && r.clip && Lr(u, d, "CLIP", vt(r.clip)), f && r.vae && Lr(u, d, "VAE", vt(r.vae));
 	for (let e of u) {
 		let t = String(e.label || "").toLowerCase();
-		(t.includes("checkpoint") || t === "model") && (e.override = $(i, "checkpoint", "model")), t === "clip" && (e.override = $(i, "clip")), t === "vae" && (e.override = $(i, "vae")), t.includes("lora") && (e.override = $(i, "loras"));
+		(t.includes("checkpoint") || t === "model") && (e.override = Ur(i, "checkpoint", "model")), t === "clip" && (e.override = Ur(i, "clip")), t === "vae" && (e.override = Ur(i, "vae")), t.includes("lora") && (e.override = Ur(i, "loras"));
 	}
 	let g = [];
 	Vr(r.seed) && g.push({
-		label: j("sidebar.generation.seed", "Seed"),
+		label: M("sidebar.generation.seed", "Seed"),
 		value: r.seed,
-		override: $(i, "seed")
+		override: Ur(i, "seed")
 	}), (r.sampler || r.sampler_name) && g.push({
-		label: j("sidebar.generation.sampler", "Sampler"),
+		label: M("sidebar.generation.sampler", "Sampler"),
 		value: r.sampler || r.sampler_name,
-		override: $(i, "sampler", "sampler_name")
+		override: Ur(i, "sampler", "sampler_name")
 	}), Vr(r.steps) && g.push({
-		label: j("sidebar.generation.steps", "Steps"),
+		label: M("sidebar.generation.steps", "Steps"),
 		value: r.steps,
-		override: $(i, "steps")
+		override: Ur(i, "steps")
 	});
 	let _ = Vr(r.cfg) ? r.cfg : r.cfg_scale;
 	Vr(_) && g.push({
-		label: j("sidebar.generation.cfgScale", "CFG Scale"),
+		label: M("sidebar.generation.cfgScale", "CFG Scale"),
 		value: _,
-		override: $(i, "cfg", "cfg_scale")
+		override: Ur(i, "cfg", "cfg_scale")
 	}), r.cfg_high_noise !== void 0 && r.cfg_high_noise !== null && g.push({
-		label: j("sidebar.generation.cfgHighNoise", "CFG High Noise"),
+		label: M("sidebar.generation.cfgHighNoise", "CFG High Noise"),
 		value: r.cfg_high_noise
 	}), r.cfg_low_noise !== void 0 && r.cfg_low_noise !== null && g.push({
-		label: j("sidebar.generation.cfgLowNoise", "CFG Low Noise"),
+		label: M("sidebar.generation.cfgLowNoise", "CFG Low Noise"),
 		value: r.cfg_low_noise
 	}), r.scheduler && g.push({
-		label: j("sidebar.generation.scheduler", "Scheduler"),
+		label: M("sidebar.generation.scheduler", "Scheduler"),
 		value: r.scheduler,
-		override: $(i, "scheduler")
+		override: Ur(i, "scheduler")
 	});
 	let v = Vr(r.denoise) ? r.denoise : r.denoising;
 	Vr(v) && g.push({
-		label: j("sidebar.generation.denoise", "Denoise"),
+		label: M("sidebar.generation.denoise", "Denoise"),
 		value: v,
-		override: $(i, "denoise", "denoising")
+		override: Ur(i, "denoise", "denoising")
 	});
 	let y = [];
 	Array.isArray(r.chained_passes) && r.chained_passes.length > 1 ? y = r.chained_passes.filter((e) => e && typeof e == "object").map((e, t) => ({
 		label: Nr(e, t),
 		fields: [
 			{
-				label: j("sidebar.generation.model", "Model"),
-				value: Q(e?.model)
+				label: M("sidebar.generation.model", "Model"),
+				value: $(e?.model)
 			},
 			{
-				label: j("sidebar.generation.sampler", "Sampler"),
-				value: Q(e?.sampler_name || e?.sampler)
+				label: M("sidebar.generation.sampler", "Sampler"),
+				value: $(e?.sampler_name || e?.sampler)
 			},
 			{
-				label: j("sidebar.generation.scheduler", "Scheduler"),
-				value: Q(e?.scheduler)
+				label: M("sidebar.generation.scheduler", "Scheduler"),
+				value: $(e?.scheduler)
 			},
 			{
-				label: j("sidebar.generation.steps", "Steps"),
-				value: Q(e?.steps)
+				label: M("sidebar.generation.steps", "Steps"),
+				value: $(e?.steps)
 			},
 			{
 				label: "CFG",
-				value: Q(e?.cfg)
+				value: $(e?.cfg)
 			},
 			{
-				label: j("sidebar.generation.denoise", "Denoise"),
-				value: Q(e?.denoise)
+				label: M("sidebar.generation.denoise", "Denoise"),
+				value: $(e?.denoise)
 			},
 			{
-				label: j("sidebar.generation.seed", "Seed"),
-				value: Q(e?.seed_val || e?.seed)
+				label: M("sidebar.generation.seed", "Seed"),
+				value: $(e?.seed_val || e?.seed)
 			}
 		]
 	})) : Array.isArray(r.all_samplers) && r.all_samplers.length > 1 && (y = r.all_samplers.filter((e) => e && typeof e == "object").map((e, t) => ({
 		label: Nr(e, t),
 		fields: [
 			{
-				label: j("sidebar.generation.model", "Model"),
-				value: Q(e?.model)
+				label: M("sidebar.generation.model", "Model"),
+				value: $(e?.model)
 			},
 			{
-				label: j("sidebar.generation.sampler", "Sampler"),
-				value: Q(e?.sampler_name || e?.sampler)
+				label: M("sidebar.generation.sampler", "Sampler"),
+				value: $(e?.sampler_name || e?.sampler)
 			},
 			{
-				label: j("sidebar.generation.scheduler", "Scheduler"),
-				value: Q(e?.scheduler)
+				label: M("sidebar.generation.scheduler", "Scheduler"),
+				value: $(e?.scheduler)
 			},
 			{
-				label: j("sidebar.generation.steps", "Steps"),
-				value: Q(e?.steps)
+				label: M("sidebar.generation.steps", "Steps"),
+				value: $(e?.steps)
 			},
 			{
 				label: "CFG",
-				value: Q(e?.cfg)
+				value: $(e?.cfg)
 			},
 			{
-				label: j("sidebar.generation.denoise", "Denoise"),
-				value: Q(e?.denoise)
+				label: M("sidebar.generation.denoise", "Denoise"),
+				value: $(e?.denoise)
 			},
 			{
-				label: j("sidebar.generation.seed", "Seed"),
-				value: Q(e?.seed_val || e?.seed)
+				label: M("sidebar.generation.seed", "Seed"),
+				value: $(e?.seed_val || e?.seed)
 			}
 		]
 	})));
 	let b = [];
 	r.voice && b.push({
-		label: j("sidebar.generation.narratorVoice", "Narrator Voice"),
+		label: M("sidebar.generation.narratorVoice", "Narrator Voice"),
 		value: r.voice
 	}), r.language && b.push({
-		label: j("sidebar.generation.language", "Language"),
+		label: M("sidebar.generation.language", "Language"),
 		value: r.language
 	}), r.top_k !== void 0 && r.top_k !== null && b.push({
 		label: "Top-k",
@@ -3219,77 +3220,77 @@ function Wr(e) {
 		label: "Top-p",
 		value: r.top_p
 	}), r.temperature !== void 0 && r.temperature !== null && b.push({
-		label: j("sidebar.generation.temperature", "Temperature"),
+		label: M("sidebar.generation.temperature", "Temperature"),
 		value: r.temperature
 	}), r.repetition_penalty !== void 0 && r.repetition_penalty !== null && b.push({
-		label: j("sidebar.generation.repetitionPenalty", "Repetition Penalty"),
+		label: M("sidebar.generation.repetitionPenalty", "Repetition Penalty"),
 		value: r.repetition_penalty
 	}), r.max_new_tokens !== void 0 && r.max_new_tokens !== null && b.push({
-		label: j("sidebar.generation.maxNewTokens", "Max New Tokens"),
+		label: M("sidebar.generation.maxNewTokens", "Max New Tokens"),
 		value: r.max_new_tokens
 	});
 	let x = [];
 	r.device && x.push({
-		label: j("sidebar.generation.device", "Device"),
+		label: M("sidebar.generation.device", "Device"),
 		value: r.device
 	}), r.voice_preset && x.push({
-		label: j("sidebar.generation.voicePreset", "Voice Preset"),
+		label: M("sidebar.generation.voicePreset", "Voice Preset"),
 		value: r.voice_preset
 	}), r.dtype && x.push({
-		label: j("sidebar.generation.dtype", "Dtype"),
+		label: M("sidebar.generation.dtype", "Dtype"),
 		value: r.dtype
 	}), r.attn_implementation && x.push({
-		label: j("sidebar.generation.attention", "Attention"),
+		label: M("sidebar.generation.attention", "Attention"),
 		value: r.attn_implementation
 	}), r.compile_mode && x.push({
-		label: j("sidebar.generation.compileMode", "Compile Mode"),
+		label: M("sidebar.generation.compileMode", "Compile Mode"),
 		value: r.compile_mode
 	}), [
-		Br(j("sidebar.generation.torchCompile", "Torch Compile"), r.use_torch_compile),
-		Br(j("sidebar.generation.cudaGraphs", "CUDA Graphs"), r.use_cuda_graphs),
-		Br(j("sidebar.generation.xVectorOnly", "X-Vector Only"), r.x_vector_only_mode)
+		Br(M("sidebar.generation.torchCompile", "Torch Compile"), r.use_torch_compile),
+		Br(M("sidebar.generation.cudaGraphs", "CUDA Graphs"), r.use_cuda_graphs),
+		Br(M("sidebar.generation.xVectorOnly", "X-Vector Only"), r.x_vector_only_mode)
 	].filter(Boolean).forEach((e) => x.push(e));
 	let S = [];
 	[
-		Br(j("sidebar.generation.chunking", "Chunking"), r.enable_chunking),
+		Br(M("sidebar.generation.chunking", "Chunking"), r.enable_chunking),
 		r.max_chars_per_chunk !== void 0 && r.max_chars_per_chunk !== null ? {
-			label: j("sidebar.generation.maxCharsChunk", "Max Chars/Chunk"),
+			label: M("sidebar.generation.maxCharsChunk", "Max Chars/Chunk"),
 			value: r.max_chars_per_chunk
 		} : null,
 		r.chunk_combination_method ? {
-			label: j("sidebar.generation.chunkMethod", "Chunk Method"),
+			label: M("sidebar.generation.chunkMethod", "Chunk Method"),
 			value: r.chunk_combination_method
 		} : null,
 		r.silence_between_chunks_ms !== void 0 && r.silence_between_chunks_ms !== null ? {
-			label: j("sidebar.generation.silenceBetweenChunks", "Silence Between Chunks (ms)"),
+			label: M("sidebar.generation.silenceBetweenChunks", "Silence Between Chunks (ms)"),
 			value: r.silence_between_chunks_ms
 		} : null,
-		Br(j("sidebar.generation.audioCache", "Audio Cache"), r.enable_audio_cache),
+		Br(M("sidebar.generation.audioCache", "Audio Cache"), r.enable_audio_cache),
 		r.batch_size !== void 0 && r.batch_size !== null ? {
-			label: j("sidebar.generation.batchSize", "Batch Size"),
+			label: M("sidebar.generation.batchSize", "Batch Size"),
 			value: r.batch_size
 		} : null
 	].filter(Boolean).forEach((e) => S.push(e));
 	let C = [];
 	r.lyrics_strength !== void 0 && r.lyrics_strength !== null && C.push({
-		label: j("sidebar.generation.lyricsStrength", "Lyrics Strength"),
+		label: M("sidebar.generation.lyricsStrength", "Lyrics Strength"),
 		value: r.lyrics_strength
 	});
 	let w = [];
 	Vr(v) && !g.some((e) => e.label === "Denoise") && w.push({
-		label: j("sidebar.generation.denoise", "Denoise"),
+		label: M("sidebar.generation.denoise", "Denoise"),
 		value: v
 	}), Vr(r.clip_skip) && w.push({
-		label: j("sidebar.generation.clipSkip", "Clip Skip"),
+		label: M("sidebar.generation.clipSkip", "Clip Skip"),
 		value: r.clip_skip
 	});
 	let T = [], E = String(r.workflow_notes || r.notes || "").trim();
 	E && T.push({
-		label: j("sidebar.generation.workflowNotes", "Workflow Notes"),
+		label: M("sidebar.generation.workflowNotes", "Workflow Notes"),
 		value: E,
-		override: $(i, "workflow_notes", "notes")
+		override: Ur(i, "workflow_notes", "notes")
 	});
-	let D = Ur(r.custom_info), ee = Array.isArray(r.inputs) ? r.inputs.filter((e) => e && typeof e == "object" && e.filename).map((e, t) => ({
+	let D = Wr(r.custom_info), ee = Array.isArray(r.inputs) ? r.inputs.filter((e) => e && typeof e == "object" && e.filename).map((e, t) => ({
 		id: `${e.filename}-${t}`,
 		filename: String(e.filename || "").trim(),
 		filepath: String(e.filepath || e.filename || "").trim(),
@@ -3308,8 +3309,8 @@ function Wr(e) {
 		isTruncated: !!(e?.geninfo?._truncated || e?.metadata?._truncated || e?.prompt?._truncated),
 		positivePrompt: l.length ? "" : String(c.positive || "").trim(),
 		negativePrompt: l.length ? "" : String(c.negative || "").trim(),
-		positivePromptOverride: $(i, "prompt", "positive", "positive_prompt"),
-		negativePromptOverride: $(i, "negative_prompt", "negative", "negativePrompt"),
+		positivePromptOverride: Ur(i, "prompt", "positive", "positive_prompt"),
+		negativePromptOverride: Ur(i, "negative_prompt", "negative", "negativePrompt"),
 		promptTabs: l,
 		showAlignment: !!e?.id && (!!String(c.positive || "").trim() || l.length > 0),
 		isImageAsset: Tr(e),
@@ -3334,7 +3335,7 @@ function Wr(e) {
 }
 //#endregion
 //#region ui/vue/components/panel/sidebar/GenerationInputThumb.vue
-var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
+var Kr = ["title"], qr = ["src"], Jr = ["src"], Yr = {
 	key: 2,
 	style: {
 		position: "absolute",
@@ -3350,7 +3351,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 		overflow: "hidden",
 		"text-overflow": "ellipsis"
 	}
-}, Yr = {
+}, Xr = {
 	key: 3,
 	title: "Video file",
 	style: {
@@ -3360,14 +3361,14 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 		"font-size": "16px",
 		"pointer-events": "none"
 	}
-}, Xr = {
+}, Zr = {
 	__name: "GenerationInputThumb",
 	props: { inputFile: {
 		type: Object,
 		required: !0
 	} },
 	setup(e) {
-		let t = e, n = R(0), r = R(!1);
+		let t = e, n = H(0), r = H(!1);
 		function i() {
 			return (Array.isArray(t.inputFile?.previewCandidates) ? t.inputFile.previewCandidates : [])[n.value] || "";
 		}
@@ -3405,9 +3406,9 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 				console.debug?.(e);
 			}
 		}
-		return (t, n) => (I(), P("div", {
+		return (t, n) => (N(), V("div", {
 			title: `${e.inputFile.filename} (click to copy, double-click to open in new tab)`,
-			style: L({
+			style: U({
 				width: "64px",
 				height: "64px",
 				background: "#222",
@@ -3423,7 +3424,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 			}),
 			onClick: o,
 			onDblclick: s
-		}, [e.inputFile.isVideo ? (I(), P("video", {
+		}, [e.inputFile.isVideo ? (N(), V("video", {
 			key: 0,
 			src: i(),
 			muted: "",
@@ -3438,7 +3439,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 			onError: a,
 			onMouseover: c,
 			onMouseout: l
-		}, null, 40, Kr)) : (I(), P("img", {
+		}, null, 40, qr)) : (N(), V("img", {
 			key: 1,
 			src: i(),
 			style: {
@@ -3447,16 +3448,16 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 				"object-fit": "cover"
 			},
 			onError: a
-		}, null, 40, qr)), e.inputFile.role && e.inputFile.role !== "secondary" ? (I(), P("div", Jr, z(e.inputFile.roleLabel), 1)) : e.inputFile.isVideo ? (I(), P("div", Yr, " Play ")) : F("", !0)], 44, Gr));
+		}, null, 40, Jr)), e.inputFile.role && e.inputFile.role !== "secondary" ? (N(), V("div", Yr, B(e.inputFile.roleLabel), 1)) : e.inputFile.isVideo ? (N(), V("div", Xr, " Play ")) : L("", !0)], 44, Kr));
 	}
-}, Zr = {
+}, Qr = {
 	key: 0,
 	style: {
 		display: "flex",
 		"flex-direction": "column",
 		gap: "12px"
 	}
-}, Qr = {
+}, $r = {
 	key: 0,
 	style: {
 		display: "flex",
@@ -3471,77 +3472,77 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 		fontSize: "11px",
 		color: "var(--fg-color, #ccc)"
 	}
-}, $r = { style: { opacity: "0.85" } }, ei = { style: {
+}, ei = { style: { opacity: "0.85" } }, ti = { style: {
 	display: "flex",
 	"align-items": "center",
 	gap: "8px",
 	"flex-wrap": "wrap",
 	"justify-content": "flex-end"
-} }, ti = ["title"], ni = ["title"], ri = { style: {
+} }, ni = ["title"], ri = ["title"], ii = { style: {
 	display: "flex",
 	"align-items": "center",
 	"justify-content": "space-between",
 	gap: "10px"
-} }, ii = { style: {
+} }, ai = { style: {
 	"font-size": "11px",
 	"font-weight": "700",
 	color: "#00BCD4",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.6px"
-} }, ai = { style: {
+} }, oi = { style: {
 	"font-size": "11px",
 	color: "var(--fg-color, rgba(255,255,255,0.9))",
 	"font-weight": "600"
-} }, oi = { style: {
+} }, si = { style: {
 	"font-size": "11px",
 	"font-weight": "600",
 	color: "#FF9800",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "8px"
-} }, si = { style: {
+} }, ci = { style: {
 	"font-size": "12px",
 	color: "var(--fg-color, rgba(255,255,255,0.9))",
 	"line-height": "1.5",
 	"white-space": "pre-wrap",
 	"word-break": "break-word"
-} }, ci = { style: {
+} }, li = { style: {
 	"font-size": "11px",
 	"font-weight": "600",
 	color: "#9E9E9E",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "8px"
-} }, li = { style: {
+} }, ui = { style: {
 	"font-size": "12px",
 	color: "var(--fg-color, rgba(255,255,255,0.9))",
 	"line-height": "1.5",
 	"white-space": "pre-wrap",
 	"word-break": "break-word"
-} }, ui = { style: {
+} }, di = { style: {
 	"font-size": "11px",
 	"font-weight": "600",
 	color: "#4CAF50",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "10px"
-} }, di = { style: {
+} }, fi = { style: {
 	display: "flex",
 	"flex-wrap": "wrap",
 	gap: "6px",
 	"margin-bottom": "10px"
-} }, fi = { style: {
+} }, pi = { style: {
 	"font-size": "10px",
 	"font-weight": "700",
 	color: "#4CAF50",
 	"letter-spacing": "0.4px"
-} }, pi = ["onClick"], mi = { style: {
+} }, mi = ["onClick"], hi = { style: {
 	"font-size": "10px",
 	"font-weight": "700",
 	color: "#F44336",
 	"letter-spacing": "0.4px",
 	"margin-top": "4px"
-} }, hi = ["onClick"], gi = { style: {
+} }, gi = ["onClick"], _i = { style: {
 	display: "flex",
 	"justify-content": "space-between",
 	"align-items": "center",
@@ -3551,7 +3552,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "8px"
-} }, _i = ["title"], vi = ["title"], yi = { style: {
+} }, vi = ["title"], yi = ["title"], bi = { style: {
 	display: "flex",
 	"justify-content": "space-between",
 	"align-items": "center",
@@ -3561,7 +3562,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "8px"
-} }, bi = ["title"], xi = ["title"], Si = { style: {
+} }, xi = ["title"], Si = ["title"], Ci = { style: {
 	"font-size": "11px",
 	"font-weight": "600",
 	color: "#00BCD4",
@@ -3570,17 +3571,17 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 	display: "flex",
 	"align-items": "center",
 	"justify-content": "space-between"
-} }, Ci = ["title"], wi = { style: {
+} }, wi = ["title"], Ti = { style: {
 	display: "flex",
 	"align-items": "center",
 	gap: "10px"
-} }, Ti = { style: {
+} }, Ei = { style: {
 	flex: "1",
 	height: "8px",
 	background: "rgba(255,255,255,0.1)",
 	"border-radius": "4px",
 	overflow: "hidden"
-} }, Ei = {
+} }, Di = {
 	key: 0,
 	style: {
 		"font-size": "10px",
@@ -3590,7 +3591,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 		padding: "6px 8px",
 		background: "rgba(255,255,255,0.04)"
 	}
-}, Di = { style: {
+}, Oi = { style: {
 	"font-size": "10px",
 	"font-weight": "600",
 	color: "rgba(0, 188, 212, 0.75)",
@@ -3601,11 +3602,11 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 	"align-items": "center",
 	"justify-content": "space-between",
 	gap: "8px"
-} }, Oi = ["title"], ki = { style: {
+} }, ki = ["title"], Ai = { style: {
 	display: "flex",
 	"align-items": "center",
 	gap: "6px"
-} }, Ai = ["title"], ji = { style: {
+} }, ji = ["title"], Mi = { style: {
 	display: "flex",
 	"justify-content": "space-between",
 	"align-items": "center",
@@ -3615,80 +3616,80 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "8px"
-} }, Mi = { style: {
+} }, Ni = { style: {
 	"font-size": "12px",
 	color: "var(--fg-color, rgba(255,255,255,0.9))",
 	"line-height": "1.5",
 	"white-space": "pre-wrap",
 	"word-break": "break-word"
-} }, Ni = { style: {
+} }, Pi = { style: {
 	"font-size": "11px",
 	"font-weight": "600",
 	color: "#FF9800",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "10px"
-} }, Pi = { style: {
+} }, Fi = { style: {
 	display: "flex",
 	"flex-wrap": "wrap",
 	gap: "6px",
 	"margin-bottom": "10px"
-} }, Fi = { style: {
+} }, Ii = { style: {
 	"font-size": "10px",
 	"font-weight": "600",
 	color: "rgba(255,255,255,0.6)",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.4px"
-} }, Ii = ["onClick"], Li = { style: {
+} }, Li = ["onClick"], Ri = { style: {
 	"font-size": "11px",
 	"font-weight": "600",
 	color: "#9C27B0",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "10px"
-} }, Ri = { style: {
+} }, zi = { style: {
 	display: "grid",
 	"grid-template-columns": "repeat(auto-fit, minmax(220px, 1fr))",
 	gap: "10px"
-} }, zi = { style: {
+} }, Bi = { style: {
 	display: "flex",
 	"align-items": "center",
 	"justify-content": "space-between",
 	gap: "10px"
-} }, Bi = { style: {
+} }, Vi = { style: {
 	display: "flex",
 	"flex-direction": "column",
 	gap: "4px"
-} }, Vi = ["onClick"], Hi = {
+} }, Hi = ["onClick"], Ui = {
 	key: 0,
 	style: {
 		display: "flex",
 		"flex-direction": "column",
 		gap: "6px"
 	}
-}, Ui = { style: {
+}, Wi = { style: {
 	"font-size": "10px",
 	"font-weight": "700",
 	color: "rgba(255,255,255,0.58)",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.4px"
-} }, Wi = { style: {
+} }, Gi = { style: {
 	display: "flex",
 	"flex-direction": "column",
 	gap: "5px"
-} }, Gi = ["onClick"], Ki = { style: {
+} }, Ki = ["onClick"], qi = { style: {
 	display: "grid",
 	"grid-template-columns": "auto 1fr",
 	gap: "8px 12px",
 	"align-items": "start"
-} }, qi = ["title"], Ji = ["title"], Yi = ["title", "onClick"], Xi = { style: {
+} }, Ji = ["title"], Yi = ["title"], Xi = ["title", "onClick"], Zi = { style: {
 	"font-size": "11px",
 	"font-weight": "600",
 	color: "#4CAF50",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "10px"
-} }, Zi = ["title", "onClick"], Qi = ["title", "onClick"], $i = { style: {
+} }, Qi = ["title", "onClick"], $i = ["title", "onClick"], ea = { style: {
 	display: "flex",
 	"justify-content": "space-between",
 	"align-items": "center",
@@ -3698,35 +3699,35 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 	"text-transform": "uppercase",
 	"letter-spacing": "0.5px",
 	"margin-bottom": "8px"
-} }, ea = ["title"], ta = { style: {
+} }, ta = ["title"], na = { style: {
 	"font-size": "11px",
 	"font-weight": "700",
 	color: "#E91E63",
 	"text-transform": "uppercase",
 	"letter-spacing": "1px"
-} }, na = ["title"], ra = ["title"], ia = { style: {
+} }, ra = ["title"], ia = ["title"], aa = { style: {
 	display: "flex",
 	gap: "8px",
 	"flex-wrap": "wrap"
-} }, aa = {
+} }, oa = {
 	__name: "SidebarGenerationSection",
 	props: { asset: {
 		type: Object,
 		required: !0
 	} },
 	setup(e) {
-		let t = e, n = R(0), r = R(0), i = R(""), a = R(j("action.copy", "Copy")), o = R(j("action.generate", "Generate")), s = R(!1), c = R(u()), l = 0;
+		let t = e, n = H(0), r = H(0), i = H(""), a = H(M("action.copy", "Copy")), o = H(M("action.generate", "Generate")), s = H(!1), c = H(u()), l = 0;
 		function u() {
 			return {
 				scoreText: "...",
 				scoreColor: "#888",
-				qualityText: j("status.loading", "Loading"),
+				qualityText: M("status.loading", "Loading"),
 				qualityColor: "#888",
 				qualityBackground: "rgba(127,127,127,0.3)",
 				fillWidth: "0%",
 				fillColor: "#666",
 				aiStatusVisible: !1,
-				aiStatusText: j("sidebar.generation.aiDisabledEnv", "AI features are disabled (enable vector search env var).")
+				aiStatusText: M("sidebar.generation.aiDisabledEnv", "AI features are disabled (enable vector search env var).")
 			};
 		}
 		function d(e, t) {
@@ -3772,17 +3773,17 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 				whiteSpace: "nowrap"
 			};
 		}
-		let _ = N(() => Wr(t.asset)), v = N(() => Dr()), y = N(() => _.value.kind === "full" || _.value.kind === "caption-only"), b = N(() => Ar(i.value) || _.value.emptyCaptionText), x = N(() => v.value && _.value.isImageAsset && !!t.asset?.id), S = N(() => v.value && !!Ar(b.value) && b.value !== _.value.emptyCaptionText), C = N(() => {
+		let _ = R(() => Gr(t.asset)), v = R(() => Dr()), y = R(() => _.value.kind === "full" || _.value.kind === "caption-only"), b = R(() => Ar(i.value) || _.value.emptyCaptionText), x = R(() => v.value && _.value.isImageAsset && !!t.asset?.id), S = R(() => v.value && !!Ar(b.value) && b.value !== _.value.emptyCaptionText), C = R(() => {
 			let e = [];
 			return _.value.modelFields.length && e.push({
 				key: "model",
-				title: j("sidebar.generation.modelLora", "Model & LoRA"),
+				title: M("sidebar.generation.modelLora", "Model & LoRA"),
 				accent: "#9C27B0",
 				emphasis: !0,
 				fields: _.value.modelFields
 			}), !_.value.pipelineTabs.length && _.value.samplingFields.length && e.push({
 				key: "sampling",
-				title: j("sidebar.generation.sampling", "Sampling"),
+				title: M("sidebar.generation.sampling", "Sampling"),
 				accent: "#FF9800",
 				emphasis: !0,
 				fields: _.value.samplingFields
@@ -3806,13 +3807,13 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 				fields: _.value.ttsRuntimeFields
 			}), _.value.audioFields.length && e.push({
 				key: "audio",
-				title: j("sidebar.generation.audio", "Audio"),
+				title: M("sidebar.generation.audio", "Audio"),
 				accent: "#00BCD4",
 				emphasis: !1,
 				fields: _.value.audioFields
 			}), _.value.imageFields.length && e.push({
 				key: "image",
-				title: j("sidebar.generation.image", "Image"),
+				title: M("sidebar.generation.image", "Image"),
 				accent: "#2196F3",
 				emphasis: !1,
 				fields: _.value.imageFields
@@ -3852,13 +3853,13 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 			c.value = {
 				scoreText: "AI OFF",
 				scoreColor: "#9E9E9E",
-				qualityText: j("status.disabled", "Disabled"),
+				qualityText: M("status.disabled", "Disabled"),
 				qualityColor: "#BDBDBD",
 				qualityBackground: "rgba(158,158,158,0.25)",
 				fillWidth: "0%",
 				fillColor: "#777",
 				aiStatusVisible: !0,
-				aiStatusText: j("sidebar.generation.aiDisabledSettings", "AI features are disabled in settings.")
+				aiStatusText: M("sidebar.generation.aiDisabledSettings", "AI features are disabled in settings.")
 			};
 		}
 		function te() {
@@ -3888,7 +3889,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 					c.value = {
 						scoreText: "N/A",
 						scoreColor: "#888",
-						qualityText: j("status.na", "N/A"),
+						qualityText: M("status.na", "N/A"),
 						qualityColor: "#888",
 						qualityBackground: "rgba(127,127,127,0.3)",
 						fillWidth: "0%",
@@ -3915,7 +3916,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 				c.value = {
 					scoreText: "-",
 					scoreColor: "#888",
-					qualityText: j("status.unavailable", "Unavailable"),
+					qualityText: M("status.unavailable", "Unavailable"),
 					qualityColor: "#888",
 					qualityBackground: "rgba(127,127,127,0.3)",
 					fillWidth: "0%",
@@ -3927,29 +3928,29 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 		}
 		async function re() {
 			if (!(!x.value || s.value)) {
-				s.value = !0, o.value = j("status.generating", "Generating...");
+				s.value = !0, o.value = M("status.generating", "Generating...");
 				try {
 					let e = await p(t.asset.id);
 					e?.ok && (i.value = String(e?.data || "").trim());
 				} catch (e) {
 					console.debug?.(e);
 				} finally {
-					s.value = !1, o.value = j("action.generate", "Generate");
+					s.value = !1, o.value = M("action.generate", "Generate");
 				}
 			}
 		}
 		async function O() {
 			if (S.value) try {
-				await navigator.clipboard.writeText(b.value), a.value = j("viewer.copySuccessShort", "Copied!"), setTimeout(() => {
-					a.value = j("action.copy", "Copy");
+				await navigator.clipboard.writeText(b.value), a.value = M("viewer.copySuccessShort", "Copied!"), setTimeout(() => {
+					a.value = M("action.copy", "Copy");
 				}, 900);
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}
-		return Ge(() => t.asset, () => {
-			n.value = 0, r.value = 0, i.value = String(t.asset?.enhanced_caption || "").trim(), a.value = j("action.copy", "Copy"), o.value = j("action.generate", "Generate");
-		}, { immediate: !0 }), Ge(() => [
+		return Re(() => t.asset, () => {
+			n.value = 0, r.value = 0, i.value = String(t.asset?.enhanced_caption || "").trim(), a.value = M("action.copy", "Copy"), o.value = M("action.generate", "Generate");
+		}, { immediate: !0 }), Re(() => [
 			t.asset?.id,
 			_.value.kind,
 			_.value.showAlignment,
@@ -3957,10 +3958,10 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 		], () => {
 			ne();
 		}, { immediate: !0 }), (e, t) => {
-			let i = Be("MButton");
-			return _.value.kind === "empty" ? F("", !0) : (I(), P("div", Zr, [
-				_.value.workflowType ? (I(), P("div", Qr, [V("span", $r, z(B(j)("viewer.workflow", "Workflow")), 1), V("div", ei, [V("span", {
-					title: B(j)("sidebar.generation.workflowEngine", "Workflow engine: {value}", { value: _.value.workflowType }),
+			let i = Ue("MButton");
+			return _.value.kind === "empty" ? L("", !0) : (N(), V("div", Qr, [
+				_.value.workflowType ? (N(), V("div", $r, [F("span", ei, B(z(M)("viewer.workflow", "Workflow")), 1), F("div", ti, [F("span", {
+					title: z(M)("sidebar.generation.workflowEngine", "Workflow engine: {value}", { value: _.value.workflowType }),
 					style: {
 						background: "#2196F3",
 						color: "white",
@@ -3970,9 +3971,9 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						"font-size": "10px",
 						"letter-spacing": "0.2px"
 					}
-				}, z(_.value.workflowLabel || _.value.workflowType), 9, ti), _.value.workflowBadge ? (I(), P("span", {
+				}, B(_.value.workflowLabel || _.value.workflowType), 9, ni), _.value.workflowBadge ? (N(), V("span", {
 					key: 0,
-					title: B(j)("sidebar.generation.apiProvider", "API provider: {value}", { value: _.value.workflowBadge }),
+					title: z(M)("sidebar.generation.apiProvider", "API provider: {value}", { value: _.value.workflowBadge }),
 					style: {
 						background: "rgba(255,255,255,0.08)",
 						color: "var(--fg-color, #eee)",
@@ -3983,47 +3984,47 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						"font-size": "10px",
 						"letter-spacing": "0.2px"
 					}
-				}, z(_.value.workflowBadge), 9, ni)) : F("", !0)])])) : F("", !0),
-				_.value.isOverride ? (I(), P("div", {
+				}, B(_.value.workflowBadge), 9, ri)) : L("", !0)])])) : L("", !0),
+				_.value.isOverride ? (N(), V("div", {
 					key: 1,
-					style: L(f("#00BCD4", {
+					style: U(f("#00BCD4", {
 						emphasis: !0,
 						startAlpha: .14,
 						endAlpha: .08
 					}))
-				}, [V("div", ri, [V("span", ii, z(B(j)("sidebar.generation.override", "Override")), 1), V("span", ai, z(_.value.overrideLabel), 1)])], 4)) : F("", !0),
-				_.value.isTruncated ? (I(), P("div", {
+				}, [F("div", ii, [F("span", ai, B(z(M)("sidebar.generation.override", "Override")), 1), F("span", oi, B(_.value.overrideLabel), 1)])], 4)) : L("", !0),
+				_.value.isTruncated ? (N(), V("div", {
 					key: 2,
-					style: L(f("#FF9800", {
+					style: U(f("#FF9800", {
 						emphasis: !0,
 						startAlpha: .12,
 						endAlpha: .08
 					}))
-				}, [V("div", oi, z(B(j)("sidebar.generation.metadataTruncated", "Metadata Truncated")), 1), V("div", si, z(B(j)("sidebar.generation.metadataTruncatedBody", "Generation data is incomplete because it exceeded the size limit.")), 1)], 4)) : F("", !0),
-				_.value.kind === "media-only" ? (I(), P("div", {
+				}, [F("div", si, B(z(M)("sidebar.generation.metadataTruncated", "Metadata Truncated")), 1), F("div", ci, B(z(M)("sidebar.generation.metadataTruncatedBody", "Generation data is incomplete because it exceeded the size limit.")), 1)], 4)) : L("", !0),
+				_.value.kind === "media-only" ? (N(), V("div", {
 					key: 3,
-					style: L(f("#9E9E9E", {
+					style: U(f("#9E9E9E", {
 						emphasis: !0,
 						startAlpha: .1,
 						endAlpha: .06
 					}))
-				}, [V("div", ci, z(B(j)("sidebar.generation.generationData", "Generation Data")), 1), V("div", li, z(_.value.mediaOnlyMessage), 1)], 4)) : F("", !0),
-				_.value.kind === "full" ? (I(), P(H, { key: 4 }, [_.value.promptTabs.length ? (I(), P("div", {
+				}, [F("div", li, B(z(M)("sidebar.generation.generationData", "Generation Data")), 1), F("div", ui, B(_.value.mediaOnlyMessage), 1)], 4)) : L("", !0),
+				_.value.kind === "full" ? (N(), V(P, { key: 4 }, [_.value.promptTabs.length ? (N(), V("div", {
 					key: 0,
-					style: L(f("#4CAF50", {
+					style: U(f("#4CAF50", {
 						emphasis: !0,
 						startAlpha: .16,
 						endAlpha: .1
 					}))
 				}, [
-					V("div", ui, z(B(j)("sidebar.generation.promptPipeline", "Prompt Pipeline ({count} variants)", { count: _.value.promptTabs.length })), 1),
-					V("div", di, [(I(!0), P(H, null, M(_.value.promptTabs, (e, t) => (I(), We(i, {
+					F("div", di, B(z(M)("sidebar.generation.promptPipeline", "Prompt Pipeline ({count} variants)", { count: _.value.promptTabs.length })), 1),
+					F("div", fi, [(N(!0), V(P, null, I(_.value.promptTabs, (e, t) => (N(), Le(i, {
 						key: e.label,
 						type: "button",
 						severity: "secondary",
 						text: "",
 						rounded: "",
-						style: L({
+						style: U({
 							appearance: "none",
 							border: n.value === t ? "1px solid #4CAF50" : "1px solid var(--border-color, rgba(255,255,255,0.12))",
 							borderRadius: "999px",
@@ -4037,10 +4038,10 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						}),
 						onClick: (e) => n.value = t
 					}, {
-						default: ze(() => [Ue(z(e.label), 1)]),
+						default: ot(() => [Ie(B(e.label), 1)]),
 						_: 2
 					}, 1032, ["style", "onClick"]))), 128))]),
-					(I(!0), P(H, null, M(_.value.promptTabs, (e, t) => He((I(), P("div", {
+					(N(!0), V(P, null, I(_.value.promptTabs, (e, t) => ze((N(), V("div", {
 						key: `${e.label}-panel`,
 						style: {
 							display: "flex",
@@ -4053,8 +4054,8 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							padding: "10px"
 						}
 					}, [
-						V("div", fi, z(B(j)("sidebar.generation.positive", "POSITIVE")), 1),
-						V("div", {
+						F("div", pi, B(z(M)("sidebar.generation.positive", "POSITIVE")), 1),
+						F("div", {
 							style: {
 								"font-size": "12px",
 								color: "var(--fg-color, #ddd)",
@@ -4063,8 +4064,8 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 								cursor: "pointer"
 							},
 							onClick: (t) => D(e.positive, t.currentTarget)
-						}, z(e.positive), 9, pi),
-						e.negative ? (I(), P(H, { key: 0 }, [V("div", mi, z(B(j)("sidebar.generation.negative", "NEGATIVE")), 1), V("div", {
+						}, B(e.positive), 9, mi),
+						e.negative ? (N(), V(P, { key: 0 }, [F("div", hi, B(z(M)("sidebar.generation.negative", "NEGATIVE")), 1), F("div", {
 							style: {
 								"font-size": "12px",
 								color: "var(--fg-color, #ddd)",
@@ -4073,21 +4074,21 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 								cursor: "pointer"
 							},
 							onClick: (t) => D(e.negative, t.currentTarget)
-						}, z(e.negative), 9, hi)], 64)) : F("", !0)
-					])), [[ft, n.value === t]])), 128))
-				], 4)) : _.value.positivePrompt ? (I(), P("div", {
+						}, B(e.negative), 9, gi)], 64)) : L("", !0)
+					])), [[Ke, n.value === t]])), 128))
+				], 4)) : _.value.positivePrompt ? (N(), V("div", {
 					key: 1,
-					style: L(f("#4CAF50", {
+					style: U(f("#4CAF50", {
 						emphasis: !0,
 						startAlpha: .16,
 						endAlpha: .1
 					}))
-				}, [V("div", gi, [V("span", null, z(B(j)("sidebar.generation.positivePrompt", "Positive Prompt")), 1), _.value.positivePromptOverride ? (I(), P("span", {
+				}, [F("div", _i, [F("span", null, B(z(M)("sidebar.generation.positivePrompt", "Positive Prompt")), 1), _.value.positivePromptOverride ? (N(), V("span", {
 					key: 0,
-					style: L(h()),
-					title: B(j)("sidebar.generation.overrideTooltip", "This field was forced by Majoor Gen Info Override")
-				}, z(B(j)("sidebar.generation.override", "override")), 13, _i)) : F("", !0)]), V("div", {
-					title: B(j)("action.clickToCopy", "Click to copy"),
+					style: U(h()),
+					title: z(M)("sidebar.generation.overrideTooltip", "This field was forced by Majoor Gen Info Override")
+				}, B(z(M)("sidebar.generation.override", "override")), 13, vi)) : L("", !0)]), F("div", {
+					title: z(M)("action.clickToCopy", "Click to copy"),
 					style: {
 						"font-size": "12px",
 						color: "var(--fg-color, rgba(255,255,255,0.9))",
@@ -4097,19 +4098,19 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						cursor: "pointer"
 					},
 					onClick: t[0] ||= (e) => D(_.value.positivePrompt, e.currentTarget)
-				}, z(_.value.positivePrompt), 9, vi)], 4)) : F("", !0), !_.value.promptTabs.length && _.value.negativePrompt ? (I(), P("div", {
+				}, B(_.value.positivePrompt), 9, yi)], 4)) : L("", !0), !_.value.promptTabs.length && _.value.negativePrompt ? (N(), V("div", {
 					key: 2,
-					style: L(f("#F44336", {
+					style: U(f("#F44336", {
 						emphasis: !0,
 						startAlpha: .16,
 						endAlpha: .1
 					}))
-				}, [V("div", yi, [V("span", null, z(B(j)("sidebar.generation.negativePrompt", "Negative Prompt")), 1), _.value.negativePromptOverride ? (I(), P("span", {
+				}, [F("div", bi, [F("span", null, B(z(M)("sidebar.generation.negativePrompt", "Negative Prompt")), 1), _.value.negativePromptOverride ? (N(), V("span", {
 					key: 0,
-					style: L(h()),
-					title: B(j)("sidebar.generation.overrideTooltip", "This field was forced by Majoor Gen Info Override")
-				}, z(B(j)("sidebar.generation.override", "override")), 13, bi)) : F("", !0)]), V("div", {
-					title: B(j)("action.clickToCopy", "Click to copy"),
+					style: U(h()),
+					title: z(M)("sidebar.generation.overrideTooltip", "This field was forced by Majoor Gen Info Override")
+				}, B(z(M)("sidebar.generation.override", "override")), 13, xi)) : L("", !0)]), F("div", {
+					title: z(M)("action.clickToCopy", "Click to copy"),
 					style: {
 						"font-size": "12px",
 						color: "var(--fg-color, rgba(255,255,255,0.9))",
@@ -4119,8 +4120,8 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						cursor: "pointer"
 					},
 					onClick: t[1] ||= (e) => D(_.value.negativePrompt, e.currentTarget)
-				}, z(_.value.negativePrompt), 9, xi)], 4)) : F("", !0)], 64)) : F("", !0),
-				y.value ? (I(), P("div", {
+				}, B(_.value.negativePrompt), 9, Si)], 4)) : L("", !0)], 64)) : L("", !0),
+				y.value ? (N(), V("div", {
 					key: 5,
 					style: {
 						background: "linear-gradient(135deg, rgba(0, 188, 212, 0.14) 0%, rgba(33, 150, 243, 0.10) 100%)",
@@ -4131,27 +4132,27 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						"flex-direction": "column",
 						gap: "10px"
 					},
-					class: ct({ "mjr-ai-disabled-block": !v.value })
+					class: tt({ "mjr-ai-disabled-block": !v.value })
 				}, [
-					_.value.showAlignment ? (I(), P(H, { key: 0 }, [
-						V("div", Si, [V("span", { title: B(j)("sidebar.generation.promptAlignmentTooltip", "How closely the generated image matches the prompt (SigLIP2 score)") }, z(B(j)("sidebar.generation.promptAlignment", "Prompt Alignment")), 9, Ci)]),
-						V("div", wi, [
-							V("div", Ti, [V("div", { style: L({
+					_.value.showAlignment ? (N(), V(P, { key: 0 }, [
+						F("div", Ci, [F("span", { title: z(M)("sidebar.generation.promptAlignmentTooltip", "How closely the generated image matches the prompt (SigLIP2 score)") }, B(z(M)("sidebar.generation.promptAlignment", "Prompt Alignment")), 9, wi)]),
+						F("div", Ti, [
+							F("div", Ei, [F("div", { style: U({
 								height: "100%",
 								width: c.value.fillWidth,
 								background: c.value.fillColor,
 								borderRadius: "4px",
 								transition: "width 0.6s ease, background 0.4s ease"
 							}) }, null, 4)]),
-							V("span", { style: L({
+							F("span", { style: U({
 								fontSize: "13px",
 								fontWeight: "700",
 								color: c.value.scoreColor,
 								minWidth: "60px",
 								textAlign: "right",
 								fontFamily: "'Consolas', 'Monaco', monospace"
-							}) }, z(c.value.scoreText), 5),
-							V("span", { style: L({
+							}) }, B(c.value.scoreText), 5),
+							F("span", { style: U({
 								fontSize: "9px",
 								fontWeight: "700",
 								padding: "2px 6px",
@@ -4160,17 +4161,17 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 								color: c.value.qualityColor,
 								textTransform: "uppercase",
 								letterSpacing: "0.5px"
-							}) }, z(c.value.qualityText), 5)
+							}) }, B(c.value.qualityText), 5)
 						]),
-						c.value.aiStatusVisible ? (I(), P("div", Ei, z(c.value.aiStatusText), 1)) : F("", !0)
-					], 64)) : F("", !0),
-					V("div", Di, [V("span", { title: B(j)("sidebar.generation.aiCaptionTooltip", "AI caption generated by Florence-2") }, z(_.value.captionLabel), 9, Oi), V("div", ki, [et(i, {
+						c.value.aiStatusVisible ? (N(), V("div", Di, B(c.value.aiStatusText), 1)) : L("", !0)
+					], 64)) : L("", !0),
+					F("div", Oi, [F("span", { title: z(M)("sidebar.generation.aiCaptionTooltip", "AI caption generated by Florence-2") }, B(_.value.captionLabel), 9, ki), F("div", Ai, [$e(i, {
 						type: "button",
 						class: "mjr-ai-control",
 						severity: "secondary",
 						text: "",
 						disabled: !x.value || s.value,
-						style: L([{
+						style: U([{
 							border: "1px solid rgba(0,188,212,0.45)",
 							background: "rgba(0,188,212,0.12)",
 							color: "#00BCD4",
@@ -4183,17 +4184,17 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							opacity: x.value ? "1" : "0.6",
 							cursor: x.value ? "pointer" : "default"
 						}]),
-						onClick: qe(re, ["stop"])
+						onClick: He(re, ["stop"])
 					}, {
-						default: ze(() => [Ue(z(o.value), 1)]),
+						default: ot(() => [Ie(B(o.value), 1)]),
 						_: 1
-					}, 8, ["disabled", "style"]), et(i, {
+					}, 8, ["disabled", "style"]), $e(i, {
 						type: "button",
 						class: "mjr-ai-control",
 						severity: "secondary",
 						text: "",
 						disabled: !S.value,
-						style: L([{
+						style: U([{
 							border: "1px solid rgba(0,188,212,0.45)",
 							background: "rgba(0,188,212,0.12)",
 							color: "#00BCD4",
@@ -4206,14 +4207,14 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							opacity: S.value ? "1" : "0.6",
 							cursor: S.value ? "pointer" : "default"
 						}]),
-						onClick: qe(O, ["stop"])
+						onClick: He(O, ["stop"])
 					}, {
-						default: ze(() => [Ue(z(a.value), 1)]),
+						default: ot(() => [Ie(B(a.value), 1)]),
 						_: 1
 					}, 8, ["disabled", "style"])])]),
-					V("div", {
-						title: v.value ? B(j)("sidebar.generation.copyCaptionTooltip", "Click to copy caption") : B(j)("sidebar.generation.aiCaptionDisabled", "AI caption controls are disabled"),
-						style: L({
+					F("div", {
+						title: v.value ? z(M)("sidebar.generation.copyCaptionTooltip", "Click to copy caption") : z(M)("sidebar.generation.aiCaptionDisabled", "AI caption controls are disabled"),
+						style: U({
 							marginTop: "4px",
 							padding: "8px",
 							borderRadius: "6px",
@@ -4227,28 +4228,28 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							cursor: S.value ? "copy" : "default"
 						}),
 						onClick: O
-					}, z(b.value), 13, Ai)
-				], 2)) : F("", !0),
-				_.value.lyrics ? (I(), P("div", {
+					}, B(b.value), 13, ji)
+				], 2)) : L("", !0),
+				_.value.lyrics ? (N(), V("div", {
 					key: 6,
-					style: L(f("#00BCD4", { emphasis: !1 }))
-				}, [V("div", ji, [V("span", null, z(B(j)("sidebar.generation.lyrics", "Lyrics")), 1)]), V("div", Mi, z(_.value.lyrics), 1)], 4)) : F("", !0),
-				_.value.pipelineTabs.length ? (I(), P("div", {
+					style: U(f("#00BCD4", { emphasis: !1 }))
+				}, [F("div", Mi, [F("span", null, B(z(M)("sidebar.generation.lyrics", "Lyrics")), 1)]), F("div", Ni, B(_.value.lyrics), 1)], 4)) : L("", !0),
+				_.value.pipelineTabs.length ? (N(), V("div", {
 					key: 7,
-					style: L(f("#FF9800", {
+					style: U(f("#FF9800", {
 						emphasis: !0,
 						startAlpha: .16,
 						endAlpha: .1
 					}))
 				}, [
-					V("div", Ni, z(B(j)("sidebar.generation.pipeline", "Generation Pipeline")), 1),
-					V("div", Pi, [(I(!0), P(H, null, M(_.value.pipelineTabs, (e, t) => (I(), We(i, {
+					F("div", Pi, B(z(M)("sidebar.generation.pipeline", "Generation Pipeline")), 1),
+					F("div", Fi, [(N(!0), V(P, null, I(_.value.pipelineTabs, (e, t) => (N(), Le(i, {
 						key: e.label,
 						type: "button",
 						severity: "secondary",
 						text: "",
 						rounded: "",
-						style: L({
+						style: U({
 							appearance: "none",
 							border: r.value === t ? "1px solid #FF9800" : "1px solid var(--border-color, rgba(255,255,255,0.12))",
 							borderRadius: "999px",
@@ -4262,10 +4263,10 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						}),
 						onClick: (e) => r.value = t
 					}, {
-						default: ze(() => [Ue(z(e.label), 1)]),
+						default: ot(() => [Ie(B(e.label), 1)]),
 						_: 2
 					}, 1032, ["style", "onClick"]))), 128))]),
-					(I(!0), P(H, null, M(_.value.pipelineTabs, (e, t) => He((I(), P("div", {
+					(N(!0), V(P, null, I(_.value.pipelineTabs, (e, t) => ze((N(), V("div", {
 						key: `${e.label}-pipeline`,
 						style: {
 							display: "grid",
@@ -4277,7 +4278,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							background: "linear-gradient(135deg, rgba(255, 152, 0, 0.12) 0%, rgba(255, 193, 7, 0.08) 100%)",
 							"box-shadow": "0 0 0 1px rgba(255, 152, 0, 0.12) inset"
 						}
-					}, [(I(!0), P(H, null, M(e.fields, (t) => (I(), P("div", {
+					}, [(N(!0), V(P, null, I(e.fields, (t) => (N(), V("div", {
 						key: `${e.label}-${t.label}`,
 						style: {
 							display: "flex",
@@ -4285,7 +4286,7 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							gap: "2px",
 							"min-width": "0"
 						}
-					}, [V("span", Fi, z(t.label), 1), V("span", {
+					}, [F("span", Ii, B(t.label), 1), F("span", {
 						style: {
 							"font-size": "12px",
 							color: "var(--fg-color, #ddd)",
@@ -4296,26 +4297,26 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							cursor: "copy"
 						},
 						onClick: (e) => D(t.value, e.currentTarget)
-					}, z(t.value), 9, Ii)]))), 128))])), [[ft, r.value === t]])), 128))
-				], 4)) : F("", !0),
-				_.value.modelGroups.length ? (I(), P("div", {
+					}, B(t.value), 9, Li)]))), 128))])), [[Ke, r.value === t]])), 128))
+				], 4)) : L("", !0),
+				_.value.modelGroups.length ? (N(), V("div", {
 					key: 8,
-					style: L(f("#9C27B0", {
+					style: U(f("#9C27B0", {
 						emphasis: !0,
 						startAlpha: .18,
 						endAlpha: .1
 					}))
-				}, [V("div", Li, z(B(j)("sidebar.generation.modelBranches", "Model Branches")), 1), V("div", Ri, [(I(!0), P(H, null, M(_.value.modelGroups, (e) => (I(), P("div", {
+				}, [F("div", Ri, B(z(M)("sidebar.generation.modelBranches", "Model Branches")), 1), F("div", zi, [(N(!0), V(P, null, I(_.value.modelGroups, (e) => (N(), V("div", {
 					key: `model-group-${e.key}`,
-					style: L(T(E(e.key), !0))
+					style: U(T(E(e.key), !0))
 				}, [
-					V("div", zi, [V("div", { style: L({
+					F("div", Bi, [F("div", { style: U({
 						fontSize: "10px",
 						fontWeight: "800",
 						color: E(e.key),
 						letterSpacing: "0.6px",
 						textTransform: "uppercase"
-					}) }, z(e.label), 5), V("span", { style: L({
+					}) }, B(e.label), 5), F("span", { style: U({
 						fontSize: "9px",
 						fontWeight: "700",
 						color: "#fff",
@@ -4325,14 +4326,14 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						padding: "2px 8px",
 						letterSpacing: "0.4px",
 						textTransform: "uppercase"
-					}) }, z(e.loras?.length || 0) + " LoRA ", 5)]),
-					V("div", Bi, [t[4] ||= V("div", { style: {
+					}) }, B(e.loras?.length || 0) + " LoRA ", 5)]),
+					F("div", Vi, [t[4] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "700",
 						color: "rgba(255,255,255,0.58)",
 						"text-transform": "uppercase",
 						"letter-spacing": "0.4px"
-					} }, " UNet ", -1), V("div", {
+					} }, " UNet ", -1), F("div", {
 						style: {
 							"font-size": "12px",
 							color: "var(--fg-color, rgba(255,255,255,0.96))",
@@ -4341,8 +4342,8 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							cursor: "pointer"
 						},
 						onClick: (t) => D(e.model, t.currentTarget)
-					}, z(e.model || "-"), 9, Vi)]),
-					e.loras?.length ? (I(), P("div", Hi, [V("div", Ui, z(B(j)("sidebar.generation.loraStack", "LoRA Stack")), 1), V("div", Wi, [(I(!0), P(H, null, M(e.loras, (t, n) => (I(), P("div", {
+					}, B(e.model || "-"), 9, Hi)]),
+					e.loras?.length ? (N(), V("div", Ui, [F("div", Wi, B(z(M)("sidebar.generation.loraStack", "LoRA Stack")), 1), F("div", Gi, [(N(!0), V(P, null, I(e.loras, (t, n) => (N(), V("div", {
 						key: `${e.key}-lora-${n}`,
 						style: {
 							"font-size": "12px",
@@ -4356,19 +4357,19 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 							cursor: "pointer"
 						},
 						onClick: (e) => D(t, e.currentTarget)
-					}, z(t), 9, Gi))), 128))])])) : F("", !0)
-				], 4))), 128))])], 4)) : F("", !0),
-				(I(!0), P(H, null, M(C.value, (e) => (I(), P("div", {
+					}, B(t), 9, Ki))), 128))])])) : L("", !0)
+				], 4))), 128))])], 4)) : L("", !0),
+				(N(!0), V(P, null, I(C.value, (e) => (N(), V("div", {
 					key: e.key,
-					style: L(f(e.accent, { emphasis: e.emphasis }))
-				}, [V("div", { style: L({
+					style: U(f(e.accent, { emphasis: e.emphasis }))
+				}, [F("div", { style: U({
 					fontSize: "11px",
 					fontWeight: "600",
 					color: e.accent,
 					textTransform: "uppercase",
 					letterSpacing: "0.5px",
 					marginBottom: "10px"
-				}) }, z(e.title), 5), V("div", Ki, [(I(!0), P(H, null, M(e.fields, (t) => (I(), P(H, { key: `${e.key}-${t.label}` }, [V("div", {
+				}) }, B(e.title), 5), F("div", qi, [(N(!0), V(P, null, I(e.fields, (t) => (N(), V(P, { key: `${e.key}-${t.label}` }, [F("div", {
 					title: t.label,
 					style: {
 						"font-size": "11px",
@@ -4378,11 +4379,11 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						"align-items": "center",
 						gap: "6px"
 					}
-				}, [V("span", null, z(t.label) + ":", 1), t.override ? (I(), P("span", {
+				}, [F("span", null, B(t.label) + ":", 1), t.override ? (N(), V("span", {
 					key: 0,
-					style: L(h()),
-					title: B(j)("sidebar.generation.overrideTooltip", "This field was forced by Majoor Gen Info Override")
-				}, z(B(j)("sidebar.generation.override", "override")), 13, Ji)) : F("", !0)], 8, qi), V("div", {
+					style: U(h()),
+					title: z(M)("sidebar.generation.overrideTooltip", "This field was forced by Majoor Gen Info Override")
+				}, B(z(M)("sidebar.generation.override", "override")), 13, Yi)) : L("", !0)], 8, Ji), F("div", {
 					title: `${t.label}: ${t.value}`,
 					style: {
 						"font-size": "12px",
@@ -4392,11 +4393,11 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						cursor: "pointer"
 					},
 					onClick: (e) => D(t.value, e.currentTarget)
-				}, z(t.value), 9, Yi)], 64))), 128))])], 4))), 128)),
-				_.value.notesFields.length ? (I(), P("div", {
+				}, B(t.value), 9, Xi)], 64))), 128))])], 4))), 128)),
+				_.value.notesFields.length ? (N(), V("div", {
 					key: 9,
-					style: L(f("#4CAF50", { emphasis: !1 }))
-				}, [V("div", Xi, z(B(j)("sidebar.generation.notes", "Notes")), 1), (I(!0), P(H, null, M(_.value.notesFields, (e) => (I(), P("div", {
+					style: U(f("#4CAF50", { emphasis: !1 }))
+				}, [F("div", Zi, B(z(M)("sidebar.generation.notes", "Notes")), 1), (N(!0), V(P, null, I(_.value.notesFields, (e) => (N(), V("div", {
 					key: e.label,
 					title: `${e.label}: ${e.value}`,
 					style: {
@@ -4408,18 +4409,18 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						cursor: "pointer"
 					},
 					onClick: (t) => D(e.value, t.currentTarget)
-				}, z(e.value), 9, Zi))), 128))], 4)) : F("", !0),
-				(I(!0), P(H, null, M(_.value.customInfoBlocks, (e) => (I(), P("div", {
+				}, B(e.value), 9, Qi))), 128))], 4)) : L("", !0),
+				(N(!0), V(P, null, I(_.value.customInfoBlocks, (e) => (N(), V("div", {
 					key: `${e.title}-${e.content}`,
-					style: L(f(e.color, { emphasis: !1 }))
-				}, [V("div", { style: L({
+					style: U(f(e.color, { emphasis: !1 }))
+				}, [F("div", { style: U({
 					fontSize: "11px",
 					fontWeight: "600",
 					color: e.color,
 					textTransform: "uppercase",
 					letterSpacing: "0.5px",
 					marginBottom: "8px"
-				}) }, z(e.title), 5), V("div", {
+				}) }, B(e.title), 5), F("div", {
 					title: `${e.title}: ${e.content}`,
 					style: {
 						"font-size": "12px",
@@ -4430,12 +4431,12 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						cursor: "pointer"
 					},
 					onClick: (t) => D(e.content, t.currentTarget)
-				}, z(e.content), 9, Qi)], 4))), 128)),
-				_.value.ttsInstruction ? (I(), P("div", {
+				}, B(e.content), 9, $i)], 4))), 128)),
+				_.value.ttsInstruction ? (N(), V("div", {
 					key: 10,
-					style: L(f("#26A69A", { emphasis: !1 }))
-				}, [V("div", $i, [V("span", null, z(B(j)("sidebar.generation.ttsInstruction", "TTS Instruction")), 1)]), V("div", {
-					title: B(j)("action.clickToCopy", "Click to copy"),
+					style: U(f("#26A69A", { emphasis: !1 }))
+				}, [F("div", ea, [F("span", null, B(z(M)("sidebar.generation.ttsInstruction", "TTS Instruction")), 1)]), F("div", {
+					title: z(M)("action.clickToCopy", "Click to copy"),
 					style: {
 						"font-size": "12px",
 						color: "var(--fg-color, rgba(255,255,255,0.9))",
@@ -4445,12 +4446,12 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						cursor: "pointer"
 					},
 					onClick: t[2] ||= (e) => D(_.value.ttsInstruction, e.currentTarget)
-				}, z(_.value.ttsInstruction), 9, ea)], 4)) : F("", !0),
-				_.value.seed !== null && _.value.seed !== void 0 && _.value.seed !== "" ? (I(), P("div", {
+				}, B(_.value.ttsInstruction), 9, ta)], 4)) : L("", !0),
+				_.value.seed !== null && _.value.seed !== void 0 && _.value.seed !== "" ? (N(), V("div", {
 					key: 11,
-					style: L(m())
-				}, [V("div", ta, z(B(j)("sidebar.generation.seed", "SEED")), 1), V("div", {
-					title: B(j)("sidebar.generation.copySeedTooltip", "Click to copy seed: {seed}", { seed: _.value.seed }),
+					style: U(m())
+				}, [F("div", na, B(z(M)("sidebar.generation.seed", "SEED")), 1), F("div", {
+					title: z(M)("sidebar.generation.copySeedTooltip", "Click to copy seed: {seed}", { seed: _.value.seed }),
 					style: {
 						"font-size": "18px",
 						"font-weight": "700",
@@ -4463,16 +4464,16 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						transition: "background 0.2s"
 					},
 					onClick: t[3] ||= (e) => D(_.value.seed, e.currentTarget, "rgba(76, 175, 80, 0.4)")
-				}, z(_.value.seed), 9, na)], 4)) : F("", !0),
-				_.value.inputFiles.length ? (I(), P("div", {
+				}, B(_.value.seed), 9, ra)], 4)) : L("", !0),
+				_.value.inputFiles.length ? (N(), V("div", {
 					key: 12,
-					style: L(f("#4CAF50", {
+					style: U(f("#4CAF50", {
 						emphasis: !0,
 						startAlpha: .16,
 						endAlpha: .1
 					}))
-				}, [V("div", {
-					title: B(j)("tooltip.generationInputs", "Input files used in generation"),
+				}, [F("div", {
+					title: z(M)("tooltip.generationInputs", "Input files used in generation"),
 					style: {
 						"font-size": "11px",
 						"font-weight": "600",
@@ -4481,42 +4482,42 @@ var Gr = ["title"], Kr = ["src"], qr = ["src"], Jr = {
 						"letter-spacing": "0.5px",
 						"margin-bottom": "8px"
 					}
-				}, z(B(j)("sidebar.generation.sourceFiles", "Source Files")), 9, ra), V("div", ia, [(I(!0), P(H, null, M(_.value.inputFiles, (e) => (I(), We(Xr, {
+				}, B(z(M)("sidebar.generation.sourceFiles", "Source Files")), 9, ia), F("div", aa, [(N(!0), V(P, null, I(_.value.inputFiles, (e) => (N(), Le(Zr, {
 					key: e.id,
 					"input-file": e
-				}, null, 8, ["input-file"]))), 128))])], 4)) : F("", !0)
+				}, null, 8, ["input-file"]))), 128))])], 4)) : L("", !0)
 			]));
 		};
 	}
-}, oa = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, sa = /^[0-9a-f]{20,}$/i;
-function ca(...e) {
+}, sa = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, ca = /^[0-9a-f]{20,}$/i;
+function la(...e) {
 	for (let t of e) {
 		let e = String(t || "").trim();
 		if (e) return e;
 	}
 	return "";
 }
-function la(e) {
-	let t = String(e || "").trim();
-	return !!t && (oa.test(t) || sa.test(t));
-}
 function ua(e) {
-	return String(e?.type || e?.class_type || e?.comfyClass || e?.classType || "").trim();
+	let t = String(e || "").trim();
+	return !!t && (sa.test(t) || ca.test(t));
 }
 function da(e) {
-	return ca(e?.properties?.subgraph_name, e?.title, e?.properties?.title, e?.properties?.name, e?.properties?.label, e?.name, e?.subgraph?.name, e?.subgraph_instance?.name);
+	return String(e?.type || e?.class_type || e?.comfyClass || e?.classType || "").trim();
 }
 function fa(e) {
-	let t = ua(e), n = da(e);
-	return n && (!t || la(t) || n !== t) ? n : t && !la(t) ? t : n || (t ? "Subgraph" : String(e?.id || "Node").trim() || "Node");
+	return la(e?.properties?.subgraph_name, e?.title, e?.properties?.title, e?.properties?.name, e?.properties?.label, e?.name, e?.subgraph?.name, e?.subgraph_instance?.name);
 }
 function pa(e) {
-	let t = ua(e);
-	return t && !la(t) ? t : t ? "Subgraph" : "Node";
+	let t = da(e), n = fa(e);
+	return n && (!t || ua(t) || n !== t) ? n : t && !ua(t) ? t : n || (t ? "Subgraph" : String(e?.id || "Node").trim() || "Node");
+}
+function ma(e) {
+	let t = da(e);
+	return t && !ua(t) ? t : t ? "Subgraph" : "Node";
 }
 //#endregion
 //#region ui/components/sidebar/utils/minimap.ts
-var ma = 6, ha = 1, ga = 8, _a = 74, va = 42, ya = [
+var ha = 6, ga = 1, _a = 8, va = 74, ya = 42, ba = [
 	["sampler", "#8e5cff"],
 	["ksampler", "#8e5cff"],
 	["loader", "#4f8cff"],
@@ -4533,20 +4534,20 @@ var ma = 6, ha = 1, ga = 8, _a = 74, va = 42, ya = [
 	["save", "#4aa37c"],
 	["preview", "#4aa37c"],
 	["api", "#3aa6a6"]
-], ba = (e, t, n) => {
+], xa = (e, t, n) => {
 	let r = Number(e);
 	return Number.isFinite(r) ? Math.max(t, Math.min(n, r)) : t;
-}, xa = (e, t = !1) => {
+}, Sa = (e, t = !1) => {
 	let n = String(e || "").toUpperCase();
 	return n.includes("IMAGE") ? "rgba(145,198,99,0.9)" : n.includes("LATENT") ? "rgba(89,178,118,0.9)" : n.includes("MODEL") ? "rgba(112,155,255,0.9)" : n.includes("CONDITIONING") ? "rgba(191,123,226,0.9)" : n.includes("CLIP") ? "rgba(220,178,77,0.9)" : n.includes("VAE") ? "rgba(72,184,214,0.9)" : n.includes("MASK") ? "rgba(190,190,190,0.88)" : n.includes("STRING") || n.includes("TEXT") ? "rgba(230,230,230,0.86)" : n.includes("INT") || n.includes("FLOAT") || n.includes("NUMBER") ? "rgba(130,210,220,0.88)" : t ? "rgba(170,220,255,0.82)" : "rgba(255,255,255,0.72)";
-}, Sa = (e, t, n) => {
+}, Ca = (e, t, n) => {
 	let r = String(t || "").replace(/\s+/g, " ").trim(), i = Math.max(1, Number(n) || 1);
 	if (!r || e.measureText(r).width <= i) return r;
 	let a = r;
 	for (; a.length > 3 && e.measureText(`${a}...`).width > i;) a = a.slice(0, -1);
 	return a.length > 3 ? `${a}...` : r.slice(0, 3);
 };
-function Ca(e, t, n = null) {
+function wa(e, t, n = null) {
 	if (!e) return;
 	let r = e.getContext?.("2d");
 	if (!r) return;
@@ -4560,7 +4561,7 @@ function Ca(e, t, n = null) {
 		showNodeLabels: !1,
 		expandSubgraphs: !0,
 		...n && typeof n == "object" ? n : {}
-	}, a = i.expandSubgraphs === !1 ? t : wa(t), o = Array.isArray(a?.nodes) ? a.nodes : [], s = Array.isArray(a?.groups) && a.groups || Array.isArray(a?.extra?.groups) && a.extra.groups || Array.isArray(a?.extra?.groupNodes) && a.extra.groupNodes || Array.isArray(a?.extra?.group_nodes) && a.extra.group_nodes || [], c = Array.isArray(a?.links) && a.links || Array.isArray(a?.extra?.links) && a.extra.links || [], l = Math.max(1, e.clientWidth || e.width || 1), u = Math.max(1, e.clientHeight || e.height || 1);
+	}, a = i.expandSubgraphs === !1 ? t : Ta(t), o = Array.isArray(a?.nodes) ? a.nodes : [], s = Array.isArray(a?.groups) && a.groups || Array.isArray(a?.extra?.groups) && a.extra.groups || Array.isArray(a?.extra?.groupNodes) && a.extra.groupNodes || Array.isArray(a?.extra?.group_nodes) && a.extra.group_nodes || [], c = Array.isArray(a?.links) && a.links || Array.isArray(a?.extra?.links) && a.extra.links || [], l = Math.max(1, e.clientWidth || e.width || 1), u = Math.max(1, e.clientHeight || e.height || 1);
 	if ((!o || o.length === 0) && (!s || s.length === 0)) return r.clearRect(0, 0, l, u), null;
 	let d = (e, t) => {
 		if (!e || typeof e != "string") return `rgba(255,255,255,${t})`;
@@ -4597,7 +4598,7 @@ function Ca(e, t, n = null) {
 		let t = e?.bgcolor || e?.color || null;
 		if (t) return t;
 		let n = String(e?.category || e?.type || e?.comfyClass || e?.class_type || e?.title || "").toLowerCase();
-		for (let [e, t] of ya) if (n.includes(e)) return t;
+		for (let [e, t] of ba) if (n.includes(e)) return t;
 		let r = 0;
 		for (let e = 0; e < n.length; e += 1) r = r * 31 + n.charCodeAt(e) | 0;
 		return `hsl(${Math.abs(r) % 360} 42% 42%)`;
@@ -4606,7 +4607,7 @@ function Ca(e, t, n = null) {
 		if (n) {
 			for (let [e, r] of Object.entries(n)) if (!(Array.isArray(r) || r && typeof r == "object") && (t.push([e, r]), t.length >= 3)) return t;
 		}
-		let r = Array.isArray(e?.widgets_values) ? e.widgets_values : [], i = Array.isArray(e?.widgets) ? e.widgets : [], a = Array.isArray(e?.inputs) ? e.inputs : [], o = a.filter((e) => e?.widget === !0 || e?.widget && typeof e.widget == "object" || typeof e?.widget == "string" && e.widget.trim()), s = a.filter((e) => e?.link == null && Ma(e?.type)), c = (o.length ? o : s.length ? s : a).map((e) => String(e?.label || e?.localized_name || e?.name || e?.widget?.name || e?.widget?.label || "").trim());
+		let r = Array.isArray(e?.widgets_values) ? e.widgets_values : [], i = Array.isArray(e?.widgets) ? e.widgets : [], a = Array.isArray(e?.inputs) ? e.inputs : [], o = a.filter((e) => e?.widget === !0 || e?.widget && typeof e.widget == "object" || typeof e?.widget == "string" && e.widget.trim()), s = a.filter((e) => e?.link == null && Na(e?.type)), c = (o.length ? o : s.length ? s : a).map((e) => String(e?.label || e?.localized_name || e?.name || e?.widget?.name || e?.widget?.label || "").trim());
 		return r.forEach((e, n) => {
 			let r = i[n]?.name || i[n]?.label || c[n] || `p${n + 1}`;
 			t.push([r, e]);
@@ -4649,7 +4650,7 @@ function Ca(e, t, n = null) {
 			outputs: C,
 			inputCount: S.length || (e?.inputs && typeof e.inputs == "object" ? Object.keys(e.inputs).length : 0),
 			outputCount: C.length,
-			label: fa(e).replace(/\s+/g, " ").trim()
+			label: pa(e).replace(/\s+/g, " ").trim()
 		}), n && h.set(n, m[m.length - 1]);
 	}
 	if (i.showGroups) for (let e of s || []) {
@@ -4669,23 +4670,23 @@ function Ca(e, t, n = null) {
 	if (!m.length) return r.clearRect(0, 0, l, u), null;
 	let v = m[0].x, y = m[0].y, b = m[0].x + m[0].w, x = m[0].y + m[0].h;
 	for (let e of m) v = Math.min(v, e.x), y = Math.min(y, e.y), b = Math.max(b, e.x + e.w), x = Math.max(x, e.y + e.h);
-	let S = Math.max(1, b - v), C = Math.max(1, x - y), w = v + S / 2, T = y + C / 2, E = i.view && typeof i.view == "object" ? i.view : Object.create(null), D = ba(E.zoom ?? 1, ha, ga), ee = Math.max(1, S / D), te = Math.max(1, C / D), ne = ee / 2, re = te / 2, O = ee >= S ? w : ba(E.centerX ?? w, v + ne, b - ne), ie = te >= C ? T : ba(E.centerY ?? T, y + re, x - re), ae = O - ne, oe = ie - re, se = ma, ce = Math.min((l - se * 2) / ee, (u - se * 2) / te), le = E.hoveredNodeId !== null && E.hoveredNodeId !== void 0 ? String(E.hoveredNodeId) : null;
+	let S = Math.max(1, b - v), C = Math.max(1, x - y), w = v + S / 2, T = y + C / 2, E = i.view && typeof i.view == "object" ? i.view : Object.create(null), D = xa(E.zoom ?? 1, ga, _a), ee = Math.max(1, S / D), te = Math.max(1, C / D), ne = ee / 2, re = te / 2, O = ee >= S ? w : xa(E.centerX ?? w, v + ne, b - ne), ie = te >= C ? T : xa(E.centerY ?? T, y + re, x - re), ae = O - ne, oe = ie - re, k = ha, se = Math.min((l - k * 2) / ee, (u - k * 2) / te), ce = E.hoveredNodeId !== null && E.hoveredNodeId !== void 0 ? String(E.hoveredNodeId) : null;
 	r.clearRect(0, 0, l, u), r.fillStyle = "rgba(0,0,0,0.22)", r.fillRect(0, 0, l, u);
-	let ue = (e, t) => ({
-		x: se + (e - ae) * ce,
-		y: se + (t - oe) * ce
-	}), de = (e, t) => ({
-		x: ba(ae + (Number(e) - se) / ce, v, b),
-		y: ba(oe + (Number(t) - se) / ce, y, x)
-	}), fe = (e) => ({
-		x: se + (e.x - ae) * ce,
-		y: se + (e.y - oe) * ce,
-		w: Math.max(1, e.w * ce),
-		h: Math.max(1, e.h * ce)
-	}), pe = (e) => Math.max(10, Math.min(24, Math.floor(Number(e) * .2))), me = (e, t, n) => {
-		let r = fe(e), i = pe(r.h), a = n === "output" ? e.outputs : e.inputs, o = Math.max(1, Array.isArray(a) ? a.length : Number(e[`${n}Count`]) || 0), s = ba(t, 0, Math.max(0, o - 1));
+	let le = (e, t) => ({
+		x: k + (e - ae) * se,
+		y: k + (t - oe) * se
+	}), ue = (e, t) => ({
+		x: xa(ae + (Number(e) - k) / se, v, b),
+		y: xa(oe + (Number(t) - k) / se, y, x)
+	}), de = (e) => ({
+		x: k + (e.x - ae) * se,
+		y: k + (e.y - oe) * se,
+		w: Math.max(1, e.w * se),
+		h: Math.max(1, e.h * se)
+	}), fe = (e) => Math.max(10, Math.min(24, Math.floor(Number(e) * .2))), pe = (e, t, n) => {
+		let r = de(e), i = fe(r.h), a = n === "output" ? e.outputs : e.inputs, o = Math.max(1, Array.isArray(a) ? a.length : Number(e[`${n}Count`]) || 0), s = xa(t, 0, Math.max(0, o - 1));
 		return r.y + i + (r.h - i) * (s + 1) / (o + 1);
-	}, he = (e) => Array.isArray(e) && e.length >= 5 ? {
+	}, me = (e) => Array.isArray(e) && e.length >= 5 ? {
 		originId: e[1],
 		originSlot: Number(e[2]) || 0,
 		targetId: e[3],
@@ -4697,30 +4698,30 @@ function Ca(e, t, n = null) {
 		targetId: e.target_id ?? e.targetId ?? e.to ?? null,
 		targetSlot: Number(e.target_slot ?? e.targetSlot ?? e.toSlot ?? 0) || 0,
 		type: e.type
-	} : null, ge = (e) => {
+	} : null, he = (e) => {
 		let t = String(e || "").toUpperCase();
 		return t.includes("IMAGE") ? "rgba(145,198,99,0.38)" : t.includes("LATENT") ? "rgba(89,178,118,0.38)" : t.includes("MODEL") ? "rgba(112,155,255,0.38)" : t.includes("CONDITIONING") ? "rgba(191,123,226,0.38)" : t.includes("CLIP") ? "rgba(220,178,77,0.38)" : t.includes("VAE") ? "rgba(72,184,214,0.38)" : t.includes("MASK") ? "rgba(190,190,190,0.36)" : "rgba(255,255,255,0.2)";
-	}, _e = () => {
+	}, ge = () => {
 		if (i.showLinks && !(!c || c.length === 0)) {
 			r.save(), r.globalAlpha = 1, r.lineWidth = 1;
 			for (let e of c) {
-				let t = he(e), n = t?.originId, i = t?.targetId;
+				let t = me(e), n = t?.originId, i = t?.targetId;
 				if (n === null || i === null) continue;
 				let a = h.get(String(n)), o = h.get(String(i));
 				if (!a || !o) continue;
-				let s = fe(a), c = fe(o), l = {
+				let s = de(a), c = de(o), l = {
 					x: s.x + s.w,
-					y: me(a, t?.originSlot ?? 0, "output")
+					y: pe(a, t?.originSlot ?? 0, "output")
 				}, u = {
 					x: c.x,
-					y: me(o, t?.targetSlot ?? 0, "input")
+					y: pe(o, t?.targetSlot ?? 0, "input")
 				}, d = Math.max(12, Math.min(80, Math.abs(u.x - l.x) * .35));
-				r.strokeStyle = ge(t?.type), r.beginPath(), r.moveTo(l.x, l.y), r.bezierCurveTo(l.x + d, l.y, u.x - d, u.y, u.x, u.y), r.stroke();
+				r.strokeStyle = he(t?.type), r.beginPath(), r.moveTo(l.x, l.y), r.bezierCurveTo(l.x + d, l.y, u.x - d, u.y, u.x, u.y), r.stroke();
 			}
 			r.restore();
 		}
-	}, ve = (e) => {
-		let { x: t, y: n, w: a, h: o } = fe(e), s = e.kind === "node", c = e.kind === "group", l = !!e.bypassed, u = !!e.errored, f = c ? .18 : l && i.renderBypassState ? .14 : .62, p = c ? .55 : l && i.renderBypassState ? .32 : .8, m = d(e.fill, f), h = d(e.stroke, p), g = s && i.showNodeLabels && a >= _a && o >= va, _ = Math.max(2, Math.min(g ? 7 : 8, Math.floor(Math.min(a, o) * .08))), v = s ? pe(o) : 0;
+	}, _e = (e) => {
+		let { x: t, y: n, w: a, h: o } = de(e), s = e.kind === "node", c = e.kind === "group", l = !!e.bypassed, u = !!e.errored, f = c ? .18 : l && i.renderBypassState ? .14 : .62, p = c ? .55 : l && i.renderBypassState ? .32 : .8, m = d(e.fill, f), h = d(e.stroke, p), g = s && i.showNodeLabels && a >= va && o >= ya, _ = Math.max(2, Math.min(g ? 7 : 8, Math.floor(Math.min(a, o) * .08))), v = s ? fe(o) : 0;
 		if (r.save(), r.globalAlpha = 1, typeof m == "string" && (m.startsWith("#") || m.startsWith("rgb") || m.startsWith("hsl")) ? (r.fillStyle = m, r.globalAlpha = f) : (r.fillStyle = typeof m == "string" ? m : "rgba(82,88,96,0.72)", r.globalAlpha = f), typeof r.roundRect == "function" ? (r.beginPath(), r.roundRect(t, n, a, o, _), r.fill()) : r.fillRect(t, n, a, o), r.restore(), s && (r.save(), r.fillStyle = d(e.stroke || e.fill, l ? .34 : .9), typeof r.roundRect == "function" ? (r.beginPath(), r.roundRect(t, n, a, v, [
 			_,
 			_,
@@ -4740,12 +4741,12 @@ function Ca(e, t, n = null) {
 			let n = Math.min(g ? 16 : 6, Number(e.inputCount) || 0), i = Math.min(g ? 16 : 6, Number(e.outputCount) || 0);
 			r.save(), r.strokeStyle = "rgba(0,0,0,0.48)", r.lineWidth = 1;
 			for (let i = 0; i < n; i += 1) {
-				let n = me(e, i, "input");
-				r.fillStyle = xa(e.inputs?.[i]?.type, !1), r.beginPath(), r.arc(t, n, g ? 3 : 2.2, 0, Math.PI * 2), r.fill(), r.stroke();
+				let n = pe(e, i, "input");
+				r.fillStyle = Sa(e.inputs?.[i]?.type, !1), r.beginPath(), r.arc(t, n, g ? 3 : 2.2, 0, Math.PI * 2), r.fill(), r.stroke();
 			}
 			for (let n = 0; n < i; n += 1) {
-				let i = me(e, n, "output");
-				r.fillStyle = xa(e.outputs?.[n]?.type, !0), r.beginPath(), r.arc(t + a, i, g ? 3 : 2.2, 0, Math.PI * 2), r.fill(), r.stroke();
+				let i = pe(e, n, "output");
+				r.fillStyle = Sa(e.outputs?.[n]?.type, !0), r.beginPath(), r.arc(t + a, i, g ? 3 : 2.2, 0, Math.PI * 2), r.fill(), r.stroke();
 			}
 			r.restore();
 		}
@@ -4757,7 +4758,7 @@ function Ca(e, t, n = null) {
 			}
 			r.strokeStyle = "rgba(244,67,54,0.95)", r.lineWidth = 1.5, r.strokeRect(t - .5, n - .5, a + 1, o + 1);
 		}
-		if (s && le && String(e.id || "") === le) {
+		if (s && ce && String(e.id || "") === ce) {
 			try {
 				r.setLineDash([]);
 			} catch (e) {
@@ -4788,24 +4789,24 @@ function Ca(e, t, n = null) {
 			let i = Math.max(24, a * .34);
 			for (let a = 0; a < Math.min(8, e.inputs?.length || 0); a += 1) {
 				let o = e.inputs[a], s = String(o?.label || o?.localized_name || o?.name || "").trim();
-				s && r.fillText(Sa(r, s, i), t + 7, me(e, a, "input") + n * .35, i);
+				s && r.fillText(Ca(r, s, i), t + 7, pe(e, a, "input") + n * .35, i);
 			}
 			for (let o = 0; o < Math.min(8, e.outputs?.length || 0); o += 1) {
 				let s = e.outputs[o], c = String(s?.label || s?.localized_name || s?.name || "").trim();
 				if (!c) continue;
-				let l = Sa(r, c, i);
-				r.fillText(l, t + a - 7 - Math.min(i, r.measureText(l).width), me(e, o, "output") + n * .35, i);
+				let l = Ca(r, c, i);
+				r.fillText(l, t + a - 7 - Math.min(i, r.measureText(l).width), pe(e, o, "output") + n * .35, i);
 			}
 			r.restore();
 		}
 	};
-	for (let e of m.filter((e) => e.kind === "group")) ve(e);
-	_e();
-	for (let e of m.filter((e) => e.kind === "node")) ve(e);
+	for (let e of m.filter((e) => e.kind === "group")) _e(e);
+	ge();
+	for (let e of m.filter((e) => e.kind === "node")) _e(e);
 	if (i.showViewport) try {
-		let e = Oe();
+		let e = De();
 		if (e) {
-			let t = ue(e.x0, e.y0), n = ue(e.x1, e.y1), i = Math.min(t.x, n.x), a = Math.min(t.y, n.y), o = Math.abs(n.x - t.x), s = Math.abs(n.y - t.y);
+			let t = le(e.x0, e.y0), n = le(e.x1, e.y1), i = Math.min(t.x, n.x), a = Math.min(t.y, n.y), o = Math.abs(n.x - t.x), s = Math.abs(n.y - t.y);
 			r.save(), r.globalAlpha = 1, r.strokeStyle = "rgba(255,255,255,0.9)", r.lineWidth = 1, r.strokeRect(i, a, o, s), r.restore();
 		}
 	} catch (e) {
@@ -4828,13 +4829,13 @@ function Ca(e, t, n = null) {
 			visibleH: te,
 			viewMinX: ae,
 			viewMinY: oe,
-			pad: se,
-			renderScale: ce
+			pad: k,
+			renderScale: se
 		},
-		canvasToWorld: de,
-		worldToCanvas: ue,
+		canvasToWorld: ue,
+		worldToCanvas: le,
 		hitTestNode: (e, t) => {
-			let n = de(e, t);
+			let n = ue(e, t);
 			for (let e = m.length - 1; e >= 0; --e) {
 				let t = m[e];
 				if (t.kind === "node" && n.x >= t.x && n.x <= t.x + t.w && n.y >= t.y && n.y <= t.y + t.h) return t;
@@ -4843,16 +4844,16 @@ function Ca(e, t, n = null) {
 		}
 	};
 }
-function wa(e) {
+function Ta(e) {
 	if (!e || typeof e != "object") return e;
-	let t = Array.isArray(e.nodes) ? e.nodes.filter(Boolean) : [], n = Ta(e);
+	let t = Array.isArray(e.nodes) ? e.nodes.filter(Boolean) : [], n = Ea(e);
 	if (!t.length) return e;
 	let r = [], i = Array.isArray(e.links) ? [...e.links] : [], a = [...Array.isArray(e.groups) ? e.groups : [], ...Array.isArray(e.extra?.groups) ? e.extra.groups : []];
 	for (let e of t) {
 		r.push(e);
-		let t = Ea(e, n);
+		let t = Da(e, n);
 		if (!t || !Array.isArray(t.nodes) || !t.nodes.length) continue;
-		let o = Oa(e, wa(t));
+		let o = ka(e, Ta(t));
 		r.push(...o.nodes), i.push(...o.links), o.group && a.push(o.group);
 	}
 	return {
@@ -4866,16 +4867,16 @@ function wa(e) {
 		}
 	};
 }
-function Ta(e) {
+function Ea(e) {
 	let t = [
 		...Array.isArray(e?.definitions?.subgraphs) ? e.definitions.subgraphs : [],
 		...Array.isArray(e?.subgraphs) ? e.subgraphs : [],
 		...Array.isArray(e?.rootGraph?.subgraphs) ? e.rootGraph.subgraphs : []
 	], n = /* @__PURE__ */ new Map();
-	for (let e of t) for (let t of Da(e)) t != null && n.set(String(t), e);
+	for (let e of t) for (let t of Oa(e)) t != null && n.set(String(t), e);
 	return n;
 }
-function Ea(e, t) {
+function Da(e, t) {
 	let n = [
 		e?.type,
 		e?.comfyClass,
@@ -4903,7 +4904,7 @@ function Ea(e, t) {
 		e?.subgraph_graph
 	].find((e) => e && typeof e == "object" && Array.isArray(e.nodes)) || null;
 }
-function Da(e) {
+function Oa(e) {
 	return [
 		e?.id,
 		e?.name,
@@ -4915,9 +4916,9 @@ function Da(e) {
 		e?.properties?.subgraphId
 	].filter((e) => e != null && String(e).trim());
 }
-function Oa(e, t) {
-	let n = String(e?.id ?? e?.ID ?? ""), r = Aa(e?.pos) || [0, 0], i = ja(e?.size) || [260, 180], a = t.nodes.filter(Boolean), o = ka(a), s = Math.min(22, Math.max(8, i[0] * .08)), c = Math.min(34, Math.max(18, i[1] * .18)), l = Math.min(18, Math.max(8, i[1] * .08)), u = Math.max(40, i[0] - s * 2), d = Math.max(34, i[1] - c - l), f = Math.min(1, u / o.width, d / o.height), p = r[0] + s + (u - o.width * f) / 2, m = r[1] + c + (d - o.height * f) / 2, h = a.map((r) => {
-		let i = Aa(r?.pos) || [o.minX, o.minY], a = ja(r?.size) || [140, 60];
+function ka(e, t) {
+	let n = String(e?.id ?? e?.ID ?? ""), r = ja(e?.pos) || [0, 0], i = Ma(e?.size) || [260, 180], a = t.nodes.filter(Boolean), o = Aa(a), s = Math.min(22, Math.max(8, i[0] * .08)), c = Math.min(34, Math.max(18, i[1] * .18)), l = Math.min(18, Math.max(8, i[1] * .08)), u = Math.max(40, i[0] - s * 2), d = Math.max(34, i[1] - c - l), f = Math.min(1, u / o.width, d / o.height), p = r[0] + s + (u - o.width * f) / 2, m = r[1] + c + (d - o.height * f) / 2, h = a.map((r) => {
+		let i = ja(r?.pos) || [o.minX, o.minY], a = Ma(r?.size) || [140, 60];
 		return {
 			...r,
 			id: `${n}::${r?.id ?? r?.ID ?? ""}`,
@@ -4957,12 +4958,12 @@ function Oa(e, t) {
 		}
 	};
 }
-function ka(e) {
+function Aa(e) {
 	let t = Infinity, n = Infinity, r = -Infinity, i = -Infinity;
 	for (let a of e) {
-		let e = Aa(a?.pos);
+		let e = ja(a?.pos);
 		if (!e) continue;
-		let o = ja(a?.size) || [140, 60];
+		let o = Ma(a?.size) || [140, 60];
 		t = Math.min(t, e[0]), n = Math.min(n, e[1]), r = Math.max(r, e[0] + o[0]), i = Math.max(i, e[1] + o[1]);
 	}
 	return Number.isFinite(t) ? {
@@ -4977,7 +4978,7 @@ function ka(e) {
 		height: 1
 	};
 }
-function Aa(e) {
+function ja(e) {
 	if (Array.isArray(e) && e.length >= 2) return [Number(e[0]), Number(e[1])];
 	if (e && typeof e == "object") {
 		let t = e[0] ?? e[0] ?? e.x ?? e.left ?? null, n = e[1] ?? e[1] ?? e.y ?? e.top ?? null;
@@ -4985,7 +4986,7 @@ function Aa(e) {
 	}
 	return null;
 }
-function ja(e) {
+function Ma(e) {
 	if (Array.isArray(e) && e.length >= 2) return [Number(e[0]), Number(e[1])];
 	if (e && typeof e == "object") {
 		let t = e[0] ?? e[0] ?? e.w ?? e.width ?? null, n = e[1] ?? e[1] ?? e.h ?? e.height ?? null;
@@ -4993,12 +4994,12 @@ function ja(e) {
 	}
 	return null;
 }
-function Ma(e) {
+function Na(e) {
 	if (Array.isArray(e)) return !0;
 	let t = String(e || "").trim().toUpperCase();
 	return t === "INT" || t === "FLOAT" || t === "STRING" || t === "BOOLEAN" || t === "BOOL" || t === "COMBO" || t === "ENUM";
 }
-function Na(e, t = null) {
+function Pa(e, t = null) {
 	if (!e || typeof e != "object") return null;
 	let n = {
 		maxNodes: 220,
@@ -5069,7 +5070,7 @@ function Na(e, t = null) {
 }
 //#endregion
 //#region ui/vue/components/panel/sidebar/SidebarWorkflowSection.vue
-var Pa = {
+var Fa = {
 	key: 0,
 	class: "mjr-sidebar-section",
 	style: {
@@ -5079,19 +5080,19 @@ var Pa = {
 		padding: "12px",
 		"min-width": "300px"
 	}
-}, Fa = { style: { "margin-bottom": "12px" } }, Ia = { style: {
+}, Ia = { style: { "margin-bottom": "12px" } }, La = { style: {
 	"font-size": "16px",
 	"font-weight": "800",
 	color: "rgba(255,255,255,0.94)",
 	"line-height": "1.25",
 	overflow: "hidden",
 	"text-overflow": "ellipsis"
-} }, La = ["title"], Ra = { style: {
+} }, Ra = ["title"], za = { style: {
 	display: "flex",
 	"flex-wrap": "wrap",
 	gap: "8px",
 	"margin-bottom": "10px"
-} }, za = { style: {
+} }, Ba = { style: {
 	padding: "4px 9px",
 	"border-radius": "999px",
 	background: "rgba(33,150,243,0.14)",
@@ -5101,7 +5102,7 @@ var Pa = {
 	color: "#90CAF9",
 	"text-transform": "uppercase",
 	"letter-spacing": "0.4px"
-} }, Ba = {
+} }, Va = {
 	key: 0,
 	style: {
 		padding: "4px 9px",
@@ -5112,12 +5113,12 @@ var Pa = {
 		"font-weight": "600",
 		color: "rgba(255,255,255,0.82)"
 	}
-}, Va = { style: {
+}, Ha = { style: {
 	display: "grid",
 	"grid-template-columns": "repeat(2, minmax(0, 1fr))",
 	gap: "8px",
 	"margin-bottom": "12px"
-} }, Ha = {
+} }, Ua = {
 	key: 0,
 	style: {
 		padding: "8px 10px",
@@ -5125,12 +5126,12 @@ var Pa = {
 		background: "rgba(255,255,255,0.04)",
 		border: "1px solid rgba(255,255,255,0.10)"
 	}
-}, Ua = { style: {
+}, Wa = { style: {
 	"font-size": "13px",
 	"font-weight": "750",
 	color: "rgba(255,255,255,0.92)",
 	"margin-top": "3px"
-} }, Wa = {
+} }, Ga = {
 	key: 1,
 	style: {
 		padding: "8px 10px",
@@ -5138,12 +5139,12 @@ var Pa = {
 		background: "rgba(255,255,255,0.04)",
 		border: "1px solid rgba(255,255,255,0.10)"
 	}
-}, Ga = { style: {
+}, Ka = { style: {
 	"font-size": "13px",
 	"font-weight": "750",
 	color: "rgba(255,255,255,0.92)",
 	"margin-top": "3px"
-} }, Ka = {
+} }, qa = {
 	key: 2,
 	style: {
 		padding: "8px 10px",
@@ -5151,12 +5152,12 @@ var Pa = {
 		background: "rgba(255,255,255,0.04)",
 		border: "1px solid rgba(255,255,255,0.10)"
 	}
-}, qa = { style: {
+}, Ja = { style: {
 	"font-size": "13px",
 	"font-weight": "750",
 	color: "rgba(255,255,255,0.92)",
 	"margin-top": "3px"
-} }, Ja = {
+} }, Ya = {
 	key: 3,
 	style: {
 		padding: "8px 10px",
@@ -5164,19 +5165,19 @@ var Pa = {
 		background: "rgba(255,255,255,0.04)",
 		border: "1px solid rgba(255,255,255,0.10)"
 	}
-}, Ya = { style: {
+}, Xa = { style: {
 	"font-size": "12px",
 	"font-weight": "650",
 	color: "rgba(255,255,255,0.84)",
 	"margin-top": "3px"
-} }, Xa = {
+} }, Za = {
 	key: 0,
 	style: {
 		"font-size": "11px",
 		color: "rgba(255,255,255,0.54)",
 		"margin-top": "2px"
 	}
-}, Za = {
+}, Qa = {
 	key: 0,
 	style: {
 		"margin-bottom": "12px",
@@ -5185,14 +5186,14 @@ var Pa = {
 		background: "rgba(244,67,54,0.08)",
 		border: "1px solid rgba(244,67,54,0.25)"
 	}
-}, Qa = {
+}, $a = {
 	key: 1,
 	style: {
 		display: "flex",
 		"flex-wrap": "wrap",
 		gap: "5px"
 	}
-}, $a = {
+}, eo = {
 	key: 1,
 	style: {
 		"margin-bottom": "12px",
@@ -5201,7 +5202,7 @@ var Pa = {
 		background: "rgba(255,255,255,0.035)",
 		border: "1px solid rgba(255,255,255,0.10)"
 	}
-}, eo = {
+}, to = {
 	key: 0,
 	style: {
 		"font-size": "12px",
@@ -5209,63 +5210,63 @@ var Pa = {
 		color: "rgba(255,255,255,0.82)",
 		"white-space": "pre-wrap"
 	}
-}, to = { style: {
+}, no = { style: {
 	display: "grid",
 	"grid-template-columns": "repeat(2, minmax(0, 1fr))",
 	gap: "8px",
 	"margin-bottom": "12px"
-} }, no = { style: {
+} }, ro = { style: {
 	display: "grid",
 	"grid-template-columns": "repeat(3, minmax(0, 1fr))",
 	gap: "8px",
 	"margin-bottom": "12px"
-} }, ro = { style: {
-	padding: "8px 10px",
-	"border-radius": "10px",
-	background: "rgba(255,255,255,0.04)",
-	border: "1px solid rgba(255,255,255,0.10)"
 } }, io = { style: {
-	"font-size": "18px",
-	"font-weight": "700",
-	color: "rgba(255,255,255,0.94)",
-	"margin-top": "2px"
+	padding: "8px 10px",
+	"border-radius": "10px",
+	background: "rgba(255,255,255,0.04)",
+	border: "1px solid rgba(255,255,255,0.10)"
 } }, ao = { style: {
-	padding: "8px 10px",
-	"border-radius": "10px",
-	background: "rgba(255,255,255,0.04)",
-	border: "1px solid rgba(255,255,255,0.10)"
+	"font-size": "18px",
+	"font-weight": "700",
+	color: "rgba(255,255,255,0.94)",
+	"margin-top": "2px"
 } }, oo = { style: {
-	"font-size": "18px",
-	"font-weight": "700",
-	color: "rgba(255,255,255,0.94)",
-	"margin-top": "2px"
-} }, so = { style: {
 	padding: "8px 10px",
 	"border-radius": "10px",
 	background: "rgba(255,255,255,0.04)",
 	border: "1px solid rgba(255,255,255,0.10)"
-} }, co = { style: {
+} }, so = { style: {
 	"font-size": "18px",
 	"font-weight": "700",
 	color: "rgba(255,255,255,0.94)",
 	"margin-top": "2px"
+} }, co = { style: {
+	padding: "8px 10px",
+	"border-radius": "10px",
+	background: "rgba(255,255,255,0.04)",
+	border: "1px solid rgba(255,255,255,0.10)"
 } }, lo = { style: {
+	"font-size": "18px",
+	"font-weight": "700",
+	color: "rgba(255,255,255,0.94)",
+	"margin-top": "2px"
+} }, uo = { style: {
 	"margin-bottom": "12px",
 	padding: "10px",
 	"border-radius": "10px",
 	background: "rgba(255,255,255,0.03)",
 	border: "1px solid rgba(255,255,255,0.10)"
-} }, uo = { style: {
+} }, fo = { style: {
 	display: "flex",
 	"align-items": "center",
 	"justify-content": "space-between",
 	gap: "10px",
 	"margin-bottom": "8px"
-} }, fo = { style: {
+} }, po = { style: {
 	"font-size": "12px",
 	color: "rgba(255,255,255,0.8)",
 	"margin-top": "2px"
-} }, po = {
+} }, mo = {
 	key: 0,
 	style: {
 		display: "flex",
@@ -5273,31 +5274,31 @@ var Pa = {
 		gap: "4px",
 		"justify-content": "flex-end"
 	}
-}, mo = { style: {
+}, ho = { style: {
 	display: "flex",
 	gap: "8px",
 	"align-items": "center"
-} }, ho = ["placeholder"], go = {
+} }, go = ["placeholder"], _o = {
 	key: 2,
 	class: "mjr-workflow-tree-wrap"
-}, _o = { class: "mjr-workflow-tree-node" }, vo = { class: "mjr-workflow-tree-node-name" }, yo = {
+}, vo = { class: "mjr-workflow-tree-node" }, yo = { class: "mjr-workflow-tree-node-name" }, bo = {
 	key: 0,
 	class: "mjr-workflow-tree-node-type"
-}, bo = { class: "mjr-menu-item-hint" }, xo = {
+}, xo = { class: "mjr-menu-item-hint" }, So = {
 	key: 0,
 	class: "mjr-section-hint"
-}, So = { style: {
+}, Co = { style: {
 	display: "flex",
 	"align-items": "center",
 	"justify-content": "space-between",
 	gap: "10px",
 	"margin-top": "8px"
-} }, Co = { style: {
+} }, wo = { style: {
 	display: "flex",
 	"flex-wrap": "wrap",
 	gap: "6px",
 	"align-items": "center"
-} }, wo = {
+} }, To = {
 	key: 3,
 	style: {
 		display: "grid",
@@ -5307,23 +5308,23 @@ var Pa = {
 		"margin-top": "10px",
 		"margin-bottom": "10px"
 	}
-}, To = { style: {
+}, Eo = { style: {
 	display: "flex",
 	"flex-direction": "column",
 	gap: "2px",
 	"min-width": "0"
-} }, Eo = { style: {
+} }, Do = { style: {
 	"font-size": "13px",
 	"font-weight": "600"
-} }, Do = { style: {
+} }, Oo = { style: {
 	"font-size": "11px",
 	color: "rgba(255,255,255,0.58)"
-} }, Oo = { style: {
+} }, ko = { style: {
 	display: "flex",
 	gap: "10px",
 	"align-items": "stretch",
 	"margin-top": "10px"
-} }, ko = { style: {
+} }, Ao = { style: {
 	display: "flex",
 	"justify-content": "space-between",
 	"align-items": "center",
@@ -5331,7 +5332,7 @@ var Pa = {
 	"margin-top": "8px",
 	"font-size": "11px",
 	color: "rgba(255,255,255,0.58)"
-} }, Ao = ["open"], jo = { style: {
+} }, jo = ["open"], Mo = { style: {
 	background: "rgba(0,0,0,0.5)",
 	padding: "10px",
 	"border-radius": "6px",
@@ -5341,7 +5342,7 @@ var Pa = {
 	margin: "10px 0 0 0",
 	color: "#90CAF9",
 	"font-family": "'Consolas', 'Monaco', monospace"
-} }, Mo = 1, No = 8, Po = 250, Fo = {
+} }, No = 1, Po = 8, Fo = 250, Io = {
 	__name: "SidebarWorkflowSection",
 	props: { asset: {
 		type: Object,
@@ -5378,7 +5379,7 @@ var Pa = {
 				label: "Expanded",
 				height: 220
 			}
-		]), s = R(null), c = R(""), l = R(!1), u = R(!1), d = R(null), f = R(!1), p = R(!1), m = R(ne()), h = R({ ...i }), g = R("crosshair"), _ = R(""), v = null, y = null, b = null;
+		]), s = H(null), c = H(""), l = H(!1), u = H(!1), d = H(null), f = H(!1), p = H(!1), m = H(ne()), h = H({ ...i }), g = H("crosshair"), _ = H(""), v = null, y = null, b = null;
 		function S(e, t, n) {
 			let r = Number(e);
 			return Number.isFinite(r) ? Math.max(t, Math.min(n, r)) : t;
@@ -5386,7 +5387,7 @@ var Pa = {
 		function C(e) {
 			!e || typeof e != "object" || (h.value = {
 				...h.value,
-				zoom: S(e.zoom ?? h.value.zoom, Mo, No),
+				zoom: S(e.zoom ?? h.value.zoom, No, Po),
 				centerX: Number.isFinite(Number(e.centerX)) ? Number(e.centerX) : null,
 				centerY: Number.isFinite(Number(e.centerY)) ? Number(e.centerY) : null
 			});
@@ -5454,7 +5455,7 @@ var Pa = {
 		}
 		function ne() {
 			try {
-				let e = K?.()?.workflowMinimap;
+				let e = q?.()?.workflowMinimap;
 				if (e && typeof e == "object") return {
 					...n,
 					...e
@@ -5472,11 +5473,11 @@ var Pa = {
 					...t
 				};
 				try {
-					let e = K();
+					let e = q();
 					e.workflowMinimap = {
 						...e.workflowMinimap,
 						...r
-					}, q(e), localStorage?.removeItem?.(x);
+					}, J(e), localStorage?.removeItem?.(x);
 				} catch (e) {
 					console.debug?.(e);
 				}
@@ -5487,44 +5488,44 @@ var Pa = {
 		}
 		function re(e) {
 			try {
-				let t = K();
+				let t = q();
 				t.workflowMinimap = {
 					...t.workflowMinimap,
 					...e
-				}, q(t);
+				}, J(t);
 			} catch (e) {
 				console.debug?.(e);
 			}
 		}
-		let O = N(() => {
+		let O = R(() => {
 			let e = ee(t.asset) || ee(d.value), n = te(t.asset) || te(d.value);
-			return !e && !n ? null : e || Na(n);
-		}), ie = N(() => String(t.asset?.filepath || t.asset?.path || t.asset?.file_info?.filepath || "").trim()), ae = N(() => String(t.asset?.display_name || t.asset?.name || t.asset?.filename || t.asset?.title || "Workflow").trim()), se = N(() => String(t.asset?.task || t.asset?.workflow_task || "").trim()), ce = N(() => String(t.asset?.model_family || t.asset?.workflow_model_family || "").trim()), le = N(() => String(t.asset?.provider || t.asset?.workflow_provider || "").trim()), ue = N(() => String(t.asset?.runs_on || t.asset?.runsOn || "").trim().toLowerCase()), de = N(() => {
-			let e = ue.value, t = le.value;
+			return !e && !n ? null : e || Pa(n);
+		}), ie = R(() => String(t.asset?.filepath || t.asset?.path || t.asset?.file_info?.filepath || "").trim()), ae = R(() => String(t.asset?.display_name || t.asset?.name || t.asset?.filename || t.asset?.title || "Workflow").trim()), k = R(() => String(t.asset?.task || t.asset?.workflow_task || "").trim()), se = R(() => String(t.asset?.model_family || t.asset?.workflow_model_family || "").trim()), ce = R(() => String(t.asset?.provider || t.asset?.workflow_provider || "").trim()), le = R(() => String(t.asset?.runs_on || t.asset?.runsOn || "").trim().toLowerCase()), ue = R(() => {
+			let e = le.value, t = ce.value;
 			return e === "api" && t ? `API · ${t}` : e ? t && t.toLowerCase() !== e ? `${e} · ${t}` : e : t;
-		}), fe = N(() => String(t.asset?.notes || "").trim()), pe = N(() => [
+		}), de = R(() => String(t.asset?.notes || "").trim()), fe = R(() => [
 			t.asset?.detected_task ? `detected: ${t.asset.detected_task}` : "",
 			t.asset?.detected_model_family ? t.asset.detected_model_family : "",
 			t.asset?.detected_provider ? t.asset.detected_provider : ""
-		].filter(Boolean).join(" · ")), he = N(() => k(t.asset?.missing_nodes || t.asset?.missingNodes)), ge = N(() => k(t.asset?.missing_models || t.asset?.missingModels)), _e = N(() => {
+		].filter(Boolean).join(" · ")), me = R(() => A(t.asset?.missing_nodes || t.asset?.missingNodes)), he = R(() => A(t.asset?.missing_models || t.asset?.missingModels)), ge = R(() => {
 			let e = Number(t.asset?.usage_count || t.asset?.usageCount || 0);
 			return !Number.isFinite(e) || e <= 0 ? "" : `${Math.floor(e)} use${e === 1 ? "" : "s"}`;
-		}), ve = N(() => ye(t.asset?.mtime || t.asset?.modified_at || t.asset?.updated_at));
-		function k(e) {
+		}), _e = R(() => ve(t.asset?.mtime || t.asset?.modified_at || t.asset?.updated_at));
+		function A(e) {
 			if (Array.isArray(e)) return e.map((e) => String(e || "").trim()).filter(Boolean);
 			if (typeof e == "string") {
 				let t = e.trim();
 				if (!t) return [];
 				try {
 					let e = JSON.parse(t);
-					if (Array.isArray(e)) return k(e);
+					if (Array.isArray(e)) return A(e);
 				} catch {
 					return t.split(/[,\n]/).map((e) => e.trim()).filter(Boolean);
 				}
 			}
 			return [];
 		}
-		function ye(e) {
+		function ve(e) {
 			let t = Number(e);
 			if (!Number.isFinite(t) || t <= 0) return "";
 			let n = t > 1e10 ? t : t * 1e3;
@@ -5534,13 +5535,13 @@ var Pa = {
 				return "";
 			}
 		}
-		async function be() {
+		async function ye() {
 			if (O.value) return;
 			let e = ie.value;
 			if (e && !u.value) {
 				u.value = !0;
 				try {
-					let t = await me(e, { timeoutMs: 25e3 });
+					let t = await pe(e, { timeoutMs: 25e3 });
 					if (!t?.ok) return;
 					let n = t?.data?.workflow || t?.workflow || null, r = t?.data?.prompt || t?.prompt || null;
 					if (!n && !r) return;
@@ -5555,25 +5556,25 @@ var Pa = {
 				}
 			}
 		}
-		let xe = N(() => t.asset?.has_generation_data ? "Complete" : "Partial"), Se = N(() => O.value ? JSON.stringify(O.value, null, 2) : ""), Ce = N(() => String(t.asset?.category || t.asset?.subfolder || t.asset?.folder || "").trim().replace(/^\/+|\/+$/g, "")), we = N(() => Ce.value ? Ce.value.split(/[\\/]+/).filter(Boolean) : []);
-		function A(e, t) {
+		let be = R(() => t.asset?.has_generation_data ? "Complete" : "Partial"), xe = R(() => O.value ? JSON.stringify(O.value, null, 2) : ""), Se = R(() => String(t.asset?.category || t.asset?.subfolder || t.asset?.folder || "").trim().replace(/^\/+|\/+$/g, "")), Ce = R(() => Se.value ? Se.value.split(/[\\/]+/).filter(Boolean) : []);
+		function j(e, t) {
 			let n = e?.id ?? e?.key ?? t + 1;
 			return String(e?.title || e?._meta?.title || e?.type || e?.class_type || e?.name || `Node ${n}`);
 		}
-		function Te(e) {
+		function we(e) {
 			return String(e?.type || e?.class_type || e?.name || "").trim();
 		}
-		function Ee() {
-			c.value = Ce.value;
+		function Te() {
+			c.value = Se.value;
 		}
-		async function Oe() {
+		async function De() {
 			let e = String(t.asset?.filepath || t.asset?.path || t.asset?.file_info?.filepath || "").trim();
 			if (!e) {
-				T(j("toast.workflowMissingPath", "Workflow file path is missing."), "error");
+				T(M("toast.workflowMissingPath", "Workflow file path is missing."), "error");
 				return;
 			}
 			let n = String(c.value || "").trim();
-			if (n !== Ce.value) {
+			if (n !== Se.value) {
 				l.value = !0;
 				try {
 					let t = await o({
@@ -5581,21 +5582,21 @@ var Pa = {
 						category: n
 					}, { timeoutMs: 3e4 });
 					if (!t?.ok) {
-						T(t?.error || j("toast.workflowMoveFailed", "Failed to move workflow."), "error");
+						T(t?.error || M("toast.workflowMoveFailed", "Failed to move workflow."), "error");
 						return;
 					}
-					c.value = String(t?.data?.workflow?.category || n || "").trim(), T(j("toast.workflowCategoryUpdated", "Workflow category updated"), "success", 1800);
+					c.value = String(t?.data?.workflow?.category || n || "").trim(), T(M("toast.workflowCategoryUpdated", "Workflow category updated"), "success", 1800);
 				} catch {
-					T(j("toast.workflowMoveFailed", "Failed to move workflow."), "error");
+					T(M("toast.workflowMoveFailed", "Failed to move workflow."), "error");
 				} finally {
 					l.value = !1;
 				}
 			}
 		}
-		async function ke() {
+		async function Oe() {
 			let e = ie.value;
 			if (!e) {
-				T(j("toast.workflowMissingPath", "Workflow file path is missing."), "error");
+				T(M("toast.workflowMissingPath", "Workflow file path is missing."), "error");
 				return;
 			}
 			let n = await r({
@@ -5603,16 +5604,16 @@ var Pa = {
 				limit: 12
 			}, { timeoutMs: 15e3 });
 			if (!n?.ok) {
-				T(n?.error || j("toast.workflowLoadFailed", "Failed to load workflow."), "error");
+				T(n?.error || M("toast.workflowLoadFailed", "Failed to load workflow."), "error");
 				return;
 			}
 			let i = Array.isArray(n.data) ? n.data : [];
 			if (!i.length) {
-				T(j("toast.workflowThumbnailNoCandidates", "No linked outputs are available for this workflow yet."), "warning", 2600);
+				T(M("toast.workflowThumbnailNoCandidates", "No linked outputs are available for this workflow yet."), "warning", 2600);
 				return;
 			}
 			let a = await rr({
-				title: j("ctx.setWorkflowThumbnail", "Set workflow thumbnail"),
+				title: M("ctx.setWorkflowThumbnail", "Set workflow thumbnail"),
 				workflow: t.asset,
 				items: i
 			});
@@ -5622,18 +5623,18 @@ var Pa = {
 				source_filepath: a.filepath
 			}, { timeoutMs: 3e4 });
 			if (!o?.ok) {
-				T(o?.error || j("toast.workflowSaveFailed", "Failed to save workflow."), "error");
+				T(o?.error || M("toast.workflowSaveFailed", "Failed to save workflow."), "error");
 				return;
 			}
-			T(j("toast.workflowUpdated", "Workflow updated"), "success", 1800), window?.dispatchEvent?.(new CustomEvent("mjr:reload-grid", { detail: { reason: "workflow-thumbnail-sidebar" } }));
+			T(M("toast.workflowUpdated", "Workflow updated"), "success", 1800), window?.dispatchEvent?.(new CustomEvent("mjr:reload-grid", { detail: { reason: "workflow-thumbnail-sidebar" } }));
 		}
-		async function Ae() {
-			if (await be(), !O.value) {
-				T(j("toast.workflowLoadFailed", "Failed to load workflow."), "error");
+		async function ke() {
+			if (await ye(), !O.value) {
+				T(M("toast.workflowLoadFailed", "Failed to load workflow."), "error");
 				return;
 			}
 			try {
-				await Ie.openAssets({
+				await Fe.openAssets({
 					assets: [{
 						...t.asset,
 						workflow: O.value,
@@ -5643,21 +5644,21 @@ var Pa = {
 					mode: "graph"
 				});
 			} catch (e) {
-				console.debug?.(e), T(j("toast.workflowLoadFailed", "Failed to load workflow."), "error");
+				console.debug?.(e), T(M("toast.workflowLoadFailed", "Failed to load workflow."), "error");
 			}
 		}
-		let je = N(() => (Array.isArray(O.value?.nodes) ? O.value.nodes : []).slice(0, Po).map((e, t) => {
-			let n = e?.id ?? e?.key ?? t + 1, r = Te(e);
+		let Ae = R(() => (Array.isArray(O.value?.nodes) ? O.value.nodes : []).slice(0, Fo).map((e, t) => {
+			let n = e?.id ?? e?.key ?? t + 1, r = we(e);
 			return {
 				key: String(n),
-				label: A(e, t),
+				label: j(e, t),
 				icon: "pi pi-circle-fill",
 				data: {
 					id: n,
 					type: r
 				}
 			};
-		})), Me = N(() => Math.max(0, Number(Ne.value.nodes || 0) - je.value.length)), Ne = N(() => {
+		})), je = R(() => Math.max(0, Number(Me.value.nodes || 0) - Ae.value.length)), Me = R(() => {
 			let e = O.value;
 			return e ? {
 				nodes: Array.isArray(e?.nodes) ? e.nodes.length : 0,
@@ -5670,10 +5671,10 @@ var Pa = {
 				groups: 0,
 				source: ""
 			};
-		}), Pe = N(() => {
+		}), Ne = R(() => {
 			let e = String(m.value?.size || "comfortable");
 			return a.find((t) => t.key === e) || a[1];
-		}), Fe = N(() => `${Pe.value.height}px`), Le = N(() => [
+		}), Pe = R(() => `${Ne.value.height}px`), He = R(() => [
 			{
 				key: "showNodeLabels",
 				label: "Node Labels",
@@ -5710,21 +5711,21 @@ var Pa = {
 				iconClass: "pi pi-window-maximize"
 			}
 		]);
-		function Ke() {
+		function We() {
 			let e = s.value, t = O.value;
 			if (!e || !t) return;
 			let n = Math.max(1, e.clientWidth || 320), r = Math.max(1, e.clientHeight || 120), i = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
 			e.width = Math.floor(n * i), e.height = Math.floor(r * i);
 			let a = e.getContext("2d");
-			a && a.setTransform(i, 0, 0, i, 0, 0), y = Ca(e, t, {
+			a && a.setTransform(i, 0, 0, i, 0, 0), y = wa(e, t, {
 				...m.value,
 				view: h.value
 			}) || null, C(y?.resolvedView);
 		}
-		function qe(e) {
-			De(e);
+		function Ge(e) {
+			Ee(e);
 		}
-		function Je(e) {
+		function Ke(e) {
 			let t = s.value;
 			if (!t) return null;
 			let n = t.getBoundingClientRect?.();
@@ -5733,50 +5734,50 @@ var Pa = {
 				y: Number(e?.clientY) - n.top
 			} : null;
 		}
-		function Ye(e) {
-			let t = Je(e);
+		function qe(e) {
+			let t = Ke(e);
 			return !t || !y?.canvasToWorld ? null : {
 				local: t,
 				world: y.canvasToWorld(t.x, t.y)
 			};
 		}
-		function Xe(e) {
-			let t = Je(e), n = t && y?.hitTestNode ? y.hitTestNode(t.x, t.y) : null, r = n?.id !== null && n?.id !== void 0 ? String(n.id) : null, i = h.value.hoveredNodeId !== null && h.value.hoveredNodeId !== void 0 ? String(h.value.hoveredNodeId) : null;
+		function Je(e) {
+			let t = Ke(e), n = t && y?.hitTestNode ? y.hitTestNode(t.x, t.y) : null, r = n?.id !== null && n?.id !== void 0 ? String(n.id) : null, i = h.value.hoveredNodeId !== null && h.value.hoveredNodeId !== void 0 ? String(h.value.hoveredNodeId) : null;
 			_.value = n?.label || "", r !== i && (h.value = {
 				...h.value,
 				hoveredNodeId: r
-			}, Ke());
+			}, We());
 		}
-		function Ze(e) {
-			e && (qe(e), h.value = {
+		function Ye(e) {
+			e && (Ge(e), h.value = {
 				...h.value,
 				centerX: Number(e.x),
 				centerY: Number(e.y)
-			}, Ke());
+			}, We());
 		}
-		function Qe(e) {
+		function Xe(e) {
 			if (Number(e?.button ?? 0) !== 0) return;
-			let t = Ye(e);
-			t && (b = e.pointerId ?? 1, g.value = "grabbing", s.value?.setPointerCapture?.(b), Ze(t.world), Xe(e), e.preventDefault?.(), e.stopPropagation?.());
+			let t = qe(e);
+			t && (b = e.pointerId ?? 1, g.value = "grabbing", s.value?.setPointerCapture?.(b), Ye(t.world), Je(e), e.preventDefault?.(), e.stopPropagation?.());
 		}
-		function $e(e) {
+		function Ze(e) {
 			if (b !== null && e.pointerId === b) {
-				let t = Ye(e);
-				t && Ze(t.world), e.preventDefault?.(), e.stopPropagation?.();
+				let t = qe(e);
+				t && Ye(t.world), e.preventDefault?.(), e.stopPropagation?.();
 				return;
 			}
-			Xe(e);
+			Je(e);
 		}
-		function tt(e) {
+		function Qe(e) {
 			b !== null && e?.pointerId === b && (s.value?.releasePointerCapture?.(b), b = null, g.value = "crosshair"), e?.type === "pointerleave" && (_.value = "", h.value.hoveredNodeId !== null && (h.value = {
 				...h.value,
 				hoveredNodeId: null
-			}, Ke()));
+			}, We()));
 		}
-		function nt(e) {
-			let t = Ye(e), n = y?.resolvedView;
+		function et(e) {
+			let t = qe(e), n = y?.resolvedView;
 			if (!t || !n) return;
-			let r = S(Number(e?.deltaY) || 0, -240, 240), i = Math.exp(-r * .0025), a = S((Number(h.value.zoom) || 1) * i, Mo, No);
+			let r = S(Number(e?.deltaY) || 0, -240, 240), i = Math.exp(-r * .0025), a = S((Number(h.value.zoom) || 1) * i, No, Po);
 			if (Math.abs(a - (Number(h.value.zoom) || 1)) < .001) {
 				e.preventDefault?.(), e.stopPropagation?.();
 				return;
@@ -5787,40 +5788,40 @@ var Pa = {
 				zoom: a,
 				centerX: Number(t.world.x) + (.5 - c) * o,
 				centerY: Number(t.world.y) + (.5 - l) * s
-			}, Ke(), Xe(e), e.preventDefault?.(), e.stopPropagation?.();
+			}, We(), Je(e), e.preventDefault?.(), e.stopPropagation?.();
+		}
+		function nt(e) {
+			let t = qe(e);
+			w(), t && Ge(t.world), We(), e.preventDefault?.(), e.stopPropagation?.();
 		}
 		function rt(e) {
-			let t = Ye(e);
-			w(), t && qe(t.world), Ke(), e.preventDefault?.(), e.stopPropagation?.();
-		}
-		function it(e) {
 			m.value = {
 				...m.value,
 				[e]: !m.value?.[e]
 			}, re(m.value);
 		}
-		function at(e) {
+		function it(e) {
 			a.some((t) => t.key === e) && (m.value = {
 				...m.value,
 				size: e
 			}, re(m.value));
 		}
 		return Ve(() => {
-			s.value && typeof ResizeObserver == "function" && (v = new ResizeObserver(() => Ke()), v.observe(s.value)), Ee(), be(), Ke();
-		}), Ge(O, () => {
-			w(), Ke();
-		}, { flush: "post" }), Ge(ie, () => {
-			d.value = null, be();
-		}, { immediate: !0 }), Ge(Ce, () => {
-			Ee();
-		}), Ge(m, () => {
-			Ke();
+			s.value && typeof ResizeObserver == "function" && (v = new ResizeObserver(() => We()), v.observe(s.value)), Te(), ye(), We();
+		}), Re(O, () => {
+			w(), We();
+		}, { flush: "post" }), Re(ie, () => {
+			d.value = null, ye();
+		}, { immediate: !0 }), Re(Se, () => {
+			Te();
+		}), Re(m, () => {
+			We();
 		}, {
 			deep: !0,
 			flush: "post"
-		}), Ge(f, () => {
-			Ke();
-		}, { flush: "post" }), Re(() => {
+		}), Re(f, () => {
+			We();
+		}, { flush: "post" }), Be(() => {
 			try {
 				v?.disconnect?.();
 			} catch (e) {
@@ -5828,9 +5829,9 @@ var Pa = {
 			}
 			v = null, b = null;
 		}), (e, t) => {
-			let n = Be("MButton"), r = Be("MTree");
-			return O.value ? (I(), P("div", Pa, [
-				t[17] ||= V("div", { style: {
+			let n = Ue("MButton"), r = Ue("MTree");
+			return O.value ? (N(), V("div", Fa, [
+				t[17] ||= F("div", { style: {
 					"font-size": "13px",
 					"font-weight": "600",
 					color: "var(--fg-color, #eaeaea)",
@@ -5838,7 +5839,7 @@ var Pa = {
 					"text-transform": "uppercase",
 					"letter-spacing": "0.5px"
 				} }, " ComfyUI Workflow ", -1),
-				V("div", Fa, [V("div", Ia, z(ae.value), 1), ie.value ? (I(), P("div", {
+				F("div", Ia, [F("div", La, B(ae.value), 1), ie.value ? (N(), V("div", {
 					key: 0,
 					style: {
 						"font-size": "11px",
@@ -5849,44 +5850,44 @@ var Pa = {
 						"white-space": "nowrap"
 					},
 					title: ie.value
-				}, z(ie.value), 9, La)) : F("", !0)]),
-				V("div", Ra, [V("div", za, z(xe.value), 1), Ne.value.source ? (I(), P("div", Ba, z(Ne.value.source), 1)) : F("", !0)]),
-				V("div", Va, [
-					se.value ? (I(), P("div", Ha, [t[3] ||= V("div", { style: {
+				}, B(ie.value), 9, Ra)) : L("", !0)]),
+				F("div", za, [F("div", Ba, B(be.value), 1), Me.value.source ? (N(), V("div", Va, B(Me.value.source), 1)) : L("", !0)]),
+				F("div", Ha, [
+					k.value ? (N(), V("div", Ua, [t[3] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "700",
 						color: "rgba(255,255,255,0.55)",
 						"text-transform": "uppercase",
 						"letter-spacing": "0.4px"
-					} }, "Task", -1), V("div", Ua, z(se.value), 1)])) : F("", !0),
-					ce.value ? (I(), P("div", Wa, [t[4] ||= V("div", { style: {
+					} }, "Task", -1), F("div", Wa, B(k.value), 1)])) : L("", !0),
+					se.value ? (N(), V("div", Ga, [t[4] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "700",
 						color: "rgba(255,255,255,0.55)",
 						"text-transform": "uppercase",
 						"letter-spacing": "0.4px"
-					} }, "Model", -1), V("div", Ga, z(ce.value), 1)])) : F("", !0),
-					de.value ? (I(), P("div", Ka, [t[5] ||= V("div", { style: {
+					} }, "Model", -1), F("div", Ka, B(se.value), 1)])) : L("", !0),
+					ue.value ? (N(), V("div", qa, [t[5] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "700",
 						color: "rgba(255,255,255,0.55)",
 						"text-transform": "uppercase",
 						"letter-spacing": "0.4px"
-					} }, "Runs on", -1), V("div", qa, z(de.value), 1)])) : F("", !0),
-					_e.value || ve.value ? (I(), P("div", Ja, [
-						t[6] ||= V("div", { style: {
+					} }, "Runs on", -1), F("div", Ja, B(ue.value), 1)])) : L("", !0),
+					ge.value || _e.value ? (N(), V("div", Ya, [
+						t[6] ||= F("div", { style: {
 							"font-size": "10px",
 							"font-weight": "700",
 							color: "rgba(255,255,255,0.55)",
 							"text-transform": "uppercase",
 							"letter-spacing": "0.4px"
 						} }, "Library", -1),
-						V("div", Ya, z(_e.value || ve.value), 1),
-						_e.value && ve.value ? (I(), P("div", Xa, z(ve.value), 1)) : F("", !0)
-					])) : F("", !0)
+						F("div", Xa, B(ge.value || _e.value), 1),
+						ge.value && _e.value ? (N(), V("div", Za, B(_e.value), 1)) : L("", !0)
+					])) : L("", !0)
 				]),
-				he.value.length || ge.value.length ? (I(), P("div", Za, [
-					t[7] ||= V("div", { style: {
+				me.value.length || he.value.length ? (N(), V("div", Qa, [
+					t[7] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "800",
 						color: "#ef9a9a",
@@ -5894,15 +5895,15 @@ var Pa = {
 						"letter-spacing": "0.4px",
 						"margin-bottom": "6px"
 					} }, "Missing dependencies", -1),
-					he.value.length ? (I(), P("div", {
+					me.value.length ? (N(), V("div", {
 						key: 0,
-						style: L({
+						style: U({
 							display: "flex",
 							flexWrap: "wrap",
 							gap: "5px",
-							marginBottom: ge.value.length ? "7px" : "0"
+							marginBottom: he.value.length ? "7px" : "0"
 						})
-					}, [(I(!0), P(H, null, M(he.value, (e) => (I(), P("span", {
+					}, [(N(!0), V(P, null, I(me.value, (e) => (N(), V("span", {
 						key: `node-${e}`,
 						style: {
 							padding: "3px 7px",
@@ -5912,8 +5913,8 @@ var Pa = {
 							"font-weight": "700",
 							color: "#ffcdd2"
 						}
-					}, z(e), 1))), 128))], 4)) : F("", !0),
-					ge.value.length ? (I(), P("div", Qa, [(I(!0), P(H, null, M(ge.value, (e) => (I(), P("span", {
+					}, B(e), 1))), 128))], 4)) : L("", !0),
+					he.value.length ? (N(), V("div", $a, [(N(!0), V(P, null, I(he.value, (e) => (N(), V("span", {
 						key: `model-${e}`,
 						style: {
 							padding: "3px 7px",
@@ -5923,17 +5924,17 @@ var Pa = {
 							"font-weight": "700",
 							color: "#ffe0b2"
 						}
-					}, z(e), 1))), 128))])) : F("", !0)
-				])) : F("", !0),
-				fe.value || pe.value ? (I(), P("div", $a, [fe.value ? (I(), P("div", eo, z(fe.value), 1)) : F("", !0), pe.value ? (I(), P("div", {
+					}, B(e), 1))), 128))])) : L("", !0)
+				])) : L("", !0),
+				de.value || fe.value ? (N(), V("div", eo, [de.value ? (N(), V("div", to, B(de.value), 1)) : L("", !0), fe.value ? (N(), V("div", {
 					key: 1,
-					style: L({
+					style: U({
 						fontSize: "11px",
 						color: "rgba(255,255,255,0.48)",
-						marginTop: fe.value ? "7px" : "0"
+						marginTop: de.value ? "7px" : "0"
 					})
-				}, z(pe.value), 5)) : F("", !0)])) : F("", !0),
-				V("div", to, [et(n, {
+				}, B(fe.value), 5)) : L("", !0)])) : L("", !0),
+				F("div", no, [$e(n, {
 					type: "button",
 					severity: "secondary",
 					text: "",
@@ -5951,11 +5952,11 @@ var Pa = {
 						"justify-content": "center",
 						gap: "7px"
 					},
-					onClick: ke
+					onClick: Oe
 				}, {
-					default: ze(() => [t[8] ||= V("i", { class: "pi pi-image" }, null, -1), V("span", null, z(B(j)("ctx.setWorkflowThumbnail", "Set workflow thumbnail")), 1)]),
+					default: ot(() => [t[8] ||= F("i", { class: "pi pi-image" }, null, -1), F("span", null, B(z(M)("ctx.setWorkflowThumbnail", "Set workflow thumbnail")), 1)]),
 					_: 1
-				}), et(n, {
+				}), $e(n, {
 					type: "button",
 					severity: "secondary",
 					text: "",
@@ -5973,41 +5974,41 @@ var Pa = {
 						"justify-content": "center",
 						gap: "7px"
 					},
-					onClick: Ae
+					onClick: ke
 				}, {
-					default: ze(() => [t[9] ||= V("i", { class: "pi pi-search" }, null, -1), V("span", null, z(B(j)("ctx.inspect", "Inspect")), 1)]),
+					default: ot(() => [t[9] ||= F("i", { class: "pi pi-search" }, null, -1), F("span", null, B(z(M)("ctx.inspect", "Inspect")), 1)]),
 					_: 1
 				})]),
-				V("div", no, [
-					V("div", ro, [t[10] ||= V("div", { style: {
+				F("div", ro, [
+					F("div", io, [t[10] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "700",
 						color: "rgba(255,255,255,0.55)",
 						"text-transform": "uppercase",
 						"letter-spacing": "0.4px"
-					} }, "Nodes", -1), V("div", io, z(Ne.value.nodes), 1)]),
-					V("div", ao, [t[11] ||= V("div", { style: {
+					} }, "Nodes", -1), F("div", ao, B(Me.value.nodes), 1)]),
+					F("div", oo, [t[11] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "700",
 						color: "rgba(255,255,255,0.55)",
 						"text-transform": "uppercase",
 						"letter-spacing": "0.4px"
-					} }, "Links", -1), V("div", oo, z(Ne.value.links), 1)]),
-					V("div", so, [t[12] ||= V("div", { style: {
+					} }, "Links", -1), F("div", so, B(Me.value.links), 1)]),
+					F("div", co, [t[12] ||= F("div", { style: {
 						"font-size": "10px",
 						"font-weight": "700",
 						color: "rgba(255,255,255,0.55)",
 						"text-transform": "uppercase",
 						"letter-spacing": "0.4px"
-					} }, "Groups", -1), V("div", co, z(Ne.value.groups), 1)])
+					} }, "Groups", -1), F("div", lo, B(Me.value.groups), 1)])
 				]),
-				V("div", lo, [V("div", uo, [V("div", null, [t[13] ||= V("div", { style: {
+				F("div", uo, [F("div", fo, [F("div", null, [t[13] ||= F("div", { style: {
 					"font-size": "10px",
 					"font-weight": "700",
 					color: "rgba(255,255,255,0.55)",
 					"text-transform": "uppercase",
 					"letter-spacing": "0.4px"
-				} }, "Category", -1), V("div", fo, z(Ce.value || "Root"), 1)]), we.value.length ? (I(), P("div", po, [(I(!0), P(H, null, M(we.value, (e) => (I(), P("span", {
+				} }, "Category", -1), F("div", po, B(Se.value || "Root"), 1)]), Ce.value.length ? (N(), V("div", mo, [(N(!0), V(P, null, I(Ce.value, (e) => (N(), V("span", {
 					key: e,
 					style: {
 						padding: "3px 7px",
@@ -6020,10 +6021,10 @@ var Pa = {
 						"text-transform": "uppercase",
 						"letter-spacing": "0.3px"
 					}
-				}, z(e), 1))), 128))])) : F("", !0)]), V("div", mo, [He(V("input", {
+				}, B(e), 1))), 128))])) : L("", !0)]), F("div", ho, [ze(F("input", {
 					"onUpdate:modelValue": t[0] ||= (e) => c.value = e,
 					type: "text",
-					placeholder: B(j)("dialog.workflowCategory", "Workflow category"),
+					placeholder: z(M)("dialog.workflowCategory", "Workflow category"),
 					style: {
 						flex: "1",
 						"min-width": "0",
@@ -6034,13 +6035,13 @@ var Pa = {
 						color: "rgba(255,255,255,0.92)",
 						"font-size": "12px"
 					}
-				}, null, 8, ho), [[dt, c.value]]), et(n, {
+				}, null, 8, go), [[ft, c.value]]), $e(n, {
 					type: "button",
 					severity: "secondary",
 					text: "",
 					rounded: "",
 					disabled: l.value,
-					style: L({
+					style: U({
 						padding: "8px 12px",
 						borderRadius: "8px",
 						border: "1px solid rgba(255,255,255,0.12)",
@@ -6051,15 +6052,15 @@ var Pa = {
 						fontWeight: "700",
 						whiteSpace: "nowrap"
 					}),
-					onClick: Oe
+					onClick: De
 				}, {
-					default: ze(() => [Ue(z(l.value ? "Saving..." : "Move"), 1)]),
+					default: ot(() => [Ie(B(l.value ? "Saving..." : "Move"), 1)]),
 					_: 1
 				}, 8, ["disabled", "style"])])]),
-				je.value.length ? (I(), P("div", go, [
-					t[14] ||= V("div", { class: "mjr-section-title" }, " Workflow Nodes ", -1),
-					et(r, {
-						value: je.value,
+				Ae.value.length ? (N(), V("div", _o, [
+					t[14] ||= F("div", { class: "mjr-section-title" }, " Workflow Nodes ", -1),
+					$e(r, {
+						value: Ae.value,
 						class: "mjr-workflow-tree",
 						"scroll-height": "180px",
 						pt: {
@@ -6071,23 +6072,23 @@ var Pa = {
 							nodeLabel: { class: "mjr-workflow-tree-label" }
 						}
 					}, {
-						default: ze(({ node: e }) => [V("span", _o, [
-							V("span", vo, z(e.label), 1),
-							e.data?.type ? (I(), P("span", yo, z(e.data.type), 1)) : F("", !0),
-							V("span", bo, "#" + z(e.data?.id), 1)
+						default: ot(({ node: e }) => [F("span", vo, [
+							F("span", yo, B(e.label), 1),
+							e.data?.type ? (N(), V("span", bo, B(e.data.type), 1)) : L("", !0),
+							F("span", xo, "#" + B(e.data?.id), 1)
 						])]),
 						_: 1
 					}, 8, ["value"]),
-					Me.value ? (I(), P("div", xo, " +" + z(Me.value) + " more nodes ", 1)) : F("", !0)
-				])) : F("", !0),
-				V("div", So, [V("div", Co, [(I(!0), P(H, null, M(B(a), (e) => (I(), We(n, {
+					je.value ? (N(), V("div", So, " +" + B(je.value) + " more nodes ", 1)) : L("", !0)
+				])) : L("", !0),
+				F("div", Co, [F("div", wo, [(N(!0), V(P, null, I(z(a), (e) => (N(), Le(n, {
 					key: e.key,
 					type: "button",
 					severity: "secondary",
 					text: "",
 					rounded: "",
 					title: `${e.label} minimap`,
-					style: L({
+					style: U({
 						appearance: "none",
 						border: m.value.size === e.key ? "1px solid rgba(33,150,243,0.55)" : "1px solid rgba(255,255,255,0.12)",
 						borderRadius: "999px",
@@ -6098,21 +6099,21 @@ var Pa = {
 						fontWeight: m.value.size === e.key ? "700" : "600",
 						cursor: "pointer"
 					}),
-					onClick: (t) => at(e.key)
+					onClick: (t) => it(e.key)
 				}, {
-					default: ze(() => [Ue(z(e.label), 1)]),
+					default: ot(() => [Ie(B(e.label), 1)]),
 					_: 2
 				}, 1032, [
 					"title",
 					"style",
 					"onClick"
-				]))), 128))]), et(n, {
+				]))), 128))]), $e(n, {
 					type: "button",
 					class: "mjr-btn mjr-icon-btn",
 					severity: "secondary",
 					text: "",
 					rounded: "",
-					title: B(j)("tooltip.minimapSettings", "Minimap settings"),
+					title: z(M)("tooltip.minimapSettings", "Minimap settings"),
 					style: {
 						width: "28px",
 						height: "28px",
@@ -6127,15 +6128,15 @@ var Pa = {
 					},
 					onClick: t[1] ||= (e) => f.value = !f.value
 				}, {
-					default: ze(() => [...t[15] ||= [V("i", { class: "pi pi-sliders-h" }, null, -1)]]),
+					default: ot(() => [...t[15] ||= [F("i", { class: "pi pi-sliders-h" }, null, -1)]]),
 					_: 1
 				}, 8, ["title"])]),
-				f.value ? (I(), P("div", wo, [(I(!0), P(H, null, M(Le.value, (e) => (I(), We(n, {
+				f.value ? (N(), V("div", To, [(N(!0), V(P, null, I(He.value, (e) => (N(), Le(n, {
 					key: e.key,
 					type: "button",
 					severity: "secondary",
 					text: "",
-					style: L({
+					style: U({
 						display: "flex",
 						alignItems: "center",
 						gap: "10px",
@@ -6147,10 +6148,10 @@ var Pa = {
 						color: "rgba(255,255,255,0.92)",
 						textAlign: "left"
 					}),
-					onClick: (t) => it(e.key)
+					onClick: (t) => rt(e.key)
 				}, {
-					default: ze(() => [
-						V("span", { style: L({
+					default: ot(() => [
+						F("span", { style: U({
 							width: "22px",
 							height: "22px",
 							borderRadius: "6px",
@@ -6160,31 +6161,31 @@ var Pa = {
 							background: m.value?.[e.key] ? "rgba(76,175,80,0.95)" : "rgba(255,255,255,0.08)",
 							border: m.value?.[e.key] ? "1px solid rgba(76,175,80,0.35)" : "1px solid rgba(255,255,255,0.12)",
 							flex: "0 0 auto"
-						}) }, [V("i", {
+						}) }, [F("i", {
 							class: "pi pi-check",
-							style: L({
+							style: U({
 								fontSize: "12px",
 								opacity: m.value?.[e.key] ? "1" : "0"
 							})
 						}, null, 4)], 4),
-						V("i", {
-							class: ct(e.iconClass),
+						F("i", {
+							class: tt(e.iconClass),
 							style: {
 								"font-size": "18px",
 								opacity: "0.9",
 								width: "18px"
 							}
 						}, null, 2),
-						V("div", To, [V("div", Eo, z(e.label), 1), V("div", Do, z(m.value?.[e.key] ? "On" : "Off"), 1)])
+						F("div", Eo, [F("div", Do, B(e.label), 1), F("div", Oo, B(m.value?.[e.key] ? "On" : "Off"), 1)])
 					]),
 					_: 2
-				}, 1032, ["style", "onClick"]))), 128))])) : F("", !0),
-				V("div", Oo, [V("canvas", {
+				}, 1032, ["style", "onClick"]))), 128))])) : L("", !0),
+				F("div", ko, [F("canvas", {
 					ref_key: "canvasRef",
 					ref: s,
-					style: L({
+					style: U({
 						width: "100%",
-						height: Fe.value,
+						height: Pe.value,
 						cursor: g.value,
 						touchAction: "none",
 						borderRadius: "10px",
@@ -6193,28 +6194,28 @@ var Pa = {
 						border: "1px solid var(--mjr-border, rgba(255,255,255,0.12))",
 						boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.03)"
 					}),
-					onPointerdown: Qe,
-					onPointermove: $e,
-					onPointerup: tt,
-					onPointercancel: tt,
-					onPointerleave: tt,
-					onWheel: nt,
-					onDblclick: rt
+					onPointerdown: Xe,
+					onPointermove: Ze,
+					onPointerup: Qe,
+					onPointercancel: Qe,
+					onPointerleave: Qe,
+					onWheel: et,
+					onDblclick: nt
 				}, null, 36)]),
-				V("div", ko, [V("span", null, z(_.value || "Click/drag to navigate | wheel to zoom"), 1), V("span", null, z(Math.round((h.value.zoom || 1) * 100)) + "% | " + z(Pe.value.label), 1)]),
-				V("details", {
+				F("div", Ao, [F("span", null, B(_.value || "Click/drag to navigate | wheel to zoom"), 1), F("span", null, B(Math.round((h.value.zoom || 1) * 100)) + "% | " + B(Ne.value.label), 1)]),
+				F("details", {
 					open: p.value,
 					style: { "margin-top": "10px" },
 					onToggle: t[2] ||= (e) => p.value = e.target.open
-				}, [t[16] ||= V("summary", { style: {
+				}, [t[16] ||= F("summary", { style: {
 					cursor: "pointer",
 					color: "var(--mjr-muted, rgba(255,255,255,0.65))",
 					"font-size": "12px",
 					"user-select": "none"
-				} }, " Show raw JSON ", -1), V("pre", jo, z(Se.value), 1)], 40, Ao)
-			])) : F("", !0);
+				} }, " Show raw JSON ", -1), F("pre", Mo, B(xe.value), 1)], 40, jo)
+			])) : L("", !0);
 		};
 	}
 };
 //#endregion
-export { J as C, Ut as S, q as T, rr as _, ua as a, tr as b, Wr as c, _r as d, gr as f, ir as g, pr as h, fa as i, Sr as l, fr as m, Ca as n, pa as o, sr as p, Na as r, aa as s, Fo as t, hr as u, nr as v, K as w, er as x, Z as y };
+export { Y as C, Ut as S, J as T, rr as _, da as a, tr as b, Gr as c, _r as d, gr as f, ir as g, pr as h, pa as i, Sr as l, fr as m, wa as n, ma as o, sr as p, Pa as r, oa as s, Io as t, hr as u, nr as v, q as w, er as x, Q as y };

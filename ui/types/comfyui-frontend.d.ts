@@ -81,6 +81,12 @@ interface MajoorExtensionManager {
     activeSidebarTab?: { id?: string };
 }
 
+interface MajoorWorkspaceStore {
+    sidebarTab?: MajoorSidebarController;
+    registerSidebarTab?(tab: unknown): void;
+    unregisterSidebarTab?(id: string): void;
+}
+
 interface MajoorComfyApi {
     fetchApi?(route: string, options?: RequestInit): Promise<Response>;
     apiURL(route: string): string;
@@ -93,6 +99,8 @@ interface MajoorComfyApp {
         api?: MajoorComfyApi;
         app?: MajoorComfyApp;
         extensionManager?: MajoorExtensionManager;
+        workspaceStore?: MajoorWorkspaceStore;
+        workspace?: MajoorWorkspaceStore;
         settings?: unknown;
         dialog?: { show(message: unknown): void; element?: HTMLElement };
         $el?: (tag: string, props?: Record<string, unknown>, children?: unknown) => HTMLElement;
@@ -105,6 +113,8 @@ interface MajoorComfyApp {
     canvas?: LGraphCanvas | unknown;
     graph?: LGraph | unknown;
     extensionManager?: MajoorExtensionManager;
+    workspaceStore?: MajoorWorkspaceStore;
+    workspace?: MajoorWorkspaceStore;
     settings?: unknown;
     loadGraphData?(data: unknown): unknown;
 }

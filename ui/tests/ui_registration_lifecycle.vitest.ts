@@ -68,10 +68,20 @@ vi.mock("../api/client.js", () => ({
     del: vi.fn(),
     getWatcherStatus: vi.fn(() => Promise.resolve(null)),
     toggleWatcher: vi.fn(() => Promise.resolve(null)),
+    setOutputDirectorySetting: vi.fn(() => Promise.resolve({ ok: true, data: {} })),
+    setIndexDirectorySetting: vi.fn(() => Promise.resolve({ ok: true, data: {} })),
 }));
 
 vi.mock("../api/endpoints.js", () => ({
     buildListURL: vi.fn(() => "/mjr/am/assets?q=*"),
+    ENDPOINTS: {
+        BROWSE_FOLDER: "/mjr/sys/browse-folder",
+    },
+}));
+
+vi.mock("../app/settings/settingsCore.js", () => ({
+    loadMajoorSettings: vi.fn(() => ({ paths: {} })),
+    saveMajoorSettings: vi.fn(),
 }));
 
 vi.mock("../app/bootstrap.js", () => ({
@@ -328,6 +338,8 @@ describe("native ComfyUI frontend registration payloads", () => {
             "mjr.openFloatingViewer",
             "mjr.openGeneratedFeed",
             "mjr.openSettings",
+            "mjr.pickOutputDirectory",
+            "mjr.pickIndexDirectory",
             "mjr.openNodeContext",
         ]);
     });
@@ -383,6 +395,8 @@ describe("native ComfyUI frontend registration payloads", () => {
         expect(menuCommands[0].path).toEqual(["Extensions", "Majoor Assets Manager"]);
         expect(menuCommands[0].commands).toContain("mjr.openSettings");
         expect(menuCommands[0].commands).toContain("mjr.openGeneratedFeed");
+        expect(menuCommands[0].commands).toContain("mjr.pickOutputDirectory");
+        expect(menuCommands[0].commands).toContain("mjr.pickIndexDirectory");
     });
 
     it("builds official ComfyUI canvas context menu items with a declarative submenu", () => {

@@ -23,11 +23,15 @@ import {
     registerCommandForApp,
     registerKeybindingForApp,
     registerSidebarTabForApp,
+    setSettingForApp,
 } from "../../app/hostAdapter.js";
 import { EVENTS } from "../../app/events.js";
 import { openMajoorSettings } from "../../app/openMajoorSettings.js";
 import { comfyToast } from "../../app/toast.js";
 import { t } from "../../app/i18n.js";
+import { post, setIndexDirectorySetting, setOutputDirectorySetting } from "../../api/client.js";
+import { ENDPOINTS } from "../../api/endpoints.js";
+import { loadMajoorSettings, saveMajoorSettings } from "../../app/settings/settingsCore.js";
 import { mountKeepAlive, unmountKeepAlive } from "../../vue/createVueApp.js";
 import GlobalRuntimeApp from "../../vue/GlobalRuntime.vue";
 import AssetsManagerApp from "../../vue/App.vue";
@@ -128,6 +132,85 @@ function openGeneratedFeedPanel(runtimeApp: any): boolean {
         }
     }
     return opened;
+}
+
+async function pickNativeFolderPath(): Promise<string> {
+    try {
+        const browseRes = await post(ENDPOINTS.BROWSE_FOLDER, {});
+        if (browseRes?.ok) {
+            return String(browseRes?.data?.path || "").trim();
+        }
+        const code = String(browseRes?.code || "").trim();
+        if (code && code !== "CANCELLED") {
+            comfyToast(
+                browseRes?.error ||
+                    t(
+                        "toast.nativeFolderBrowserUnavailable",
+                        "Native folder browser unavailable. Please enter path manually.",
+                    ),
+                "warning",
+                3500,
+            );
+        }
+    } catch (e) {
+        console.debug?.(e);
+        comfyToast(
+            t(
+                "toast.nativeFolderBrowserUnavailable",
+                "Native folder browser unavailable. Please enter path manually.",
+            ),
+            "warning",
+            3500,
+        );
+    }
+    return "";
+}
+
+async function pickSettingsDirectory(
+    runtimeApp: any,
+    {
+        settingId,
+        settingsPathKey,
+        save,
+        successMessage,
+        restartRequired = false,
+    }: {
+        settingId: string;
+        settingsPathKey: string;
+        save: (value: string) => Promise<any>;
+        successMessage: string;
+        restartRequired?: boolean;
+    },
+): Promise<boolean> {
+    const pickedPath = await pickNativeFolderPath();
+    if (!pickedPath) return false;
+    const result = await save(pickedPath);
+    if (!result?.ok) {
+        comfyToast(result?.error || t("toast.settingsPathSaveFailed", "Failed to save path"), "error");
+        return false;
+    }
+    try {
+        const settings = loadMajoorSettings();
+        settings.paths = settings.paths || {};
+        settings.paths[settingsPathKey] = pickedPath;
+        saveMajoorSettings(settings);
+        setSettingForApp(runtimeApp, settingId, pickedPath);
+        window.dispatchEvent(
+            new CustomEvent(EVENTS.SETTINGS_CHANGED, {
+                detail: { key: `paths.${settingsPathKey}`, value: pickedPath },
+            }),
+        );
+    } catch (e) {
+        console.debug?.(e);
+    }
+    comfyToast(
+        restartRequired
+            ? `${successMessage} ${t("toast.restartComfyUiToApply", "Restart ComfyUI to apply.")}`
+            : successMessage,
+        "success",
+        2800,
+    );
+    return true;
 }
 
 // -- commands (declarative array for ComfyUI extension API) --------------------
@@ -239,6 +322,55 @@ export function buildNativeCommands(runtimeApp: any, { sidebarTabId, triggerStar
             function: () => openMajoorSettings(runtimeApp),
         },
         {
+            id: "mjr.pickOutputDirectory",
+            label: t("command.pickOutputDirectory", "Pick output directory"),
+            tooltip: t(
+                "tooltip.pickOutputDirectory",
+                "Use the native folder browser to set Majoor's generation output directory",
+            ),
+            title: t(
+                "tooltip.pickOutputDirectory",
+                "Use the native folder browser to set Majoor's generation output directory",
+            ),
+            description: t(
+                "tooltip.pickOutputDirectory",
+                "Use the native folder browser to set Majoor's generation output directory",
+            ),
+            icon: "pi pi-folder",
+            function: () =>
+                pickSettingsDirectory(runtimeApp, {
+                    settingId: "Majoor.Paths.OutputDirectory",
+                    settingsPathKey: "outputDirectory",
+                    save: setOutputDirectorySetting,
+                    successMessage: t("toast.outputDirectorySaved", "Output directory saved."),
+                }),
+        },
+        {
+            id: "mjr.pickIndexDirectory",
+            label: t("command.pickIndexDirectory", "Pick index directory"),
+            tooltip: t(
+                "tooltip.pickIndexDirectory",
+                "Use the native folder browser to set Majoor's index database directory",
+            ),
+            title: t(
+                "tooltip.pickIndexDirectory",
+                "Use the native folder browser to set Majoor's index database directory",
+            ),
+            description: t(
+                "tooltip.pickIndexDirectory",
+                "Use the native folder browser to set Majoor's index database directory",
+            ),
+            icon: "pi pi-database",
+            function: () =>
+                pickSettingsDirectory(runtimeApp, {
+                    settingId: "Majoor.Paths.IndexDirectory",
+                    settingsPathKey: "indexDirectory",
+                    save: setIndexDirectorySetting,
+                    successMessage: t("toast.indexDirectorySaved", "Index directory saved."),
+                    restartRequired: true,
+                }),
+        },
+        {
             id: "mjr.openNodeContext",
             label: t("command.openNodeContext", "Show assets from selected node"),
             tooltip: t(
@@ -283,6 +415,8 @@ export function buildNativeMenuCommands(): unknown[] {
                 "mjr.refreshAssetsGrid",
                 "mjr.scanAssets",
                 "mjr.openSettings",
+                "mjr.pickOutputDirectory",
+                "mjr.pickIndexDirectory",
             ],
         },
     ];

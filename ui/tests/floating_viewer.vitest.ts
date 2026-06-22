@@ -355,6 +355,79 @@ describe("FloatingViewer", () => {
         );
     });
 
+    it("forwards popout keydown events through the main window shortcut pipeline", async () => {
+        const { FloatingViewer } = await import("../features/viewer/FloatingViewer.js");
+
+        const OriginalKeyboardEvent = globalThis.KeyboardEvent;
+        const OriginalWindowKeyboardEvent = window.KeyboardEvent;
+        if (typeof globalThis.KeyboardEvent !== "function") {
+            globalThis.KeyboardEvent = class extends Event {
+                constructor(type, init = {}) {
+                    super(type, init);
+                    Object.defineProperties(this, {
+                        key: { value: init.key || "" },
+                        code: { value: init.code || "" },
+                        keyCode: { value: init.keyCode || 0 },
+                        ctrlKey: { value: Boolean(init.ctrlKey) },
+                        shiftKey: { value: Boolean(init.shiftKey) },
+                        altKey: { value: Boolean(init.altKey) },
+                        metaKey: { value: Boolean(init.metaKey) },
+                        repeat: { value: Boolean(init.repeat) },
+                    });
+                }
+            };
+        }
+        if (typeof window.KeyboardEvent !== "function") {
+            window.KeyboardEvent = globalThis.KeyboardEvent;
+        }
+        const received = [];
+        const onKeydown = vi.fn((event) => {
+            received.push({
+                key: event.key,
+                code: event.code,
+                altKey: event.altKey,
+                bubbles: event.bubbles,
+                cancelable: event.cancelable,
+            });
+            event.preventDefault();
+        });
+        window.addEventListener("keydown", onKeydown, true);
+
+        const sourceEvent = {
+            key: "k",
+            code: "KeyK",
+            altKey: true,
+            preventDefault: vi.fn(),
+            stopPropagation: vi.fn(),
+            stopImmediatePropagation: vi.fn(),
+        };
+
+        try {
+            FloatingViewer.prototype._forwardKeydownToController.call(
+                { _controller: { handleForwardedKeydown: vi.fn() } },
+                sourceEvent,
+            );
+        } finally {
+            window.removeEventListener("keydown", onKeydown, true);
+            globalThis.KeyboardEvent = OriginalKeyboardEvent;
+            window.KeyboardEvent = OriginalWindowKeyboardEvent;
+        }
+
+        expect(onKeydown).toHaveBeenCalledTimes(1);
+        expect(received).toEqual([
+            {
+                key: "k",
+                code: "KeyK",
+                altKey: true,
+                bubbles: true,
+                cancelable: true,
+            },
+        ]);
+        expect(sourceEvent.preventDefault).toHaveBeenCalledTimes(1);
+        expect(sourceEvent.stopPropagation).toHaveBeenCalledTimes(1);
+        expect(sourceEvent.stopImmediatePropagation).toHaveBeenCalledTimes(1);
+    });
+
     it("uses about:blank popup in browser contexts even when Document PiP exists", async () => {
         const { FloatingViewer } = await import("../features/viewer/FloatingViewer.js");
 

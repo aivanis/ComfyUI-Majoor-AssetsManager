@@ -1,4 +1,4 @@
-import { O as e, _t as t, a as n, et as r, gt as i, p as a, pt as o, tt as s, vt as c } from "./events-iWiZ-Zty.js";
+import { O as e, _t as t, a as n, et as r, gt as i, p as a, pt as o, tt as s, vt as c } from "./events-Bz2Vm8U5.js";
 //#region ui/app/settingsStore.ts
 var l = "mjrSettings", u = "mjrMinimapSettings", d = new Set([
 	"POST",
@@ -1543,14 +1543,19 @@ async function Dn(e, t = {}) {
 		code: "INVALID_INPUT"
 	};
 }
-async function On({ workflow: e = null, name: t = "", category: n = "", overwrite: i = !1, filepath: a = "" } = {}, o = {}) {
+async function On({ workflow: e = null, name: t = "", category: n = "", overwrite: i = !1, filepath: a = "", task: o = "", model_family: s = "", provider: c = "", runs_on: l = "", notes: u = "" } = {}, d = {}) {
 	return J(r.WORKFLOWS_SAVE, {
 		workflow: e,
 		name: t,
 		category: n,
 		overwrite: i,
-		filepath: a
-	}, o);
+		filepath: a,
+		task: o,
+		model_family: s,
+		provider: c,
+		runs_on: l,
+		notes: u
+	}, d);
 }
 async function kn({ filepath: e = "", name: t = "" } = {}, n = {}) {
 	return J(r.WORKFLOWS_DUPLICATE, {
