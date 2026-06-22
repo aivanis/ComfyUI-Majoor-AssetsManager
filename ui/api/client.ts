@@ -359,12 +359,17 @@ export async function saveWorkflow(
         category = "",
         overwrite = false,
         filepath = "",
+        task = "",
+        model_family = "",
+        provider = "",
+        runs_on = "",
+        notes = "",
     }: Record<string, any> = {},
     options: Record<string, any> = {},
 ) {
     return post(
         ENDPOINTS.WORKFLOWS_SAVE,
-        { workflow, name, category, overwrite, filepath },
+        { workflow, name, category, overwrite, filepath, task, model_family, provider, runs_on, notes },
         options,
     );
 }

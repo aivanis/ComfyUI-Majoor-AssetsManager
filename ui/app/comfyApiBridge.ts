@@ -177,9 +177,19 @@ export function getExtensionManager(app?: any): any {
 }
 
 export function getSidebarController(app?: any): any {
+    const runtimeApp = _isObject(app) ? app : getComfyApp();
     const manager = getExtensionManager(app);
-    if (!_isObject(manager)) return null;
-    return manager?.sidebarTabStore || manager?.sidebarTab || (manager as any)?.workspaceStore?.sidebarTab || null;
+    return (
+        manager?.sidebarTabStore ||
+        manager?.sidebarTab ||
+        (manager as any)?.workspaceStore?.sidebarTab ||
+        runtimeApp?.workspaceStore?.sidebarTab ||
+        runtimeApp?.ui?.workspaceStore?.sidebarTab ||
+        runtimeApp?.ui?.app?.workspaceStore?.sidebarTab ||
+        runtimeApp?.workspace?.sidebarTab ||
+        runtimeApp?.ui?.workspace?.sidebarTab ||
+        null
+    );
 }
 
 function _getBottomPanelController(manager: any | undefined): any {
@@ -213,7 +223,7 @@ export function activateSidebarTabCompat(app: any, tabId: any): boolean {
     const manager = getExtensionManager(runtimeApp);
     const sidebarController = getSidebarController(runtimeApp);
     const safeTabId = String(tabId || "").trim();
-    if (!manager || !safeTabId) return false;
+    if (!safeTabId) return false;
     const candidates = [
         "activateSidebarTab",
         "openSidebarTab",
@@ -295,11 +305,20 @@ export function registerSidebarTabCompat(app: any, tabDef: any): boolean {
         const runtimeApp = _isObject(app) ? app : getComfyApp();
         const manager = runtimeApp?.extensionManager || runtimeApp?.ui?.extensionManager || null;
         const sidebarController = getSidebarController(runtimeApp);
+        const workspaceStore =
+            runtimeApp?.workspaceStore ||
+            runtimeApp?.ui?.workspaceStore ||
+            runtimeApp?.ui?.app?.workspaceStore ||
+            null;
         for (const host of [manager, sidebarController]) {
             if (host && typeof host.registerSidebarTab === "function") {
                 host.registerSidebarTab(tabDef);
                 return true;
             }
+        }
+        if (workspaceStore && typeof workspaceStore.registerSidebarTab === "function") {
+            workspaceStore.registerSidebarTab(tabDef);
+            return true;
         }
     } catch (e) {
         console.debug?.(e);

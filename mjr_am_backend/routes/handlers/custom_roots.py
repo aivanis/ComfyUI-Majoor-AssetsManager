@@ -398,6 +398,14 @@ def register_custom_roots_routes(routes: web.RouteTableDef) -> None:
         auth = _require_write_access(request)
         if not auth.ok:
             return _json_response(auth)
+        if not _is_loopback_request(request):
+            return _json_response(
+                Result.Err(
+                    "FORBIDDEN",
+                    "Native folder browser is only available from the local ComfyUI host",
+                ),
+                status=403,
+            )
 
         allowed, retry_after = _check_rate_limit(request, "browse_folder", max_requests=3, window_seconds=30)
         if not allowed:

@@ -1020,6 +1020,23 @@ def read_workflow_content(path: Path) -> Result[dict[str, Any]]:
     )
 
 
+def _workflow_save_info_updates(card: dict[str, Any], *, info: dict[str, Any] | None = None) -> dict[str, str]:
+    source = info or {}
+    updates: dict[str, str] = {}
+    for key in ("task", "model_family", "provider", "runs_on"):
+        value = str(source.get(key) or "").strip()
+        if not value:
+            value = str(card.get(f"detected_{key}") or card.get(key) or "").strip()
+        if key == "runs_on":
+            value = value.lower()
+        if value:
+            updates[key] = value
+    notes = str(source.get("notes") or "").strip()
+    if notes:
+        updates["notes"] = notes
+    return updates
+
+
 def save_workflow(
     *,
     workflow: dict[str, Any],
@@ -1027,6 +1044,7 @@ def save_workflow(
     category: Any = "",
     overwrite: bool = False,
     filepath: Any = "",
+    info: dict[str, Any] | None = None,
 ) -> Result[dict[str, Any]]:
     if not isinstance(workflow, dict):
         return Result.Err("INVALID_WORKFLOW", "Workflow JSON must be an object")
@@ -1053,6 +1071,17 @@ def save_workflow(
         return Result.Err(write.code or "WORKFLOW_WRITE_FAILED", write.error or "Failed to save workflow")
     root = managed_workflow_root(create=False) or target.parent
     card = _workflow_to_card(target, root)
+    if card is None:
+        return Result.Err("INVALID_WORKFLOW", "Workflow JSON is missing or invalid")
+    metadata_updates = _workflow_save_info_updates(card, info=info)
+    if metadata_updates:
+        meta_write = _upsert_workflow_library_card(card, updates=metadata_updates)
+        if not meta_write.ok:
+            return Result.Err(
+                meta_write.code or "WORKFLOW_DB_FAILED",
+                meta_write.error or "Failed to save workflow info",
+            )
+        card = _workflow_to_card(target, root) or card
     return Result.Ok({"saved": True, "workflow": card, "filepath": str(target)})
 
 

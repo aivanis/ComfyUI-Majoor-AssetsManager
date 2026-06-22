@@ -23,6 +23,7 @@ import { comfyToast } from "../../../app/toast.js";
 import { VERSION_UPDATE_EVENT, getStoredVersionUpdateState } from "../../../app/versionCheck.js";
 import { EVENTS } from "../../../app/events.js";
 import { openMajoorSettings } from "../../../app/openMajoorSettings.js";
+import { openWorkflowSaveInfoDialog } from "../../../features/workflows/workflowSaveInfoState.js";
 import { setTooltipHint } from "../../../utils/tooltipShortcuts.js";
 import SearchBar from "./SearchBar.vue";
 import SortPopover from "./SortPopover.vue";
@@ -222,14 +223,21 @@ async function onSaveCurrentWorkflow() {
         return;
     }
     const defaultName = String(workflow?.name || workflow?.title || "workflow").trim();
-    const name = await comfyPrompt(
-        t("dialog.workflowSaveName", "Workflow name"),
-        defaultName,
-        t("tab.workflow", "Workflow"),
-    );
-    const safeName = String(name || "").trim();
+    const info = await openWorkflowSaveInfoDialog({ workflow, name: defaultName });
+    const safeName = String(info?.name || "").trim();
     if (!safeName) return;
-    const result = await saveWorkflow({ workflow, name: safeName }, { timeoutMs: 30_000 });
+    const result = await saveWorkflow(
+        {
+            workflow,
+            name: safeName,
+            task: info?.task || "",
+            model_family: info?.model_family || "",
+            provider: info?.provider || "",
+            runs_on: info?.runs_on || "",
+            notes: info?.notes || "",
+        },
+        { timeoutMs: 30_000 },
+    );
     if (!result?.ok) {
         comfyToast(result?.error || t("toast.workflowSaveFailed", "Failed to save workflow."), "error");
         return;

@@ -422,8 +422,8 @@ function j(e) {
 	return t?.extensionManager || t?.ui?.extensionManager || null;
 }
 function he(e) {
-	let t = j(e);
-	return T(t) && (t?.sidebarTabStore || t?.sidebarTab || t?.workspaceStore?.sidebarTab) || null;
+	let t = T(e) ? e : A(), n = j(e);
+	return n?.sidebarTabStore || n?.sidebarTab || n?.workspaceStore?.sidebarTab || t?.workspaceStore?.sidebarTab || t?.ui?.workspaceStore?.sidebarTab || t?.ui?.app?.workspaceStore?.sidebarTab || t?.workspace?.sidebarTab || t?.ui?.workspace?.sidebarTab || null;
 }
 function ge(e) {
 	return T(e) && (e?.bottomPanel || e?.bottomPanelStore) || null;
@@ -438,7 +438,7 @@ function ve(e) {
 }
 function ye(e, t) {
 	let n = T(e) ? e : A(), r = j(n), i = he(n), a = String(t || "").trim();
-	if (!r || !a) return !1;
+	if (!a) return !1;
 	let o = [
 		"activateSidebarTab",
 		"openSidebarTab",
@@ -481,8 +481,9 @@ function xe(e, t) {
 }
 function Se(e, t) {
 	try {
-		let n = T(e) ? e : A(), r = n?.extensionManager || n?.ui?.extensionManager || null, i = he(n);
+		let n = T(e) ? e : A(), r = n?.extensionManager || n?.ui?.extensionManager || null, i = he(n), a = n?.workspaceStore || n?.ui?.workspaceStore || n?.ui?.app?.workspaceStore || null;
 		for (let e of [r, i]) if (e && typeof e.registerSidebarTab == "function") return e.registerSidebarTab(t), !0;
+		if (a && typeof a.registerSidebarTab == "function") return a.registerSidebarTab(t), !0;
 	} catch (e) {
 		console.debug?.(e);
 	}

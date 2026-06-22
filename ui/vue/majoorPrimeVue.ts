@@ -4,6 +4,7 @@ import ConfirmationService from "primevue/confirmationservice";
 import Button from "primevue/button";
 import Checkbox from "primevue/checkbox";
 import InputText from "primevue/inputtext";
+import Textarea from "primevue/textarea";
 import Select from "primevue/select";
 import ToggleButton from "primevue/togglebutton";
 import Badge from "primevue/badge";
@@ -18,6 +19,7 @@ const PRIME_COMPONENTS = {
     Button,
     Checkbox,
     InputText,
+    Textarea,
     Select,
     ToggleButton,
     Badge,

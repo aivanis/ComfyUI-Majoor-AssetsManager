@@ -60,6 +60,55 @@ async def test_workflow_save_rejects_bad_json(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_workflow_save_forwards_info_fields(monkeypatch):
+    monkeypatch.setattr(workflows_routes, "_csrf_error", lambda request: None)
+    monkeypatch.setattr(workflows_routes, "_require_write_access", lambda request: Result.Ok(True))
+
+    async def _json(_request):
+        return Result.Ok(
+            {
+                "workflow": {"nodes": []},
+                "name": "demo",
+                "task": "I2V",
+                "model_family": "Wan",
+                "provider": "local",
+                "runs_on": "local",
+                "notes": "Keep camera path locked.",
+            }
+        )
+
+    captured = {}
+
+    def _save_workflow(**kwargs):
+        captured.update(kwargs)
+        return Result.Ok({"saved": True, "workflow": {"filename": "demo.json"}})
+
+    async def _audit(*args, **kwargs):
+        return None
+
+    monkeypatch.setattr(workflows_routes, "_read_json", _json)
+    monkeypatch.setattr(workflows_routes, "save_workflow", _save_workflow)
+    monkeypatch.setattr(workflows_routes, "_audit_workflow_write", _audit)
+
+    app = _build_app()
+    req = make_mocked_request("POST", "/mjr/am/workflows/save", app=app)
+    match = await app.router.resolve(req)
+    resp = await match.handler(req)
+    body = json.loads(resp.text)
+
+    assert body.get("ok") is True
+    assert captured["name"] == "demo"
+    assert captured["category"] == "I2V"
+    assert captured["info"] == {
+        "task": "I2V",
+        "model_family": "Wan",
+        "provider": "local",
+        "runs_on": "local",
+        "notes": "Keep camera path locked.",
+    }
+
+
+@pytest.mark.asyncio
 async def test_workflow_thumbnail_missing_returns_not_found(monkeypatch, tmp_path):
     missing = tmp_path / "workflows" / "missing.png"
 

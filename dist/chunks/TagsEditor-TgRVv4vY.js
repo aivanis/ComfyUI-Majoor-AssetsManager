@@ -1,12 +1,12 @@
-import { N as e, Wt as t, _ as n } from "./viewerRuntimeHosts-CHGQYjAV.js";
-import { _t as r, n as i, p as a } from "./events-iWiZ-Zty.js";
-import { A as o } from "./mediaFps-dibNFbk4.js";
-import { B as s, C as c, D as l, F as ee, G as u, H as d, I as te, K as ne, O as f, R as p, U as m, et as h, k as g, lt as _, ot as v, st as y, w as b, x, y as S } from "./mjr-primevue-DaF1IwbI.js";
+import { N as e, Wt as t, _ as n } from "./viewerRuntimeHosts-6HaE-P9G.js";
+import { _t as r, n as i, p as a } from "./events-Bz2Vm8U5.js";
+import { A as o } from "./mediaFps-CdGbfYY3.js";
+import { A as s, B as c, C as l, E as u, G as d, H as ee, J as te, L as f, R as p, T as m, W as h, b as ne, ct as g, dt as _, j as v, k as y, lt as b, nt as x, q as S } from "./mjr-primevue-n1rsQYJg.js";
 //#region ui/vue/components/common/TagsEditor.vue
-var C = ["aria-busy"], re = ["aria-label"], w = {
+var C = ["aria-busy"], re = ["aria-label"], ie = {
 	key: 0,
 	class: "mjr-tags-empty"
-}, T = { class: "mjr-tags-input-wrap" }, ie = ["aria-selected", "onMouseenter"], E = 100, D = 200, O = {
+}, ae = { class: "mjr-tags-input-wrap" }, w = ["aria-selected", "onMouseenter"], T = 100, E = 200, D = {
 	__name: "TagsEditor",
 	props: {
 		asset: {
@@ -23,11 +23,11 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 		}
 	},
 	emits: ["update:modelValue", "tags-change"],
-	setup(O, { emit: ae }) {
-		function oe(e) {
+	setup(D, { emit: oe }) {
+		function se(e) {
 			try {
 				let t = String(e ?? "").trim();
-				if (!t || t.length > E) return null;
+				if (!t || t.length > T) return null;
 				for (let e = 0; e < t.length; e += 1) {
 					let n = t.charCodeAt(e);
 					if (n <= 31 || n === 127) return null;
@@ -37,59 +37,59 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 				return null;
 			}
 		}
-		function k(e) {
+		function O(e) {
 			try {
 				return String(e ?? "").replace(/[\x00-\x1f\x7f]/g, "").trim() || null;
 			} catch {
 				return null;
 			}
 		}
-		function A(e) {
-			let t = k(e);
+		function k(e) {
+			let t = O(e);
 			return t ? t.toLowerCase() : "";
 		}
-		function j(e) {
+		function A(e) {
 			let t = [], n = /* @__PURE__ */ new Set();
 			for (let r of Array.isArray(e) ? e : []) {
-				let e = k(r);
+				let e = O(r);
 				if (!e) continue;
 				let i = e.toLowerCase();
-				if (!n.has(i) && (n.add(i), t.push(e), t.length >= D)) break;
+				if (!n.has(i) && (n.add(i), t.push(e), t.length >= E)) break;
 			}
 			return t;
 		}
-		function M(e) {
-			if (Array.isArray(e)) return j(e);
+		function j(e) {
+			if (Array.isArray(e)) return A(e);
 			if (typeof e == "string") {
 				let t = e.trim();
 				if (!t) return [];
 				try {
 					let e = JSON.parse(t);
-					if (Array.isArray(e)) return j(e);
+					if (Array.isArray(e)) return A(e);
 				} catch {
-					return j(t.split(","));
+					return A(t.split(","));
 				}
 			}
 			return [];
 		}
-		function se(e, t) {
+		function M(e, t) {
 			if (!Array.isArray(e) || !Array.isArray(t) || e.length !== t.length) return !1;
 			for (let n = 0; n < e.length; n += 1) if (e[n] !== t[n]) return !1;
 			return !0;
 		}
-		let N = O, P = ae, F = M(N.asset?.tags ?? N.modelValue ?? []), I = h([...F]), L = h(null), R = h(""), z = h(!1), B = h(-1), V = h(null), H = h([]), U = h(!1), W = (e) => e?.$el || e || null, G = !1, K = !1, q = null, J = [...F], ce = (e) => Math.min(100 * 2 ** Math.max(0, e - 1), 2e3), le = (e) => new Promise((t) => setTimeout(t, e)), ue = () => setTimeout(() => z.value = !1, 200), Y = c(() => {
+		let N = D, P = oe, F = j(N.asset?.tags ?? N.modelValue ?? []), I = x([...F]), L = x(null), R = x(""), z = x(!1), B = x(-1), V = x(null), H = x([]), U = x(!1), W = (e) => e?.$el || e || null, G = !1, K = !1, q = null, J = [...F], ce = (e) => Math.min(100 * 2 ** Math.max(0, e - 1), 2e3), le = (e) => new Promise((t) => setTimeout(t, e)), ue = () => setTimeout(() => z.value = !1, 200), Y = m(() => {
 			let e = R.value.toLowerCase().trim();
 			if (!e) return [];
-			let t = new Set(I.value.map((e) => A(e)).filter(Boolean));
+			let t = new Set(I.value.map((e) => k(e)).filter(Boolean));
 			return H.value.filter((n) => {
-				let r = A(n);
+				let r = k(n);
 				return n.toLowerCase().includes(e) && (!r || !t.has(r));
 			}).slice(0, 10);
-		}), X = c(() => Y.value.length > 0);
+		}), X = m(() => Y.value.length > 0);
 		function Z(e) {
 			if (G) return;
-			let t = M(e);
-			J = [...t], se(t, I.value) || (I.value = [...t]);
+			let t = j(e);
+			J = [...t], M(t, I.value) || (I.value = [...t]);
 		}
 		function de(e) {
 			let t = [...e], n = N.asset?.id == null ? "" : String(N.asset.id);
@@ -116,7 +116,7 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 			let n = 0;
 			for (; n < 10;) {
 				n > 0 && await le(ce(n)), n += 1;
-				let i = M(I.value), o = typeof AbortController < "u" ? new AbortController() : null;
+				let i = j(I.value), o = typeof AbortController < "u" ? new AbortController() : null;
 				q = o;
 				let s = null;
 				try {
@@ -142,7 +142,7 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 				} catch (e) {
 					console.debug?.(e);
 				}
-				let c = M(Array.isArray(s?.data?.tags) ? s.data.tags : i);
+				let c = j(Array.isArray(s?.data?.tags) ? s.data.tags : i);
 				J = [...c];
 				try {
 					N.asset.tags = [...c];
@@ -164,14 +164,14 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 			}
 			G = !1, q = null, U.value = !1;
 		}
-		te(async () => {
+		p(async () => {
 			try {
 				let e = await n();
-				e?.ok && Array.isArray(e?.data) && (H.value = j(e.data));
+				e?.ok && Array.isArray(e?.data) && (H.value = A(e.data));
 			} catch (e) {
 				console.warn("Failed to load available tags:", e);
 			}
-		}), ee(() => {
+		}), f(() => {
 			try {
 				q?.abort?.();
 			} catch (e) {
@@ -180,11 +180,11 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 		});
 		function $(e) {
 			if (N.disabled) return;
-			let n = oe(e);
+			let n = se(e);
 			if (!n) return;
-			let r = A(n);
-			if (r && !I.value.some((e) => A(e) === r)) {
-				if (I.value.length >= D) {
+			let r = k(n);
+			if (r && !I.value.some((e) => k(e) === r)) {
+				if (I.value.length >= E) {
 					t(a("toast.maxTagsReached", "Maximum number of tags reached"), "warning");
 					return;
 				}
@@ -228,49 +228,49 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 			let t = e?.value ?? V.value;
 			t && me(t);
 		}
-		return m(() => N.modelValue, (e) => {
+		return d(() => N.modelValue, (e) => {
 			Z(e);
-		}), m(() => N.asset?.tags, (e) => {
+		}), d(() => N.asset?.tags, (e) => {
 			Z(e);
 		}), (e, t) => {
-			let n = d("MButton"), r = d("MInputText"), i = d("MListbox");
-			return p(), l("div", {
-				class: y(["mjr-tags-editor", { "is-disabled": O.disabled }]),
+			let n = h("MButton"), r = h("MInputText"), i = h("MListbox");
+			return c(), y("div", {
+				class: b(["mjr-tags-editor", { "is-disabled": D.disabled }]),
 				"aria-busy": U.value
-			}, [b("div", {
+			}, [u("div", {
 				class: "mjr-tags-display",
 				role: "list",
-				"aria-label": v(a)("tags.label", "Tags")
-			}, [I.value.length === 0 ? (p(), l("span", w, _(v(a)("msg.noTagsYet", "No tags yet...")), 1)) : (p(!0), l(x, { key: 1 }, s(I.value, (e, r) => (p(), l("div", {
+				"aria-label": g(a)("tags.label", "Tags")
+			}, [I.value.length === 0 ? (c(), y("span", ie, _(g(a)("msg.noTagsYet", "No tags yet...")), 1)) : (c(!0), y(l, { key: 1 }, ee(I.value, (e, r) => (c(), y("div", {
 				key: e,
 				class: "mjr-tag-chip",
 				role: "listitem"
-			}, [f(_(e) + " ", 1), g(n, {
+			}, [s(_(e) + " ", 1), v(n, {
 				type: "button",
 				class: "mjr-tag-chip-remove",
 				severity: "secondary",
 				text: "",
 				rounded: "",
-				"aria-label": v(a)("tags.remove", "Remove tag"),
-				disabled: O.disabled,
+				"aria-label": g(a)("tags.remove", "Remove tag"),
+				disabled: D.disabled,
 				onClick: (e) => fe(r)
 			}, {
-				default: u(() => [...t[4] ||= [f(" x ", -1)]]),
+				default: S(() => [...t[4] ||= [s(" x ", -1)]]),
 				_: 1
 			}, 8, [
 				"aria-label",
 				"disabled",
 				"onClick"
-			])]))), 128))], 8, re), b("div", T, [g(r, {
+			])]))), 128))], 8, re), u("div", ae, [v(r, {
 				ref_key: "inputRef",
 				ref: L,
 				modelValue: R.value,
 				"onUpdate:modelValue": t[0] ||= (e) => R.value = e,
 				type: "text",
 				class: "mjr-tag-input",
-				placeholder: v(a)("sidebar.addTag", "Add tag..."),
-				disabled: O.disabled,
-				"aria-label": v(a)("tags.addLabel", "Add tag"),
+				placeholder: g(a)("sidebar.addTag", "Add tag..."),
+				disabled: D.disabled,
+				"aria-label": g(a)("tags.addLabel", "Add tag"),
 				"aria-autocomplete": X.value ? "list" : "none",
 				"aria-expanded": z.value,
 				"aria-haspopup": X.value ? "listbox" : void 0,
@@ -286,28 +286,28 @@ var C = ["aria-busy"], re = ["aria-label"], w = {
 				"aria-autocomplete",
 				"aria-expanded",
 				"aria-haspopup"
-			]), ne(g(i, {
+			]), te(v(i, {
 				modelValue: V.value,
 				"onUpdate:modelValue": t[3] ||= (e) => V.value = e,
 				options: Y.value,
 				class: "mjr-tags-dropdown",
 				"scroll-height": "150px",
-				"aria-label": v(a)("tags.suggestions", "Tag suggestions"),
+				"aria-label": g(a)("tags.suggestions", "Tag suggestions"),
 				onChange: he
 			}, {
-				option: u(({ option: e, index: t }) => [b("div", {
-					class: y(["mjr-tag-suggestion", { "is-active": t === B.value }]),
+				option: S(({ option: e, index: t }) => [u("div", {
+					class: b(["mjr-tag-suggestion", { "is-active": t === B.value }]),
 					"aria-selected": t === B.value,
 					onMouseenter: (e) => B.value = t
-				}, _(e), 43, ie)]),
+				}, _(e), 43, w)]),
 				_: 1
 			}, 8, [
 				"modelValue",
 				"options",
 				"aria-label"
-			]), [[S, z.value && X.value]])])], 10, C);
+			]), [[ne, z.value && X.value]])])], 10, C);
 		};
 	}
 };
 //#endregion
-export { O as t };
+export { D as t };

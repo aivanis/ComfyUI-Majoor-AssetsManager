@@ -75,8 +75,11 @@ describe("comfyApiBridge", () => {
         const storeToggle = vi.fn();
         const legacyToggle = vi.fn();
         const workspaceToggle = vi.fn();
+        const appWorkspaceToggle = vi.fn();
         const app = {
-            ui: {},
+            ui: {
+                workspaceStore: { sidebarTab: { toggleSidebarTab: appWorkspaceToggle } },
+            },
             extensionManager: {
                 sidebarTab: { toggleSidebarTab: legacyToggle },
                 sidebarTabStore: { toggleSidebarTab: storeToggle },
@@ -96,6 +99,34 @@ describe("comfyApiBridge", () => {
         delete app.extensionManager.sidebarTabStore;
         delete app.extensionManager.sidebarTab;
         expect(mod.getSidebarController(app)).toBe(app.extensionManager.workspaceStore.sidebarTab);
+
+        delete app.extensionManager.workspaceStore;
+        expect(mod.getSidebarController(app)).toBe(app.ui.workspaceStore.sidebarTab);
+        expect(mod.activateSidebarTabCompat(app, "majoor-assets")).toBe(true);
+        expect(appWorkspaceToggle).toHaveBeenCalledWith("majoor-assets");
+    });
+
+    it("registers and activates sidebar tabs through current App mode workspace stores", async () => {
+        const registerSidebarTab = vi.fn();
+        const toggleSidebarTab = vi.fn();
+        const app = {
+            ui: {},
+            workspaceStore: {
+                sidebarTab: {
+                    activeSidebarTabId: "",
+                    registerSidebarTab,
+                    toggleSidebarTab,
+                },
+            },
+        };
+
+        const mod = await import("../app/comfyApiBridge.js");
+        mod.setComfyApp(app);
+
+        expect(mod.registerSidebarTabCompat(app, { id: "majoor-assets" })).toBe(true);
+        expect(registerSidebarTab).toHaveBeenCalledWith({ id: "majoor-assets" });
+        expect(mod.activateSidebarTabCompat(app, "majoor-assets")).toBe(true);
+        expect(toggleSidebarTab).toHaveBeenCalledWith("majoor-assets");
     });
 
     it("does not toggle a sidebar tab that is already active", async () => {

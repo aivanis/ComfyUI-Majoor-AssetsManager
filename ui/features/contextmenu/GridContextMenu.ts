@@ -74,6 +74,18 @@ function loadFloatingViewerManagerModule() {
     return floatingViewerManagerModulePromise;
 }
 
+function inferItemTone(label: any) {
+    const normalized = String(label || "").trim().toLowerCase();
+    if (!normalized) return "";
+    if (normalized.includes("open graph map")) return "graph-map";
+    if (normalized.includes("open in floating viewer") || normalized.includes("open floating viewer")) {
+        return "floating-viewer";
+    }
+    if (normalized.includes("rename")) return "rename";
+    if (normalized.includes("delete")) return "delete";
+    return "";
+}
+
 function createItem(
     label: any,
     iconClass: any,
@@ -87,6 +99,7 @@ function createItem(
         label: String(label || ""),
         iconClass: iconClass ? String(iconClass) : "",
         rightHint: rightHint ? String(rightHint) : "",
+        tone: inferItemTone(label),
         disabled: !!disabled,
         closeOnSelect,
         submenu: Array.isArray(submenu) && submenu.length ? submenu : null,

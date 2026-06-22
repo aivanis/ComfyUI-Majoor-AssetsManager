@@ -228,13 +228,26 @@ def register_workflow_routes(routes: web.RouteTableDef) -> None:
             category=body.get("category") or body.get("task") or "",
             overwrite=bool(body.get("overwrite")),
             filepath=body.get("filepath") or "",
+            info={
+                "task": body.get("task") or "",
+                "model_family": body.get("model_family") or "",
+                "provider": body.get("provider") or "",
+                "runs_on": body.get("runs_on") or "",
+                "notes": body.get("notes") or "",
+            },
         )
         await _audit_workflow_write(
             request,
             operation="workflow.save",
             target=str(body.get("filepath") or body.get("name") or "workflow"),
             result=result,
-            details={"category": str(body.get("category") or "")},
+            details={
+                "category": str(body.get("category") or ""),
+                "has_user_info": any(
+                    str(body.get(key) or "").strip()
+                    for key in ("task", "model_family", "provider", "runs_on", "notes")
+                ),
+            },
         )
         return _json_response(result)
 
