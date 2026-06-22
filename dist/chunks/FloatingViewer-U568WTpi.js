@@ -1,13 +1,13 @@
-import { Ut as e, h as t, v as n } from "./viewerRuntimeHosts-C-9ryYS-.js";
+import { Wt as e, h as t, v as n } from "./viewerRuntimeHosts-CHGQYjAV.js";
 import { A as r, B as i, C as a, D as o, F as s, L as c, N as l, S as u, _ as d, a as f, b as p, dt as m, j as h, nt as g, p as _, r as v, x as y, z as b } from "./events-iWiZ-Zty.js";
 import { a as x, i as S, o as C, s as w } from "./graphTraversal-CjIZsRsP.js";
 import { a as T, i as ee } from "./mediaFps-dibNFbk4.js";
-import { a as E, c as D, i as O, n as k, o as te, r as A } from "./SidebarWorkflowSection-CQks5fGJ.js";
-import { a as j, c as M, i as N, n as P, o as ne, r as F, s as re, t as ie } from "./openMajoorSettings-uHUBBILV.js";
+import { a as E, c as D, i as O, n as k, o as te, r as A } from "./SidebarWorkflowSection-DBKikqDe.js";
+import { a as j, c as M, i as N, n as P, o as ne, r as F, s as re, t as ie } from "./openMajoorSettings-DPVlELep.js";
 import { i as I, n as L, r as R } from "./VideoControls-CDu3ByYX.js";
 import { i as ae, o as z, r as oe, t as se } from "./geninfoParser-5vKgjqjD.js";
 import { l as B, o as ce, p as le, r as ue, s as de } from "./mediaPlayer-ufU72_SR.js";
-import { t as fe } from "./genInfo-DQSKLzvg.js";
+import { t as fe } from "./genInfo-CbxuoRS9.js";
 //#region ui/features/viewer/floatingViewerConstants.ts
 var V = Object.freeze({
 	SIMPLE: "simple",
@@ -379,6 +379,18 @@ function G(e, { fill: t = !1, controls: n = !0 } = {}) {
 		if (!n) return r;
 		let a = document.createElement("div");
 		a.className = `mjr-mfv-player-host${t ? " mjr-mfv-player-host--fill" : ""}`, a.appendChild(r);
+		try {
+			a.tabIndex = -1, a.addEventListener("pointerdown", (e) => {
+				try {
+					if (e?.target?.closest?.("button, input, textarea, select, a, [contenteditable='true']")) return;
+					a.focus?.({ preventScroll: !0 });
+				} catch (e) {
+					console.debug?.(e);
+				}
+			});
+		} catch (e) {
+			console.debug?.(e);
+		}
 		let o = ue(r, {
 			variant: "viewer",
 			hostEl: a,
@@ -3244,6 +3256,11 @@ function Br(e, t) {
 		i = null, e._resizeWindowCleanup = null;
 	}, o = (t) => {
 		if (t.button !== 0 || !e.element || e._isPopped) return;
+		try {
+			if (t.target?.closest?.("button, input, textarea, select, a, [contenteditable='true'], .mjr-mfv-idrop, .mjr-mfv-pin-group")) return;
+		} catch (e) {
+			console.debug?.(e);
+		}
 		let r = n(t);
 		if (!r) return;
 		t.preventDefault(), t.stopPropagation();

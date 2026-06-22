@@ -134,4 +134,60 @@ describe("floating viewer panel interactions", () => {
         expect(element.style.width).toBe("250px");
         expect(element.style.height).toBe("190px");
     });
+
+    it("does not steal clicks from toolbar buttons near a resize edge", () => {
+        const addWindowListener = vi.fn();
+        const element = {
+            ownerDocument: { defaultView: { addEventListener: addWindowListener } },
+            style: {},
+            classList: { add: vi.fn(), remove: vi.fn() },
+            setPointerCapture: vi.fn(),
+            releasePointerCapture: vi.fn(),
+            getBoundingClientRect: () => ({
+                left: 100,
+                top: 100,
+                right: 300,
+                bottom: 250,
+                width: 200,
+                height: 150,
+            }),
+        };
+        const viewer = {
+            element,
+            _isPopped: false,
+            _panelAC: new AbortController(),
+            _resizeState: null,
+            _getResizeDirectionFromPoint: () => "w",
+            _resizeCursorForDirection: () => "ew-resize",
+            _stopEdgeResize: vi.fn(),
+        };
+        const addElementListener = vi.fn((type, handler) => {
+            if (type === "pointerdown") element._down = handler;
+        });
+        element.addEventListener = addElementListener;
+        globalThis.window = {
+            innerWidth: 1000,
+            innerHeight: 800,
+            getComputedStyle: () => ({ minWidth: "120", minHeight: "100" }),
+        };
+        const preventDefault = vi.fn();
+        const stopPropagation = vi.fn();
+
+        initFloatingViewerEdgeResize(viewer, element);
+        element._down({
+            button: 0,
+            pointerId: 12,
+            clientX: 101,
+            clientY: 120,
+            target: { closest: (selector) => selector.includes("button") },
+            preventDefault,
+            stopPropagation,
+        });
+
+        expect(preventDefault).not.toHaveBeenCalled();
+        expect(stopPropagation).not.toHaveBeenCalled();
+        expect(element.setPointerCapture).not.toHaveBeenCalled();
+        expect(addWindowListener).not.toHaveBeenCalled();
+        expect(viewer._resizeState).toBeNull();
+    });
 });

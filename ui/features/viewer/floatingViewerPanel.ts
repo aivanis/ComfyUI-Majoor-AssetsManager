@@ -86,6 +86,17 @@ export function initFloatingViewerEdgeResize(viewer: any, el: HTMLElement): void
 
     const onPointerDown = (e: any) => {
         if (e.button !== 0 || !viewer.element || viewer._isPopped) return;
+        try {
+            if (
+                e.target?.closest?.(
+                    "button, input, textarea, select, a, [contenteditable='true'], .mjr-mfv-idrop, .mjr-mfv-pin-group",
+                )
+            ) {
+                return;
+            }
+        } catch (err: any) {
+            console.debug?.(err);
+        }
         const dir = resolveDir(e);
         if (!dir) return;
         e.preventDefault();

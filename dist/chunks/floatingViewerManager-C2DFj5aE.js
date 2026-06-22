@@ -1,5 +1,5 @@
 import { t as e } from "./rolldown-runtime-Dy4uBu1J.js";
-import { d as t, g as n, o as r, s as i, t as a } from "./viewerRuntimeHosts-C-9ryYS-.js";
+import { d as t, g as n, o as r, s as i, t as a } from "./viewerRuntimeHosts-CHGQYjAV.js";
 import { R as o, a as s, r as c } from "./events-iWiZ-Zty.js";
 //#region ui/features/panel/panelRuntimeRefs.ts
 var l = null;
@@ -98,7 +98,7 @@ var re = /* @__PURE__ */ e({
 	teardownFloatingViewerManager: () => $
 }), g = null, ie = null;
 async function ae() {
-	return g || (ie ||= import("./FloatingViewer-BLCAPC_G.js").then((e) => (g = e.FloatingViewer, g)), ie);
+	return g || (ie ||= import("./FloatingViewer-U568WTpi.js").then((e) => (g = e.FloatingViewer, g)), ie);
 }
 var _ = null, oe = null;
 async function se() {
@@ -468,8 +468,18 @@ function Se(e) {
 function Ce(e) {
 	if (!y?.isVisible || !Se(e)) return !1;
 	try {
-		let t = e?.target, n = t?.closest?.(".mjr-mfv-simple-player") || null, r = y?.element || null, i = !!r?.contains?.(t), a = (n || (i || t == null ? r?.querySelector?.(".mjr-mfv-simple-player") : null))?._mjrSimplePlayerHandleKeydown;
-		return typeof a == "function" ? (a(e), !!e?.defaultPrevented) : !1;
+		let t = e?.target, n = y?.element || null, r = !!n?.contains?.(t), i = (t?.closest?.(".mjr-mfv-simple-player") || (r || t == null ? n?.querySelector?.(".mjr-mfv-simple-player") : null))?._mjrSimplePlayerHandleKeydown;
+		if (typeof i == "function") return i(e), !!e?.defaultPrevented;
+		let a = (t?.closest?.(".mjr-mfv-player-host") || (r || t == null ? n?.querySelector?.(".mjr-mfv-player-host") : null))?._mjrMediaControlsHandle;
+		if (a && typeof a == "object") {
+			let t = String(e?.key || ""), n = () => {
+				e.preventDefault?.(), e.stopPropagation?.(), e.stopImmediatePropagation?.();
+			};
+			if ((t === " " || t === "Spacebar") && typeof a.togglePlay == "function") return a.togglePlay(), n(), !0;
+			if (t === "ArrowLeft" && typeof a.stepFrames == "function") return a.stepFrames(-1), n(), !0;
+			if (t === "ArrowRight" && typeof a.stepFrames == "function") return a.stepFrames(1), n(), !0;
+		}
+		return !1;
 	} catch (e) {
 		return console.debug?.(e), !1;
 	}

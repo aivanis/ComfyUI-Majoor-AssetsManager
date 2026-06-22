@@ -136,6 +136,42 @@ async def test_workflow_graph_map_thumbnail_supports_conditional_cache(monkeypat
 
 
 @pytest.mark.asyncio
+async def test_workflow_graph_map_thumbnail_supports_if_modified_since(monkeypatch, tmp_path):
+    workflow_dir = tmp_path / "workflows"
+    workflow_dir.mkdir()
+    workflow_path = workflow_dir / "graph-map.json"
+    workflow_path.write_text(
+        json.dumps({"name": "Graph Map", "nodes": [{"id": 1, "type": "KSampler"}]}),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("MJR_AM_WORKFLOW_DIRECTORY", str(workflow_dir))
+
+    app = _build_app()
+    first_req = make_mocked_request(
+        "GET",
+        f"/mjr/am/workflows/graph-map-thumbnail?filepath={workflow_path.as_posix()}",
+        app=app,
+    )
+    first_match = await app.router.resolve(first_req)
+    first_resp = await first_match.handler(first_req)
+    last_modified = first_resp.headers.get("Last-Modified")
+    assert last_modified
+
+    cached_req = make_mocked_request(
+        "GET",
+        f"/mjr/am/workflows/graph-map-thumbnail?filepath={workflow_path.as_posix()}",
+        headers={"If-Modified-Since": last_modified},
+        app=app,
+    )
+    cached_match = await app.router.resolve(cached_req)
+    cached_resp = await cached_match.handler(cached_req)
+
+    assert cached_resp.status == 304
+    assert cached_resp.headers.get("Last-Modified") == last_modified
+    assert cached_resp.headers.get("Cache-Control") == "private, max-age=300"
+
+
+@pytest.mark.asyncio
 async def test_workflow_model_families_returns_indexed_values(monkeypatch, tmp_path):
     workflow_dir = tmp_path / "workflows"
     workflow_dir.mkdir()

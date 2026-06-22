@@ -1,8 +1,8 @@
-import { M as e, R as t, Ut as n, b as r, c as i, d as a, ft as o, g as s, h as c, n as l, o as u, r as d, s as f, ut as p, v as m } from "./viewerRuntimeHosts-C-9ryYS-.js";
+import { M as e, R as t, Wt as n, b as r, c as i, d as a, ft as o, g as s, h as c, n as l, o as u, r as d, s as f, ut as p, v as m } from "./viewerRuntimeHosts-CHGQYjAV.js";
 import { a as h, dt as g, i as _, m as v, n as y, nt as b, p as x, r as S, st as C, t as w } from "./events-iWiZ-Zty.js";
 import { A as T, a as E, c as D, d as O, f as k, i as A, k as j, o as M, r as N, s as P, u as ee } from "./mediaFps-dibNFbk4.js";
 import { $ as F } from "./mjr-primevue-DaF1IwbI.js";
-import { c as I, n as L, o as te, r as ne, s as R, t as z } from "./ratingUpdater-Ci14Gbgc.js";
+import { c as I, n as L, o as te, r as ne, s as R, t as z } from "./ratingUpdater-0OOIPgxU.js";
 import { a as B, n as re } from "./VideoControls-CDu3ByYX.js";
 import { n as V, r as ie } from "./state-DPiaUMw1.js";
 import { c as H, d as U, f as ae, i as oe, l as W, n as se, p as ce, r as le, s as ue, t as de, u as G } from "./mediaPlayer-ufU72_SR.js";
@@ -3718,6 +3718,7 @@ function ot({ canvas: e, videoEl: t, disableWebGL: n, pauseDuringExecution: r = 
 		_rvfc: null,
 		_rafIdLoop: null,
 		_rafIdSchedule: null,
+		_seekRaf: null,
 		_lastHeavyRenderAt: 0,
 		_throttleTimer: null,
 		_connectRAF: null,
@@ -3978,7 +3979,13 @@ function ot({ canvas: e, videoEl: t, disableWebGL: n, pauseDuringExecution: r = 
 		} catch (e) {
 			console.debug?.(e);
 		}
-		b._rafIdSchedule = null, b._rendering = !1;
+		b._rafIdSchedule = null;
+		try {
+			b._seekRaf != null && cancelAnimationFrame(b._seekRaf);
+		} catch (e) {
+			console.debug?.(e);
+		}
+		b._seekRaf = null, b._rendering = !1;
 	}, P = () => {
 		if (b._runtimePaused = !1, t?.paused) {
 			A();
@@ -4038,9 +4045,50 @@ function ot({ canvas: e, videoEl: t, disableWebGL: n, pauseDuringExecution: r = 
 		}
 	};
 	try {
-		x.push(l?.(t, "loadedmetadata", F, { once: !0 }) || (() => {})), x.push(l?.(t, "seeked", A, { passive: !0 }) || (() => {})), x.push(l?.(t, "pause", A, { passive: !0 }) || (() => {})), x.push(l?.(t, "play", () => {
+		let n = () => {
 			b._runtimePaused || j();
-		}, { passive: !0 }) || (() => {})), x.push(l?.(t, "timeupdate", () => {
+		}, r = () => {
+			try {
+				b._seekRaf != null && cancelAnimationFrame(b._seekRaf);
+			} catch (e) {
+				console.debug?.(e);
+			}
+			b._seekRaf = null;
+		};
+		x.push(l?.(t, "loadedmetadata", F, { once: !0 }) || (() => {})), x.push(l?.(t, "seeking", () => {
+			if (b._destroyed || b._runtimePaused) return;
+			try {
+				if (!t?.paused) {
+					A();
+					return;
+				}
+			} catch (e) {
+				console.debug?.(e);
+			}
+			if (b._seekRaf != null) return;
+			let n = () => {
+				if (b._seekRaf = null, b._destroyed || !e?.isConnected) return;
+				A();
+				let r = !1;
+				try {
+					r = !!t?.seeking;
+				} catch (e) {
+					console.debug?.(e);
+				}
+				if (r) try {
+					b._seekRaf = requestAnimationFrame(n);
+				} catch (e) {
+					console.debug?.(e);
+				}
+			};
+			try {
+				b._seekRaf = requestAnimationFrame(n);
+			} catch (e) {
+				console.debug?.(e);
+			}
+		}, { passive: !0 }) || (() => {})), x.push(l?.(t, "seeked", () => {
+			r(), A();
+		}, { passive: !0 }) || (() => {})), x.push(l?.(t, "pause", A, { passive: !0 }) || (() => {})), x.push(l?.(t, "play", n, { passive: !0 }) || (() => {})), x.push(l?.(t, "timeupdate", () => {
 			try {
 				if (!t?.paused && typeof t?.requestVideoFrameCallback == "function") return;
 			} catch (e) {
@@ -4103,6 +4151,11 @@ function ot({ canvas: e, videoEl: t, disableWebGL: n, pauseDuringExecution: r = 
 			}
 			try {
 				b._rafIdSchedule != null && cancelAnimationFrame(b._rafIdSchedule);
+			} catch (e) {
+				console.debug?.(e);
+			}
+			try {
+				b._seekRaf != null && cancelAnimationFrame(b._seekRaf);
 			} catch (e) {
 				console.debug?.(e);
 			}
@@ -6211,7 +6264,7 @@ function Ut() {
 		zt = e;
 	}), Bt || import("./scopes-X1iFrTle.js").then((e) => {
 		Bt = e;
-	}), Vt || import("./genInfo-DQSKLzvg.js").then((e) => e.n).then((e) => {
+	}), Vt || import("./genInfo-CbxuoRS9.js").then((e) => e.n).then((e) => {
 		Vt = e;
 	}), Ht || import("./frameExport-tksSZ7sb.js").then((e) => {
 		Ht = e;

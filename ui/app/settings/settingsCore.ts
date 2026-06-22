@@ -7,6 +7,7 @@ import { APP_CONFIG, APP_DEFAULTS } from "../config.js";
 import {
     getSecuritySettings,
     bootstrapSecurityToken,
+    setRuntimeSecurityToken,
     getVectorSearchSettings,
     getExecutionGroupingSettings,
 } from "../../api/client.js";
@@ -703,7 +704,7 @@ export async function syncBackendSecuritySettings(): Promise<void> {
                 const boot = await bootstrapSecurityToken();
                 const bootToken = String(boot?.data?.token || "").trim();
                 if (boot?.ok && bootToken) {
-                    settings.security.apiToken = bootToken;
+                    setRuntimeSecurityToken(bootToken);
                 }
             } catch (e) {
                 console.debug?.(e);

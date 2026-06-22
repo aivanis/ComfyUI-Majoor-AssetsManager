@@ -141,6 +141,25 @@ export function buildFloatingViewerMediaElement(fileData: any, { fill = false, c
         host.className = `mjr-mfv-player-host${fill ? " mjr-mfv-player-host--fill" : ""}`;
         host.appendChild(mediaEl);
 
+        // Make the player host focusable so clicking it routes keyboard shortcuts
+        // (Space / ArrowLeft / ArrowRight) to this player instead of the grid/body.
+        // Mirrors the simple-player focus behaviour. tabIndex -1 keeps it out of the
+        // tab order while still allowing programmatic focus.
+        try {
+            host.tabIndex = -1;
+            host.addEventListener("pointerdown", (e: any) => {
+                try {
+                    if (e?.target?.closest?.("button, input, textarea, select, a, [contenteditable='true']"))
+                        return;
+                    host.focus?.({ preventScroll: true });
+                } catch (err: any) {
+                    console.debug?.(err);
+                }
+            });
+        } catch (e: any) {
+            console.debug?.(e);
+        }
+
         const mounted = mountUnifiedMediaControls(mediaEl, {
             variant: "viewer",
             hostEl: host,

@@ -12,6 +12,7 @@ import {
     ensureWriteAuthToken,
     normalizeWriteAuthFailure as _normalizeWriteAuthFailure,
     invalidateAuthTokenCache,
+    hasRuntimeSecurityToken,
     setRuntimeSecurityToken,
 } from "./clientAuth.js";
 
@@ -46,7 +47,7 @@ import {
  * }} ViewerInfo
  */
 
-export { setRuntimeSecurityToken, ensureWriteAuthToken };
+export { setRuntimeSecurityToken, ensureWriteAuthToken, hasRuntimeSecurityToken };
 
 const TAGS_CACHE_TTL_MS = 30_000;
 const DEFAULT_TAGS_CACHE_TTL_MS = TAGS_CACHE_TTL_MS;

@@ -10,7 +10,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const RUNTIME_TOKEN_KEY = "__mjr_write_token";
 const SETTINGS_KEY = "mjrSettings";
 
 function makeStorage() {
@@ -108,7 +107,10 @@ describe("concurrent auth bootstrap", () => {
 
         // Still only one bootstrap call total
         expect(bootstrapCalls).toBe(1);
-        expect(globalThis.sessionStorage.getItem(RUNTIME_TOKEN_KEY)).toBe("race_token_abc");
+        const sentTokens = globalThis.fetch.mock.calls
+            .filter(([url]) => String(url).includes("/asset/rating"))
+            .map(([_url, options]) => options?.headers?.get?.("X-MJR-Token"));
+        expect(sentTokens).toContain("race_token_abc");
     });
 
     it("all concurrent callers get a result even when bootstrap fails", async () => {
@@ -156,7 +158,6 @@ describe("concurrent auth bootstrap", () => {
 describe("concurrent tag writes", () => {
     it("sends separate requests for different asset IDs", async () => {
         const token = "concurrent_tag_token";
-        globalThis.sessionStorage.setItem(RUNTIME_TOKEN_KEY, token);
 
         globalThis.fetch = vi.fn(async () => ({
             status: 200,
@@ -165,6 +166,7 @@ describe("concurrent tag writes", () => {
         }));
 
         const c = await import("../api/client.js");
+        c.setRuntimeSecurityToken(token);
 
         await Promise.all([
             c.updateAssetTags(1, ["a"]),
