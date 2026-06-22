@@ -4,13 +4,15 @@
  * DB / enrichment-queue / watcher metrics fetched from the backend.
  */
 
-import { getRuntimeStatus } from "../../api/client.js";
-import { getSecuritySettings } from "../../api/client.js";
+import {
+    getRuntimeStatus,
+    getSecuritySettings,
+    hasRuntimeSecurityToken,
+} from "../../api/client.js";
 import { t } from "../i18n.js";
 import { DEFAULT_SETTINGS, loadMajoorSettings } from "./settingsCore.js";
 
 const RUNTIME_DASHBOARD_ID = "mjr-runtime-status-dashboard";
-const RUNTIME_TOKEN_KEY = "__mjr_write_token";
 const RUNTIME_AUTO_HIDE_MS = 30_000;
 
 function getRuntimeDashboardMode() {
@@ -45,14 +47,6 @@ function clearRuntimeDashboardHideTimer() {
     }
 }
 
-function readRuntimeWriteToken() {
-    try {
-        return String(sessionStorage?.getItem?.(RUNTIME_TOKEN_KEY) || "").trim();
-    } catch {
-        return "";
-    }
-}
-
 function ensureDashboardLine(el: any, key: any) {
     const storeKey = key === "auth" ? "__mjrAuthLine" : "__mjrMetricsLine";
     if (el?.[storeKey]) {
@@ -71,9 +65,9 @@ function ensureDashboardLine(el: any, key: any) {
 }
 
 function buildWriteAuthSummary(prefs: any) {
-    const token = readRuntimeWriteToken();
     const tokenHint = String(prefs?.token_hint || "").trim();
-    const sessionHint = tokenHint || (token ? `...${token.slice(-4)}` : "");
+    const hasToken = hasRuntimeSecurityToken();
+    const sessionHint = tokenHint || (hasToken ? "(session)" : "");
     const allowWrite = prefs?.allow_write !== false;
     const requireAuth = prefs?.require_auth === true;
     const tokenConfigured = prefs?.token_configured === true;
@@ -84,7 +78,7 @@ function buildWriteAuthSummary(prefs: any) {
             color: "#ff9b9b",
         };
     }
-    if (token) {
+    if (hasToken) {
         return {
             text: t("runtime.writeAuthActive", "Write auth: active {tokenHint}", {
                 tokenHint: sessionHint || "(session)",

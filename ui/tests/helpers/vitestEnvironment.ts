@@ -32,6 +32,31 @@ export function createWindowStub(overrides = {}) {
     };
 }
 
+export function ensureNavigatorStub(overrides = {}) {
+    const current =
+        globalThis.navigator && typeof globalThis.navigator === "object"
+            ? globalThis.navigator
+            : {};
+    Object.assign(current, overrides);
+    Object.defineProperty(globalThis, "navigator", {
+        configurable: true,
+        writable: true,
+        value: current,
+    });
+    try {
+        if (globalThis.window && typeof globalThis.window === "object") {
+            Object.defineProperty(globalThis.window, "navigator", {
+                configurable: true,
+                writable: true,
+                value: current,
+            });
+        }
+    } catch (e) {
+        console.debug?.(e);
+    }
+    return current;
+}
+
 export function ensureWindowStub(overrides = {}) {
     const current = globalThis.window;
     if (
@@ -40,9 +65,11 @@ export function ensureWindowStub(overrides = {}) {
         typeof current.removeEventListener !== "function"
     ) {
         globalThis.window = createWindowStub(overrides);
+        ensureNavigatorStub();
         return globalThis.window;
     }
     Object.assign(current, overrides);
+    ensureNavigatorStub();
     return current;
 }
 

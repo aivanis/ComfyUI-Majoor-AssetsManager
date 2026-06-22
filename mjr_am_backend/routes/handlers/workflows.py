@@ -494,13 +494,18 @@ def register_workflow_routes(routes: web.RouteTableDef) -> None:
         filepath = str(request.query.get("filepath") or "").strip()
         if not filepath:
             return _json_response(Result.Err("INVALID_INPUT", "Missing filepath"))
-        content = read_workflow_content(Path(filepath))
+        safe_path_res = _resolve_path_under_roots(Path(filepath), workflow_roots())
+        if not safe_path_res.ok:
+            return _json_response(safe_path_res)
+        source_path = safe_path_res.data
+        if source_path is None:
+            return _json_response(Result.Err("NOT_FOUND", "Workflow not found"))
+        content = read_workflow_content(source_path)
         if not content.ok:
             return _json_response(content)
         workflow = dict(content.data or {}).get("workflow")
         if not isinstance(workflow, dict):
             return _json_response(Result.Err("INVALID_WORKFLOW", "Workflow JSON is missing or invalid"))
-        source_path = Path(filepath)
         etag = _weak_file_etag(source_path)
         last_modified = _http_date_from_mtime(source_path)
         if _request_etag_matches(request, etag) or _request_mtime_matches(request, source_path):

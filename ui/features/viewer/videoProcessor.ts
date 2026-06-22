@@ -77,6 +77,7 @@ export function createVideoProcessor({
         _rvfc: null,
         _rafIdLoop: null,
         _rafIdSchedule: null,
+        _seekRaf: null,
         _lastHeavyRenderAt: 0,
         _throttleTimer: null,
         _connectRAF: null,
@@ -522,6 +523,12 @@ export function createVideoProcessor({
             console.debug?.(e);
         }
         proc._rafIdSchedule = null;
+        try {
+            if (proc._seekRaf != null) cancelAnimationFrame(proc._seekRaf);
+        } catch (e: any) {
+            console.debug?.(e);
+        }
+        proc._seekRaf = null;
         proc._rendering = false;
     };
 
@@ -601,6 +608,62 @@ export function createVideoProcessor({
             if (proc._runtimePaused) return;
             startFrameLoop();
         };
+        // Live scrub: while the element is actively seeking (e.g. the user is
+        // dragging the timeline while paused), the browser coalesces rapid
+        // currentTime changes and only fires a single `seeked` once it settles.
+        // Without this, the canvas stays frozen on the last fully-seeked frame
+        // and the previewed image does not follow the playhead during the drag.
+        // Drive repaints with a short rAF loop so each newly-decoded frame is
+        // drawn to the canvas as the seek progresses.
+        const stopSeekLoop = () => {
+            try {
+                if (proc._seekRaf != null) cancelAnimationFrame(proc._seekRaf);
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+            proc._seekRaf = null;
+        };
+        const onSeeking = () => {
+            if (proc._destroyed || proc._runtimePaused) return;
+            // While playing, the normal frame loop (rVFC/rAF) already repaints.
+            try {
+                if (!videoEl?.paused) {
+                    scheduleRender();
+                    return;
+                }
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+            if (proc._seekRaf != null) return;
+            const loop = () => {
+                proc._seekRaf = null;
+                if (proc._destroyed) return;
+                if (!canvas?.isConnected) return;
+                scheduleRender();
+                let stillSeeking = false;
+                try {
+                    stillSeeking = !!videoEl?.seeking;
+                } catch (e: any) {
+                    console.debug?.(e);
+                }
+                if (stillSeeking) {
+                    try {
+                        proc._seekRaf = requestAnimationFrame(loop);
+                    } catch (e: any) {
+                        console.debug?.(e);
+                    }
+                }
+            };
+            try {
+                proc._seekRaf = requestAnimationFrame(loop);
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+        };
+        const onSeeked = () => {
+            stopSeekLoop();
+            scheduleRender();
+        };
         const onError = () => {
             proc.ready = false;
             try {
@@ -638,7 +701,10 @@ export function createVideoProcessor({
             safeAddListener?.(videoEl, "loadedmetadata", onMeta, { once: true }) || (() => {}),
         );
         unsubs.push(
-            safeAddListener?.(videoEl, "seeked", scheduleRender, { passive: true }) || (() => {}),
+            safeAddListener?.(videoEl, "seeking", onSeeking, { passive: true }) || (() => {}),
+        );
+        unsubs.push(
+            safeAddListener?.(videoEl, "seeked", onSeeked, { passive: true }) || (() => {}),
         );
         unsubs.push(
             safeAddListener?.(videoEl, "pause", scheduleRender, { passive: true }) || (() => {}),
@@ -716,6 +782,11 @@ export function createVideoProcessor({
             }
             try {
                 if (proc._rafIdSchedule != null) cancelAnimationFrame(proc._rafIdSchedule);
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+            try {
+                if (proc._seekRaf != null) cancelAnimationFrame(proc._seekRaf);
             } catch (e: any) {
                 console.debug?.(e);
             }

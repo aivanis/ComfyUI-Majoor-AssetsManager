@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getRuntimeStatus = vi.fn();
 const getSecuritySettings = vi.fn();
+const hasRuntimeSecurityToken = vi.fn();
 const t = vi.fn((key, fallback, vars) => {
     if (!fallback) return key;
     if (!vars || typeof vars !== "object") return fallback;
@@ -11,6 +12,7 @@ const t = vi.fn((key, fallback, vars) => {
 vi.mock("../api/client.js", () => ({
     getRuntimeStatus,
     getSecuritySettings,
+    hasRuntimeSecurityToken,
 }));
 
 vi.mock("../app/i18n.js", () => ({
@@ -89,6 +91,7 @@ describe("settingsRuntime", () => {
         globalThis.sessionStorage = {
             getItem: vi.fn(() => "token_1234567890abcd"),
         };
+        hasRuntimeSecurityToken.mockReturnValue(true);
         globalThis.getComputedStyle = vi.fn(() => ({ position: "static" }));
         globalThis.setInterval = vi.fn(() => 1);
         globalThis.clearInterval = vi.fn();

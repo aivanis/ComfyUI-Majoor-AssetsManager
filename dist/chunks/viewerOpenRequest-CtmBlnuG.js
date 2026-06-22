@@ -1,5 +1,5 @@
 import { r as e } from "./events-iWiZ-Zty.js";
-import { t } from "./Viewer-6U5SoPWs.js";
+import { t } from "./Viewer-DK2hHW4D.js";
 //#region ui/features/viewer/viewerOpenRequest.ts
 function n(e) {
 	let t = String(e || "").trim().toLowerCase();

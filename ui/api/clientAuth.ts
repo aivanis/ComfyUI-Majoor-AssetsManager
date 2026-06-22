@@ -1,25 +1,18 @@
 /**
- * Auth token management - bootstrap, persist, invalidate.
+ * Auth token management - bootstrap, retain, invalidate.
  *
  * Extracted from client.js to keep the API surface thin.
  *
- * Security boundary - sessionStorage vs localStorage
- * ===================================================
- * Write-auth tokens are stored in **sessionStorage** on purpose:
- *   - Session-scoped: cleared when the tab closes (no long-lived secret on disk).
- *   - Same-origin only: inaccessible to other tabs/windows that haven't
- *     bootstrapped their own token.
- *   - Not sent automatically in HTTP requests: fetched explicitly per-call and
- *     injected via the `X-MJR-Token` header.
+ * Security boundary - memory vs localStorage
+ * ==========================================
+ * Write-auth tokens are retained in module memory only:
+ *   - Cleared on reload/navigation instead of being written to browser storage.
+ *   - Not sent automatically in HTTP requests: injected explicitly per write
+ *     call via the `X-MJR-Token` header.
  *
  * **localStorage** is used only for user-facing settings (never for secrets).
- * If a legacy `security.apiToken` value is found in localStorage it is migrated
- * to sessionStorage once and then wiped from localStorage immediately.
- *
- * Web Crypto encryption of the sessionStorage value was evaluated and deemed
- * unnecessary: sessionStorage is already same-origin-scoped and tab-scoped,
- * and the token lifetime is short (session-only). Adding encryption would
- * increase complexity without meaningful security gain in this context.
+ * If a legacy `security.apiToken` value is found in localStorage it is loaded
+ * into memory once and then wiped from localStorage immediately.
  */
 
 import { SETTINGS_KEY } from "../app/settingsStore.js";
@@ -30,39 +23,26 @@ import { createTTLCache } from "../utils/ttlCache.js";
 const AUTH_TOKEN_CACHE_TTL_MS = 2000;
 const AUTH_BOOTSTRAP_FAILURE_TTL_MS = 15_000;
 const WRITE_AUTH_TOAST_TTL_MS = 8_000;
-const RUNTIME_TOKEN_KEY = "__mjr_write_token";
 const AUTH_TOKEN_CACHE_KEY = "token";
 
 let _authTokenRefreshInFlight: any = null;
 let _lastAuthBootstrapFailure: any = null;
 let _lastWriteAuthToast: any = null;
+let _runtimeAuthToken = "";
 
 const _authTokenCache = createTTLCache({ ttlMs: AUTH_TOKEN_CACHE_TTL_MS, maxSize: 1 });
 
 // ---------------------------------------------------------------------------
-// Low-level session / localStorage helpers
+// Low-level runtime / localStorage helpers
 // ---------------------------------------------------------------------------
 
-function _readSessionAuthToken() {
-    try {
-        return String(sessionStorage?.getItem?.(RUNTIME_TOKEN_KEY) || "").trim();
-    } catch {
-        return "";
-    }
+function _readRuntimeAuthToken() {
+    return String(_runtimeAuthToken || "").trim();
 }
 
-function _writeSessionAuthToken(token: any) {
-    const normalized = String(token || "").trim();
-    try {
-        if (normalized) {
-            sessionStorage?.setItem?.(RUNTIME_TOKEN_KEY, normalized);
-        } else {
-            sessionStorage?.removeItem?.(RUNTIME_TOKEN_KEY);
-        }
-        return true;
-    } catch {
-        return false;
-    }
+function _writeRuntimeAuthToken(token: any) {
+    _runtimeAuthToken = String(token || "").trim();
+    return true;
 }
 
 function _clearLocalSettingsAuthToken() {
@@ -90,7 +70,7 @@ function _clearAuthToken() {
     } catch (e) {
         console.debug?.(e);
     }
-    _writeSessionAuthToken("");
+    _writeRuntimeAuthToken("");
     _clearLocalSettingsAuthToken();
 }
 
@@ -105,10 +85,10 @@ export function readAuthToken() {
     }
     const now = Date.now();
 
-    const sessionToken = _readSessionAuthToken();
-    if (sessionToken) {
-        _authTokenCache.set(AUTH_TOKEN_CACHE_KEY, sessionToken, { at: now });
-        return sessionToken;
+    const runtimeToken = _readRuntimeAuthToken();
+    if (runtimeToken) {
+        _authTokenCache.set(AUTH_TOKEN_CACHE_KEY, runtimeToken, { at: now });
+        return runtimeToken;
     }
 
     try {
@@ -117,7 +97,7 @@ export function readAuthToken() {
         const payload = parsed?.data && typeof parsed.data === "object" ? parsed.data : parsed;
         const token = String(payload?.security?.apiToken || "").trim();
         if (token) {
-            _writeSessionAuthToken(token);
+            _writeRuntimeAuthToken(token);
             try {
                 const mutable = parsed && typeof parsed === "object" ? parsed : {};
                 const target =
@@ -149,7 +129,7 @@ export function _persistAuthToken(token: any) {
     try {
         _authTokenCache.set(AUTH_TOKEN_CACHE_KEY, normalized);
         _lastAuthBootstrapFailure = null;
-        _writeSessionAuthToken(normalized);
+        _writeRuntimeAuthToken(normalized);
         _clearLocalSettingsAuthToken();
         try {
             window?.dispatchEvent?.(
@@ -177,6 +157,10 @@ export function setRuntimeSecurityToken(token: any) {
         return false;
     }
     return _persistAuthToken(normalized);
+}
+
+export function hasRuntimeSecurityToken() {
+    return !!readAuthToken();
 }
 
 // ---------------------------------------------------------------------------

@@ -234,7 +234,6 @@ describe("api client request deduplication", () => {
         const result = await client.updateAssetTags(7, ["local"]);
 
         expect(result.ok).toBe(true);
-        expect(globalThis.sessionStorage.getItem("__mjr_write_token")).toBe(token);
         const tagCall = globalThis.fetch.mock.calls.find(([url]) =>
             String(url).includes("/mjr/am/asset/tags"),
         );
@@ -243,7 +242,6 @@ describe("api client request deduplication", () => {
 
     it("drops a stale header token when bootstrap refreshes only the auth cookie", async () => {
         const staleToken = "stale-token-1234567890";
-        globalThis.sessionStorage.setItem("__mjr_write_token", staleToken);
         let tagCalls = 0;
         globalThis.fetch = vi.fn(async (url, options = {}) => {
             if (String(url).includes("/mjr/am/settings/security/bootstrap-token")) {
@@ -289,10 +287,10 @@ describe("api client request deduplication", () => {
         });
 
         const client = await import("../api/client.js");
+        client.setRuntimeSecurityToken(staleToken);
         const result = await client.updateAssetTags(7, ["remote"]);
 
         expect(result.ok).toBe(true);
         expect(tagCalls).toBe(2);
-        expect(globalThis.sessionStorage.getItem("__mjr_write_token")).toBeNull();
     });
 });

@@ -788,18 +788,54 @@ function _handleMfvPlayerShortcut(event: any) {
     if (!_instance?.isVisible || !_isMfvPlayerShortcut(event)) return false;
     try {
         const target = event?.target;
-        const targetPlayer = target?.closest?.(".mjr-mfv-simple-player") || null;
         const instanceEl = _instance?.element || null;
         const targetInsideViewer = Boolean(instanceEl?.contains?.(target));
+
+        // 1) Simple player (GIF / image / animated-webp) keydown forwarding.
+        const targetPlayer = target?.closest?.(".mjr-mfv-simple-player") || null;
         const player =
             targetPlayer ||
             (targetInsideViewer || target == null
                 ? instanceEl?.querySelector?.(".mjr-mfv-simple-player")
                 : null);
         const handler = player?._mjrSimplePlayerHandleKeydown;
-        if (typeof handler !== "function") return false;
-        handler(event);
-        return Boolean(event?.defaultPrevented);
+        if (typeof handler === "function") {
+            handler(event);
+            return Boolean(event?.defaultPrevented);
+        }
+
+        // 2) Full video/audio controls host (.mjr-mfv-player-host).
+        const targetHost = target?.closest?.(".mjr-mfv-player-host") || null;
+        const host =
+            targetHost ||
+            (targetInsideViewer || target == null
+                ? instanceEl?.querySelector?.(".mjr-mfv-player-host")
+                : null);
+        const controls = host?._mjrMediaControlsHandle;
+        if (controls && typeof controls === "object") {
+            const key = String(event?.key || "");
+            const consume = () => {
+                event.preventDefault?.();
+                event.stopPropagation?.();
+                event.stopImmediatePropagation?.();
+            };
+            if ((key === " " || key === "Spacebar") && typeof controls.togglePlay === "function") {
+                controls.togglePlay();
+                consume();
+                return true;
+            }
+            if (key === "ArrowLeft" && typeof controls.stepFrames === "function") {
+                controls.stepFrames(-1);
+                consume();
+                return true;
+            }
+            if (key === "ArrowRight" && typeof controls.stepFrames === "function") {
+                controls.stepFrames(1);
+                consume();
+                return true;
+            }
+        }
+        return false;
     } catch (e: any) {
         console.debug?.(e);
         return false;

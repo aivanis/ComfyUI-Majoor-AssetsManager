@@ -1,20 +1,15 @@
 /**
- * Unit tests for clientAuth.js — token persistence, migration, and invalidation.
+ * Unit tests for clientAuth.js - token retention, migration, and invalidation.
  *
- * These tests focus on the token lifecycle: reading, writing, migrating from
- * legacy localStorage, and clearing tokens from sessionStorage.  Write-auth
- * bootstrap and toast notifications are covered in api_client_dedupe.vitest.mjs.
+ * These tests focus on the token lifecycle: reading, writing, loading from
+ * legacy localStorage, and clearing memory tokens. Write-auth bootstrap and
+ * toast notifications are covered in api_client_dedupe.vitest.ts.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const RUNTIME_TOKEN_KEY = "__mjr_write_token";
 // Must match SETTINGS_KEY from ui/app/settingsStore.js
 const SETTINGS_KEY = "mjrSettings";
-
-// ---------------------------------------------------------------------------
-// Storage factory (shared between tests)
-// ---------------------------------------------------------------------------
 
 function makeStorage() {
     const store = new Map();
@@ -31,10 +26,6 @@ function makeStorage() {
         _store: store,
     };
 }
-
-// ---------------------------------------------------------------------------
-// Module setup helpers
-// ---------------------------------------------------------------------------
 
 async function loadAuth() {
     return import("../api/clientAuth.js");
@@ -56,13 +47,11 @@ beforeEach(() => {
             this.detail = init?.detail;
         }
     };
-    // Default: bootstrap endpoint returns no token
     globalThis.fetch = vi.fn(async () => ({
         status: 200,
         headers: { get: (name) => (name === "content-type" ? "application/json" : null) },
         json: async () => ({ ok: true, data: {} }),
     }));
-    // toast mock
     globalThis.app = { extensionManager: { toast: { add: vi.fn() } } };
 });
 
@@ -70,15 +59,11 @@ afterEach(() => {
     vi.restoreAllMocks();
 });
 
-// ---------------------------------------------------------------------------
-// setRuntimeSecurityToken + readAuthToken
-// ---------------------------------------------------------------------------
-
 describe("setRuntimeSecurityToken", () => {
-    it("persists the token in sessionStorage", async () => {
-        const { setRuntimeSecurityToken } = await loadAuth();
+    it("retains the token in module memory", async () => {
+        const { setRuntimeSecurityToken, readAuthToken } = await loadAuth();
         setRuntimeSecurityToken("mjr_abc123");
-        expect(globalThis.sessionStorage.getItem(RUNTIME_TOKEN_KEY)).toBe("mjr_abc123");
+        expect(readAuthToken()).toBe("mjr_abc123");
     });
 
     it("returns true on success", async () => {
@@ -94,9 +79,9 @@ describe("setRuntimeSecurityToken", () => {
     });
 
     it("trims surrounding whitespace before storing", async () => {
-        const { setRuntimeSecurityToken } = await loadAuth();
+        const { setRuntimeSecurityToken, readAuthToken } = await loadAuth();
         setRuntimeSecurityToken("  mjr_trimmed  ");
-        expect(globalThis.sessionStorage.getItem(RUNTIME_TOKEN_KEY)).toBe("mjr_trimmed");
+        expect(readAuthToken()).toBe("mjr_trimmed");
     });
 });
 
@@ -112,30 +97,23 @@ describe("readAuthToken", () => {
         expect(readAuthToken()).toBe("");
     });
 
-    it("prefers sessionStorage over localStorage settings", async () => {
-        globalThis.sessionStorage.setItem(RUNTIME_TOKEN_KEY, "session_token");
+    it("prefers runtime memory over localStorage settings", async () => {
         const settings = { security: { apiToken: "local_token" } };
         globalThis.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 
-        const { readAuthToken } = await loadAuth();
-        expect(readAuthToken()).toBe("session_token");
+        const { setRuntimeSecurityToken, readAuthToken } = await loadAuth();
+        setRuntimeSecurityToken("runtime_token");
+        expect(readAuthToken()).toBe("runtime_token");
     });
 });
 
-// ---------------------------------------------------------------------------
-// Legacy localStorage migration
-// ---------------------------------------------------------------------------
-
-describe("readAuthToken – localStorage migration", () => {
-    it("migrates a legacy apiToken from localStorage to sessionStorage", async () => {
+describe("readAuthToken - localStorage migration", () => {
+    it("loads a legacy apiToken from localStorage into memory", async () => {
         const settings = { security: { apiToken: "mjr_legacy_token" } };
         globalThis.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 
         const { readAuthToken } = await loadAuth();
-        const token = readAuthToken();
-
-        expect(token).toBe("mjr_legacy_token");
-        expect(globalThis.sessionStorage.getItem(RUNTIME_TOKEN_KEY)).toBe("mjr_legacy_token");
+        expect(readAuthToken()).toBe("mjr_legacy_token");
     });
 
     it("wipes the apiToken from localStorage after migration", async () => {
@@ -150,13 +128,8 @@ describe("readAuthToken – localStorage migration", () => {
     });
 });
 
-// ---------------------------------------------------------------------------
-// Token clearing (sessionStorage)
-// ---------------------------------------------------------------------------
-
-describe("ensureWriteAuthToken with force=true clears stale sessionStorage token", () => {
-    it("removes the sessionStorage token when bootstrap refreshes only the cookie (no new token)", async () => {
-        // Bootstrap returns ok:true but no token → cookie-only refresh
+describe("ensureWriteAuthToken with force=true clears stale runtime token", () => {
+    it("removes the memory token when bootstrap refreshes only the cookie", async () => {
         globalThis.fetch = vi.fn(async (url) => {
             if (String(url).includes("bootstrap-token")) {
                 return {
@@ -164,7 +137,7 @@ describe("ensureWriteAuthToken with force=true clears stale sessionStorage token
                     headers: {
                         get: (name) => (name === "content-type" ? "application/json" : null),
                     },
-                    json: async () => ({ ok: true, data: {} }), // no token field
+                    json: async () => ({ ok: true, data: {} }),
                 };
             }
             return {
@@ -174,41 +147,26 @@ describe("ensureWriteAuthToken with force=true clears stale sessionStorage token
             };
         });
 
-        globalThis.sessionStorage.setItem(RUNTIME_TOKEN_KEY, "stale_token");
-
-        const { ensureWriteAuthToken } = await loadAuth();
+        const { ensureWriteAuthToken, setRuntimeSecurityToken, readAuthToken } = await loadAuth();
+        setRuntimeSecurityToken("stale_token");
         await ensureWriteAuthToken({ force: true });
 
-        expect(globalThis.sessionStorage.getItem(RUNTIME_TOKEN_KEY)).toBeNull();
+        expect(readAuthToken()).toBe("");
     });
 });
 
-// ---------------------------------------------------------------------------
-// invalidateAuthTokenCache
-// ---------------------------------------------------------------------------
-
 describe("invalidateAuthTokenCache", () => {
-    it("forces readAuthToken to re-read from sessionStorage after invalidation", async () => {
+    it("keeps the memory token readable after cache invalidation", async () => {
         const { setRuntimeSecurityToken, readAuthToken, invalidateAuthTokenCache } =
             await loadAuth();
 
         setRuntimeSecurityToken("initial_token");
-        expect(readAuthToken()).toBe("initial_token"); // cached
-
-        // Directly update sessionStorage (bypassing the module API)
-        globalThis.sessionStorage.setItem(RUNTIME_TOKEN_KEY, "updated_token");
-
-        // Without invalidation the TTL cache still returns the old value
         expect(readAuthToken()).toBe("initial_token");
 
         invalidateAuthTokenCache();
-        expect(readAuthToken()).toBe("updated_token");
+        expect(readAuthToken()).toBe("initial_token");
     });
 });
-
-// ---------------------------------------------------------------------------
-// setRuntimeSecurityToken — token format validation (RFC 6750 token68)
-// ---------------------------------------------------------------------------
 
 describe("setRuntimeSecurityToken token format validation", () => {
     it("accepts a standard mjr_ prefixed hex token", async () => {
@@ -225,18 +183,15 @@ describe("setRuntimeSecurityToken token format validation", () => {
         expect(setRuntimeSecurityToken("a")).toBe(true);
     });
 
-    it("accepts RFC 6750 base64url-like tokens (tilde, plus, slash, equals)", async () => {
+    it("accepts RFC 6750 base64url-like tokens", async () => {
         const { setRuntimeSecurityToken } = await loadAuth();
-        // Characters allowed by the token68 charset used in Authorization: Bearer
         expect(setRuntimeSecurityToken("abc~def+ghi/jkl=")).toBe(true);
     });
 
     it("rejects tokens containing internal spaces", async () => {
         const { setRuntimeSecurityToken } = await loadAuth();
-        // Internal spaces break the Authorization: Bearer header value
         expect(setRuntimeSecurityToken("token with space")).toBe(false);
         expect(setRuntimeSecurityToken("two  spaces")).toBe(false);
-        // Note: leading/trailing whitespace is trimmed before validation (see trim test above)
     });
 
     it("rejects tokens containing control characters", async () => {
@@ -248,16 +203,15 @@ describe("setRuntimeSecurityToken token format validation", () => {
 
     it("rejects tokens containing injection-relevant characters", async () => {
         const { setRuntimeSecurityToken } = await loadAuth();
-        // Characters that could break an Authorization header value
         expect(setRuntimeSecurityToken('tok"en')).toBe(false);
         expect(setRuntimeSecurityToken("tok,en")).toBe(false);
         expect(setRuntimeSecurityToken("tok;en")).toBe(false);
         expect(setRuntimeSecurityToken("tok@en")).toBe(false);
     });
 
-    it("does not store a rejected token in sessionStorage", async () => {
-        const { setRuntimeSecurityToken } = await loadAuth();
+    it("does not retain a rejected token", async () => {
+        const { setRuntimeSecurityToken, readAuthToken } = await loadAuth();
         setRuntimeSecurityToken("bad token!");
-        expect(globalThis.sessionStorage.getItem(RUNTIME_TOKEN_KEY)).toBeNull();
+        expect(readAuthToken()).toBe("");
     });
 });

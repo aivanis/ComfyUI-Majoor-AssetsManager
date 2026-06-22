@@ -8226,6 +8226,42 @@ body.mjr-mfv-popout-body {
     min-width: 0;
 }
 
+/* The MFV uses the "--viewer" control variant, which (unlike "--viewerbar")
+   does not size the native seek input and packs frame/in/seek/out/time into a
+   single row. In the narrow MFV the seek wrap then collapses to ~0px wide and
+   the native input to 0px tall, leaving almost no click / drag target for
+   scrubbing. Give the seek its own full-width row with a usable hit area. */
+.mjr-mfv-player-host .mjr-video-controls--viewer .mjr-video-row--top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    row-gap: 42px;
+}
+
+.mjr-mfv-player-host .mjr-video-controls--viewer .mjr-video-row--top .mjr-video-seek-wrap {
+    order: 10;
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    padding-top: 6px;
+}
+
+.mjr-mfv-player-host .mjr-video-controls--viewer .mjr-video-range--seek {
+    height: 20px;
+    accent-color: rgba(214, 218, 224, 0.92);
+}
+
+.mjr-mfv-player-host .mjr-video-controls--viewer .mjr-video-seek-zones {
+    height: 10px;
+}
+
+.mjr-mfv-player-host .mjr-video-controls--viewer .mjr-video-seek-handle {
+    width: 16px;
+    height: 28px;
+    top: 20px;
+}
+
 .mjr-mfv-player-host .mjr-video-controls[data-mjr-layout="compact"] .mjr-video-bar-timeline,
 .mjr-mfv-player-host .mjr-video-controls[data-mjr-layout="stacked"] .mjr-video-bar-timeline {
     display: flex;
