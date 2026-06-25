@@ -185,6 +185,48 @@ describe("api client request deduplication", () => {
         expect(String(payload?.detail || "")).toContain("Sign in to ComfyUI");
     });
 
+    it("explains the HTTP token transport toggle when remote LAN writes use plain HTTP", async () => {
+        globalThis.fetch = vi.fn(async (url) => {
+            if (String(url).includes("/mjr/am/settings/security/bootstrap-token")) {
+                return {
+                    status: 200,
+                    headers: {
+                        get: (name) => (name === "content-type" ? "application/json" : null),
+                    },
+                    json: async () => ({ ok: true, data: { token: "mjr_remote_token" } }),
+                };
+            }
+            if (String(url).includes("/mjr/am/asset/tags")) {
+                return {
+                    status: 403,
+                    headers: {
+                        get: (name) => (name === "content-type" ? "application/json" : null),
+                    },
+                    json: async () => ({
+                        ok: false,
+                        code: "FORBIDDEN",
+                        error: "Write operation blocked: API token over insecure transport.",
+                    }),
+                };
+            }
+            return {
+                status: 200,
+                headers: { get: (name) => (name === "content-type" ? "application/json" : null) },
+                json: async () => ({ ok: true, data: null }),
+            };
+        });
+
+        const client = await import("../api/client.js");
+        const result = await client.updateAssetTags(7, ["remote"]);
+
+        expect(result.ok).toBe(false);
+        expect(result.error).toContain("plain HTTP");
+        expect(result.error).toContain("Allow HTTP Token Transport");
+        expect(globalThis.app.extensionManager.toast.add).toHaveBeenCalledTimes(1);
+        const [payload] = globalThis.app.extensionManager.toast.add.mock.calls[0];
+        expect(String(payload?.detail || "")).toContain("Allow HTTP Token Transport");
+    });
+
     it("keeps a bootstrapped token after settings-change cache invalidation", async () => {
         const listeners = new Map();
         globalThis.window.addEventListener = vi.fn((type, listener) => {

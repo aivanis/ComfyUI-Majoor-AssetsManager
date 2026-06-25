@@ -274,6 +274,12 @@ Visual confirmation inside Assets Manager:
 - the runtime status widget now shows a `Write auth:` line such as `Write auth: active ...ABCD`
 - if the browser session is missing authorization while the server still requires a token, the same widget reports that state directly
 
+Troubleshooting LAN HTTP:
+
+- If write actions work from a browser on the ComfyUI host (`localhost`) but fail from another machine on the same LAN, check `Allow HTTP Token Transport`.
+- A correct API token can still be rejected on plain `http://<host-ip>:8188` because remote token delivery over HTTP is blocked unless you explicitly opt in for a trusted LAN.
+- Do not use `Allow Remote Full Access` as the normal fix. That bypasses token protection for remote writes. Prefer `Recommended Remote LAN Setup`, or keep `Require Token For All Writes` enabled and turn on `Allow HTTP Token Transport` only for a trusted private network.
+
 If you need to authorize a different browser or device, either:
 
 - enter a fixed shared value in `Security -> Majoor: API Token`, or

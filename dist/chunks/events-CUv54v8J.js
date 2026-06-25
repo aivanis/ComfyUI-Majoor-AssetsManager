@@ -2230,6 +2230,7 @@ var U = {
 		"toast.writeAuthBootstrapHelp": "Write access is blocked. Sign in to ComfyUI and retry so Majoor can bootstrap the remote session automatically, or set a Majoor API token in Settings -> Security.",
 		"toast.writeAuthSignInRequired": "Write access is blocked. Sign in to ComfyUI first, then retry so Majoor can bootstrap the remote session token automatically.",
 		"toast.writeAuthConfiguredTokenRequired": "Write access requires the Majoor API token already configured on the server. Open Settings -> Security -> API Token and enter the matching token.",
+		"toast.writeAuthInsecureTransport": "Write access is blocked because the Majoor API token is being sent over plain HTTP from a remote machine. Use HTTPS, or enable Settings -> Security -> Allow HTTP Token Transport for a trusted LAN.",
 		"toast.writeAuthTitle": "Majoor remote write access",
 		"toast.vectorBackfillStarting": "Starting vector backfill... This may take a while.",
 		"toast.vectorBackfillRunning": "Vector backfill still running in background{job}.",

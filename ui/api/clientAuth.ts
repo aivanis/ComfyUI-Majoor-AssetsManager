@@ -211,6 +211,17 @@ function _buildWriteAuthErrorMessage(result: any) {
     const resultErrorLower = resultError.toLowerCase();
 
     if (
+        resultCode === "FORBIDDEN" &&
+        (resultErrorLower.includes("api token over insecure transport") ||
+            resultErrorLower.includes("allow http token transport"))
+    ) {
+        return t(
+            "toast.writeAuthInsecureTransport",
+            "Write access is blocked because the Majoor API token is being sent over plain HTTP from a remote machine. Use HTTPS, or enable Settings -> Security -> Allow HTTP Token Transport for a trusted LAN.",
+        );
+    }
+
+    if (
         failureCode === "FORBIDDEN" &&
         (failureError.includes("already configured") || failureError.includes("rotate-token"))
     ) {
