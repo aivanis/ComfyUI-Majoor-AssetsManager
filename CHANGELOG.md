@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+---
+
+## [2.4.9] - 2026-06-25
+
 ### ✨ Improved
 - **Graph Map UI and Parsing**: Improved Graph Map node UI and widget parsing for clearer node inspection and more reliable node details. See [docs/GRAPH_MAP.md](docs/GRAPH_MAP.md).
 - **GenInfo Metadata Parsing**: Improved metadata parsing for GenInfo display accuracy and consistency. See [docs/VIEWER_FEATURE_TUTORIAL.md](docs/VIEWER_FEATURE_TUTORIAL.md) and [docs/MFV_GUIDE.md](docs/MFV_GUIDE.md).

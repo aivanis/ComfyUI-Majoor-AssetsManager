@@ -576,6 +576,80 @@ export function createDragDropRuntimeHandlers(): Record<string, any> {
 
     // -- LTX Director timeline injection ----------------------------------------
     const _LTX_AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "flac", "m4a", "aac", "opus"]);
+    const _LTX_VIDEO_EXTS = new Set(["mp4", "webm", "mkv", "avi", "mov", "m4v", "flv", "wmv"]);
+
+    const _isLtxVideoPayload = (payload: any, ext: any) =>
+        String(payload?.kind || "").toLowerCase() === "video" ||
+        _LTX_VIDEO_EXTS.has(String(ext || "").toLowerCase());
+
+    const _installLtxVideoPreview = (te: any, seg: any, videoEl: any, frameRate: number) => {
+        const updateDuration = () => {
+            const seconds = Number(videoEl?.duration) || 0;
+            if (!Number.isFinite(seconds) || seconds <= 0) return;
+            const frames = Math.max(1, Math.ceil(seconds * frameRate));
+            seg.videoDurationFrames = frames;
+            seg.length = frames;
+            try {
+                if (!te.retakeMode) te.growTimelineIfNeeded?.(seg.start + seg.length);
+                te.commitChanges?.(true);
+                te.render?.();
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+        };
+
+        const captureThumbnail = () => {
+            try {
+                const width = Math.max(1, Number(videoEl?.videoWidth) || 512);
+                const height = Math.max(1, Number(videoEl?.videoHeight) || 512);
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.min(width, 512);
+                canvas.height = Math.max(1, Math.round((height / width) * canvas.width));
+                const ctx = canvas.getContext("2d");
+                if (!ctx) return;
+                ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+                const imageB64 = canvas.toDataURL("image/jpeg");
+                if (!imageB64) return;
+                seg.imageB64 = imageB64;
+                const img = new Image();
+                img.onload = () => {
+                    seg.imgObj = img;
+                    try {
+                        te.render?.();
+                    } catch (e: any) {
+                        console.debug?.(e);
+                    }
+                };
+                img.src = imageB64;
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+        };
+
+        videoEl.addEventListener?.("loadedmetadata", updateDuration, { once: true });
+        videoEl.addEventListener?.(
+            "loadeddata",
+            () => {
+                updateDuration();
+                try {
+                    const duration = Number(videoEl?.duration) || 0;
+                    if (duration > 0 && Number(videoEl.currentTime || 0) < 0.001) {
+                        videoEl.currentTime = Math.min(duration - 0.001, 0.01);
+                    }
+                } catch (e: any) {
+                    console.debug?.(e);
+                }
+                captureThumbnail();
+                try {
+                    te._ensureThumbnails?.(seg);
+                } catch (e: any) {
+                    console.debug?.(e);
+                }
+            },
+            { once: true },
+        );
+        videoEl.addEventListener?.("seeked", captureThumbnail, { once: true });
+    };
 
     const _injectIntoLtxDirector = async (te: any, payload: any, droppedExt: any) => {
         // Read ghost position set by LTXDirector's own dragover handler
@@ -689,7 +763,8 @@ export function createDragDropRuntimeHandlers(): Record<string, any> {
 
         // -- Image or Video -> visual segment -----------------------------------
         const frameRate = typeof te.getFrameRate === "function" ? te.getFrameRate() : 25;
-        const segLength = frameRate; // 1 second default
+        const isVideo = _isLtxVideoPayload(payload, ext);
+        const segLength = frameRate; // 1 second default until video metadata is available
 
         let start = targetFrameStart ?? 0;
         if (targetFrameStart === null) {
@@ -702,15 +777,39 @@ export function createDragDropRuntimeHandlers(): Record<string, any> {
         }
 
         const segId = Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-        const seg: Record<string, any> = {
-            id: segId,
-            start,
-            length: segLength,
-            prompt: "",
-            type: "image",
-            imageFile: mediaFile,
-            imageB64: mediaUrl,
-        };
+        let seg: Record<string, any>;
+        if (isVideo) {
+            const videoEl = document.createElement("video");
+            videoEl.crossOrigin = "Anonymous";
+            videoEl.preload = "auto";
+            videoEl.muted = true;
+            videoEl.playsInline = true;
+            videoEl.src = mediaUrl;
+
+            seg = {
+                id: `${segId}_v`,
+                start,
+                length: segLength,
+                trimStart: 0,
+                prompt: "",
+                type: "video",
+                videoDurationFrames: segLength,
+                imageFile: mediaFile,
+                fileName: name,
+                videoEl,
+            };
+            _installLtxVideoPreview(te, seg, videoEl, frameRate);
+        } else {
+            seg = {
+                id: segId,
+                start,
+                length: segLength,
+                prompt: "",
+                type: "image",
+                imageFile: mediaFile,
+                imageB64: mediaUrl,
+            };
+        }
 
         if (!te.timeline?.segments) {
             dndLog("ltxdirector inject: no timeline", {});
@@ -720,24 +819,33 @@ export function createDragDropRuntimeHandlers(): Record<string, any> {
         te.timeline.segments.push(seg);
         te.timeline.segments.sort((a: any, b: any) => a.start - b.start);
 
-        // Async thumbnail load  -  works for images; silently skipped for video
-        const img = new Image();
-        img.onload = () => {
-            seg.imgObj = img;
-            te.render?.();
-        };
-        img.src = mediaUrl;
+        if (isVideo) {
+            try {
+                if (!te.retakeMode) te.growTimelineIfNeeded?.(seg.start + seg.length);
+                te._ensureThumbnails?.(seg);
+            } catch (e: any) {
+                console.debug?.(e);
+            }
+        } else {
+            const img = new Image();
+            img.onload = () => {
+                seg.imgObj = img;
+                te.render?.();
+            };
+            img.src = mediaUrl;
+        }
 
         const idx = te.timeline.segments.findIndex((s: any) => s.id === segId);
-        if (idx >= 0) {
+        const selectedIdx = isVideo ? te.timeline.segments.findIndex((s: any) => s.id === seg.id) : idx;
+        if (selectedIdx >= 0) {
             te.selectionType = "image";
-            te.selectedIndex = idx;
+            te.selectedIndex = selectedIdx;
             te.updateUIFromSelection?.();
         }
         te.commitChanges?.(true);
         te.render?.();
-        comfyToast(`Added to LTX Director: ${name}`, "success", 3000);
-        dndLog("drop ltxdirector inject", { file: name, start, ext });
+        comfyToast(`Added ${isVideo ? "video" : "image"} to LTX Director: ${name}`, "success", 3000);
+        dndLog("drop ltxdirector inject", { file: name, start, ext, isVideo });
     };
     // -------------------------------------------------------------------------
 

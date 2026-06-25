@@ -1,6 +1,6 @@
 # Majoor Assets Manager - Hotkeys & Keyboard Shortcuts Guide
 
-**Version**: 2.4.8
+**Version**: 2.4.9
 **Last Updated**: May 18, 2026
 
 ## Overview
@@ -359,6 +359,6 @@ All features are accessible via keyboard:
 
 ---
 
-_Hotkeys & Shortcuts Guide Version: 2.4.8_
+_Hotkeys & Shortcuts Guide Version: 2.4.9_
 _Last Updated: May 18, 2026_
 _Compatible with Majoor Assets Manager v2.4.4+_

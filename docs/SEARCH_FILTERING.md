@@ -1,6 +1,6 @@
 # Majoor Assets Manager - Search & Filtering Guide
 
-**Version**: 2.4.5
+**Version**: 2.4.9
 **Last Updated**: April 5, 2026
 
 ## Overview

@@ -1,15 +1,15 @@
-import { A as e, At as t, B as n, Bt as r, C as i, D as a, E as o, Ft as s, Gt as c, I as l, Jt as u, Kt as d, L as f, M as p, Mt as m, O as h, Ot as g, P as _, Pt as v, R as y, Rt as b, S as x, St as S, T as C, U as w, V as T, Vt as E, W as D, Wt as O, Xt as k, Yt as A, Zt as j, c as M, ct as N, d as ee, dt as te, f as ne, ft as P, g as re, h as ie, ht as ae, it as oe, j as se, jt as ce, k as le, kt as ue, l as de, lt as fe, m as pe, mt as me, o as he, ot as ge, p as _e, pt as ve, qt as ye, s as be, st as xe, tt as Se, u as Ce, ut as we, v as Te, w as Ee, x as De, y as Oe, yt as ke, z as Ae, zt as je } from "./chunks/viewerRuntimeHosts-6HaE-P9G.js";
-import { $ as Me, A as Ne, G as Pe, H as Fe, I as Ie, K as Le, P as Re, Q as ze, U as Be, V as Ve, W as He, X as Ue, Y as We, Z as Ge, _t as Ke, a as F, at as qe, b as Je, ct as Ye, dt as Xe, et as I, g as L, gt as Ze, h as Qe, ht as $e, it as et, k as tt, lt as nt, m as rt, mt as it, n as at, nt as ot, ot as st, p as R, r as z, rt as ct, st as lt, t as ut, ut as dt, vt as ft } from "./chunks/events-Bz2Vm8U5.js";
+import { A as e, At as t, B as n, Bt as r, C as i, D as a, E as o, Ft as s, Gt as c, I as l, Jt as u, Kt as d, L as f, M as p, Mt as m, O as h, Ot as g, P as _, Pt as v, R as y, Rt as b, S as x, St as S, T as C, U as w, V as T, Vt as E, W as D, Wt as O, Xt as k, Yt as A, Zt as j, c as M, ct as N, d as ee, dt as te, f as ne, ft as P, g as re, h as ie, ht as ae, it as oe, j as se, jt as ce, k as le, kt as ue, l as de, lt as fe, m as pe, mt as me, o as he, ot as ge, p as _e, pt as ve, qt as ye, s as be, st as xe, tt as Se, u as Ce, ut as we, v as Te, w as Ee, x as De, y as Oe, yt as ke, z as Ae, zt as je } from "./chunks/viewerRuntimeHosts-CIpB5USD.js";
+import { $ as Me, A as Ne, G as Pe, H as Fe, I as Ie, K as Le, P as Re, Q as ze, U as Be, V as Ve, W as He, X as Ue, Y as We, Z as Ge, _t as Ke, a as F, at as qe, b as Je, ct as Ye, dt as Xe, et as I, g as L, gt as Ze, h as Qe, ht as $e, it as et, k as tt, lt as nt, m as rt, mt as it, n as at, nt as ot, ot as st, p as R, r as z, rt as ct, st as lt, t as ut, ut as dt, vt as ft } from "./chunks/events-N36HM6KP.js";
 import { a as pt, i as mt, n as ht, t as gt } from "./chunks/graphTraversal-CjIZsRsP.js";
-import { A as _t, C as vt, E as yt, O as bt, S as xt, T as St, _ as Ct, b as wt, d as Tt, f as Et, g as Dt, h as Ot, k as kt, l as At, m as jt, p as Mt, v as Nt, w as Pt, x as Ft, y as It } from "./chunks/mediaFps-CdGbfYY3.js";
-import { C as Lt, S as Rt, T as zt, _ as Bt, b as Vt, d as Ht, f as Ut, g as Wt, h as Gt, l as Kt, m as qt, p as Jt, s as Yt, t as Xt, u as Zt, v as Qt, w as $t, x as en, y as tn } from "./chunks/SidebarWorkflowSection-_nICipAq.js";
-import { r as nn, s as rn, t as an } from "./chunks/openMajoorSettings-zj8_ZAZG.js";
-import { a as on, c as sn, l as cn, o as ln, s as un, u as dn } from "./chunks/floatingViewerManager-DcCl0apN.js";
+import { A as _t, C as vt, E as yt, O as bt, S as xt, T as St, _ as Ct, b as wt, d as Tt, f as Et, g as Dt, h as Ot, k as kt, l as At, m as jt, p as Mt, v as Nt, w as Pt, x as Ft, y as It } from "./chunks/mediaFps-DMgrtZ0V.js";
+import { C as Lt, S as Rt, T as zt, _ as Bt, b as Vt, d as Ht, f as Ut, g as Wt, h as Gt, l as Kt, m as qt, p as Jt, s as Yt, t as Xt, u as Zt, v as Qt, w as $t, x as en, y as tn } from "./chunks/SidebarWorkflowSection-D3mlpgur.js";
+import { r as nn, s as rn, t as an } from "./chunks/openMajoorSettings-D8DtW0G1.js";
+import { a as on, c as sn, l as cn, o as ln, s as un, u as dn } from "./chunks/floatingViewerManager-BSPxKA3H.js";
 import { A as fn, B, C as V, D as pn, E as H, F as mn, G as hn, H as gn, I as _n, J as vn, K as yn, L as bn, M as xn, N as Sn, O as U, R as Cn, S as wn, T as W, U as Tn, V as En, W as Dn, b as On, ct as G, dt as K, et as kn, it as An, j as q, k as J, lt as Y, nt as X, q as Z, rt as jn, st as Mn, tt as Nn, ut as Pn, v as Fn, w as In, x as Ln, y as Rn, z as zn } from "./chunks/mjr-primevue-n1rsQYJg.js";
 import { n as Bn, r as Vn } from "./chunks/mjr-vue-vendor-D2GeV7Qd.js";
-import { a as Hn, c as Un, i as Wn, n as Gn, o as Kn, r as qn, s as Jn, t as Yn } from "./chunks/ratingUpdater-BCEEfDrb.js";
-import { a as Xn, n as Zn, o as Qn, r as $n, t as er } from "./chunks/VideoControls-DqoiN-7o.js";
-import { t as tr } from "./chunks/TagsEditor-TgRVv4vY.js";
+import { a as Hn, c as Un, i as Wn, n as Gn, o as Kn, r as qn, s as Jn, t as Yn } from "./chunks/ratingUpdater-ZbBE4AhS.js";
+import { a as Xn, n as Zn, o as Qn, r as $n, t as er } from "./chunks/VideoControls-DDEMEigB.js";
+import { t as tr } from "./chunks/TagsEditor-CwRCCul-.js";
 import { app as nr } from "../../scripts/app.js";
 function rr(e = null) {
 	return null;
@@ -983,7 +983,7 @@ var si = {
 	}
 }, ci = null;
 function li() {
-	return ci ||= import("./chunks/viewerOpenRequest-BEbR2X7A.js"), ci;
+	return ci ||= import("./chunks/viewerOpenRequest-C1Gmk1Eb.js"), ci;
 }
 function ui(e) {
 	if (!e) return "";
@@ -2146,10 +2146,10 @@ function Ra() {
 //#region ui/features/contextmenu/GridContextMenu.ts
 var za = 1, Ba = null, Va = null;
 function Ha() {
-	return Ba ||= import("./chunks/viewerOpenRequest-BEbR2X7A.js"), Ba;
+	return Ba ||= import("./chunks/viewerOpenRequest-C1Gmk1Eb.js"), Ba;
 }
 function Ua() {
-	return Va ||= import("./chunks/floatingViewerManager-DcCl0apN.js").then((e) => e.n), Va;
+	return Va ||= import("./chunks/floatingViewerManager-BSPxKA3H.js").then((e) => e.n), Va;
 }
 function Wa(e) {
 	let t = String(e || "").trim().toLowerCase();
@@ -3881,102 +3881,182 @@ function Xs() {
 		"m4a",
 		"aac",
 		"opus"
-	]), i = async (e, t, n) => {
+	]), i = new Set([
+		"mp4",
+		"webm",
+		"mkv",
+		"avi",
+		"mov",
+		"m4v",
+		"flv",
+		"wmv"
+	]), o = (e, t) => String(e?.kind || "").toLowerCase() === "video" || i.has(String(t || "").toLowerCase()), s = (e, t, n, r) => {
+		let i = () => {
+			let i = Number(n?.duration) || 0;
+			if (!Number.isFinite(i) || i <= 0) return;
+			let a = Math.max(1, Math.ceil(i * r));
+			t.videoDurationFrames = a, t.length = a;
+			try {
+				e.retakeMode || e.growTimelineIfNeeded?.(t.start + t.length), e.commitChanges?.(!0), e.render?.();
+			} catch (e) {
+				console.debug?.(e);
+			}
+		}, a = () => {
+			try {
+				let r = Math.max(1, Number(n?.videoWidth) || 512), i = Math.max(1, Number(n?.videoHeight) || 512), a = document.createElement("canvas");
+				a.width = Math.min(r, 512), a.height = Math.max(1, Math.round(i / r * a.width));
+				let o = a.getContext("2d");
+				if (!o) return;
+				o.drawImage(n, 0, 0, a.width, a.height);
+				let s = a.toDataURL("image/jpeg");
+				if (!s) return;
+				t.imageB64 = s;
+				let c = new Image();
+				c.onload = () => {
+					t.imgObj = c;
+					try {
+						e.render?.();
+					} catch (e) {
+						console.debug?.(e);
+					}
+				}, c.src = s;
+			} catch (e) {
+				console.debug?.(e);
+			}
+		};
+		n.addEventListener?.("loadedmetadata", i, { once: !0 }), n.addEventListener?.("loadeddata", () => {
+			i();
+			try {
+				let e = Number(n?.duration) || 0;
+				e > 0 && Number(n.currentTime || 0) < .001 && (n.currentTime = Math.min(e - .001, .01));
+			} catch (e) {
+				console.debug?.(e);
+			}
+			a();
+			try {
+				e._ensureThumbnails?.(t);
+			} catch (e) {
+				console.debug?.(e);
+			}
+		}, { once: !0 }), n.addEventListener?.("seeked", a, { once: !0 });
+	}, c = async (e, t, n) => {
 		let i = null;
 		if (e._ghostSegmentId && e._previewSegments) {
 			let t = e._previewSegments.find((t) => t.id === e._ghostSegmentId);
 			t && (i = t.resolvedStart === void 0 ? t.start : t.resolvedStart);
 		}
 		e._ghostSegmentId = null, e._ghostTrack = null, e._ghostInitialTimeline = null, e._previewSegments = null, e.render?.();
-		let o = String(n || "").toLowerCase(), s = r.has(o), c = await Pa({
+		let c = String(n || "").toLowerCase(), l = r.has(c), u = await Pa({
 			post: a,
 			endpoint: I.STAGE_TO_INPUT,
 			payload: t,
 			index: !1
 		});
-		if (!c?.name) {
+		if (!u?.name) {
 			O(`Failed to stage: "${t?.filename}"`, "error");
 			return;
 		}
-		let { name: l, subfolder: u = "" } = c, d = u ? `${u}/${l}` : l, f = `/view?filename=${encodeURIComponent(l)}&type=input&subfolder=${encodeURIComponent(u)}`;
-		if (s) {
+		let { name: d, subfolder: f = "" } = u, p = f ? `${f}/${d}` : d, m = `/view?filename=${encodeURIComponent(d)}&type=input&subfolder=${encodeURIComponent(f)}`;
+		if (l) {
 			try {
-				let t = await fetch(f);
+				let t = await fetch(m);
 				if (!t.ok) throw Error(`HTTP ${t.status}`);
-				let n = await t.arrayBuffer(), r = await new (window.AudioContext || window.webkitAudioContext)().decodeAudioData(n), a = typeof e.getFrameRate == "function" ? e.getFrameRate() : 25, o = Math.max(1, Math.ceil(r.duration * a)), s = r.getChannelData(0), c = Math.max(1, Math.floor(s.length / 200)), u = [];
+				let n = await t.arrayBuffer(), r = await new (window.AudioContext || window.webkitAudioContext)().decodeAudioData(n), a = typeof e.getFrameRate == "function" ? e.getFrameRate() : 25, o = Math.max(1, Math.ceil(r.duration * a)), s = r.getChannelData(0), c = Math.max(1, Math.floor(s.length / 200)), l = [];
 				for (let e = 0; e < 200; e++) {
 					let t = 0;
 					for (let n = 0; n < c; n++) {
 						let r = Math.abs(s[e * c + n] || 0);
 						r > t && (t = r);
 					}
-					u.push(t);
+					l.push(t);
 				}
-				let p = i ?? 0;
+				let u = i ?? 0;
 				if (i === null) {
 					let t = Array.isArray(e.timeline?.audioSegments) ? [...e.timeline.audioSegments] : [];
 					t.sort((e, t) => e.start - t.start);
 					for (let e of t) {
-						if (p + o <= e.start) break;
-						p = Math.max(p, e.start + e.length);
+						if (u + o <= e.start) break;
+						u = Math.max(u, e.start + e.length);
 					}
 				}
-				let m = Date.now().toString(36) + Math.random().toString(36).slice(2, 7), h = {
-					id: m,
+				let f = Date.now().toString(36) + Math.random().toString(36).slice(2, 7), h = {
+					id: f,
 					type: "audio",
-					start: p,
+					start: u,
 					length: o,
 					trimStart: 0,
 					audioDurationFrames: o,
-					audioFile: d,
-					fileName: l,
-					waveformPeaks: u
+					audioFile: p,
+					fileName: d,
+					waveformPeaks: l
 				};
 				if (!e.timeline?.audioSegments) {
 					qo("ltxdirector inject: no audioSegments", {});
 					return;
 				}
-				e.timeline.audioSegments.push(h), e.timeline.audioSegments.sort((e, t) => e.start - t.start), e.selectionType = "audio", e.selectedIndex = e.timeline.audioSegments.findIndex((e) => e.id === m), e.updateUIFromSelection?.(), e.commitChanges?.(!0), e.render?.(), O(`Added audio to LTX Director: ${l}`, "success", 3e3), qo("drop ltxdirector inject audio", {
-					file: l,
-					start: p
+				e.timeline.audioSegments.push(h), e.timeline.audioSegments.sort((e, t) => e.start - t.start), e.selectionType = "audio", e.selectedIndex = e.timeline.audioSegments.findIndex((e) => e.id === f), e.updateUIFromSelection?.(), e.commitChanges?.(!0), e.render?.(), O(`Added audio to LTX Director: ${d}`, "success", 3e3), qo("drop ltxdirector inject audio", {
+					file: d,
+					start: u
 				});
 			} catch (e) {
-				console.error("[Majoor] LTX Director audio inject failed", e), O(`Audio decode failed for: ${l}`, "error");
+				console.error("[Majoor] LTX Director audio inject failed", e), O(`Audio decode failed for: ${d}`, "error");
 			}
 			return;
 		}
-		let p = typeof e.getFrameRate == "function" ? e.getFrameRate() : 25, m = i ?? 0;
+		let h = typeof e.getFrameRate == "function" ? e.getFrameRate() : 25, g = o(t, c), _ = h, v = i ?? 0;
 		if (i === null) {
 			let t = Array.isArray(e.timeline?.segments) ? [...e.timeline.segments] : [];
 			t.sort((e, t) => e.start - t.start);
 			for (let e of t) {
-				if (m + p <= e.start) break;
-				m = Math.max(m, e.start + e.length);
+				if (v + _ <= e.start) break;
+				v = Math.max(v, e.start + e.length);
 			}
 		}
-		let h = Date.now().toString(36) + Math.random().toString(36).slice(2, 7), g = {
-			id: h,
-			start: m,
-			length: p,
+		let y = Date.now().toString(36) + Math.random().toString(36).slice(2, 7), b;
+		if (g) {
+			let t = document.createElement("video");
+			t.crossOrigin = "Anonymous", t.preload = "auto", t.muted = !0, t.playsInline = !0, t.src = m, b = {
+				id: `${y}_v`,
+				start: v,
+				length: _,
+				trimStart: 0,
+				prompt: "",
+				type: "video",
+				videoDurationFrames: _,
+				imageFile: p,
+				fileName: d,
+				videoEl: t
+			}, s(e, b, t, h);
+		} else b = {
+			id: y,
+			start: v,
+			length: _,
 			prompt: "",
 			type: "image",
-			imageFile: d,
-			imageB64: f
+			imageFile: p,
+			imageB64: m
 		};
 		if (!e.timeline?.segments) {
 			qo("ltxdirector inject: no timeline", {});
 			return;
 		}
-		e.timeline.segments.push(g), e.timeline.segments.sort((e, t) => e.start - t.start);
-		let _ = new Image();
-		_.onload = () => {
-			g.imgObj = _, e.render?.();
-		}, _.src = f;
-		let v = e.timeline.segments.findIndex((e) => e.id === h);
-		v >= 0 && (e.selectionType = "image", e.selectedIndex = v, e.updateUIFromSelection?.()), e.commitChanges?.(!0), e.render?.(), O(`Added to LTX Director: ${l}`, "success", 3e3), qo("drop ltxdirector inject", {
-			file: l,
-			start: m,
-			ext: o
+		if (e.timeline.segments.push(b), e.timeline.segments.sort((e, t) => e.start - t.start), g) try {
+			e.retakeMode || e.growTimelineIfNeeded?.(b.start + b.length), e._ensureThumbnails?.(b);
+		} catch (e) {
+			console.debug?.(e);
+		}
+		else {
+			let t = new Image();
+			t.onload = () => {
+				b.imgObj = t, e.render?.();
+			}, t.src = m;
+		}
+		let x = e.timeline.segments.findIndex((e) => e.id === y), S = g ? e.timeline.segments.findIndex((e) => e.id === b.id) : x;
+		S >= 0 && (e.selectionType = "image", e.selectedIndex = S, e.updateUIFromSelection?.()), e.commitChanges?.(!0), e.render?.(), O(`Added ${g ? "video" : "image"} to LTX Director: ${d}`, "success", 3e3), qo("drop ltxdirector inject", {
+			file: d,
+			start: v,
+			ext: c,
+			isVideo: g
 		});
 	};
 	return {
@@ -4007,8 +4087,8 @@ function Xs() {
 			let n = Zo(e, Ai);
 			if (!Gi(n) || !xa(t, e)) return;
 			rs();
-			let r = ys(), o = r ? Ds(e, n) : [n], s = aa(t, e.clientX, e.clientY), c = s ? ya(t, s, e.clientX, e.clientY) : null, l = String(n?.filename || "").split(".").pop() || "", u = s && !c ? va(s, n, l) : null;
-			if (s && c) {
+			let r = ys(), i = r ? Ds(e, n) : [n], o = aa(t, e.clientX, e.clientY), s = o ? ya(t, o, e.clientX, e.clientY) : null, l = String(n?.filename || "").split(".").pop() || "", u = o && !s ? va(o, n, l) : null;
+			if (o && s) {
 				e.preventDefault(), e.stopImmediatePropagation?.(), e.stopPropagation(), sa(t, Sa);
 				let r = await Fa({
 					post: a,
@@ -4021,13 +4101,13 @@ function Xs() {
 					app: t,
 					payload: n,
 					relativePath: r,
-					targetNode: s,
-					inputSlotIndex: c.index,
+					targetNode: o,
+					inputSlotIndex: s.index,
 					event: e
 				})) {
 					qo("drop slot created and connected loader", {
-						node: s?.title,
-						slot: c.input?.name,
+						node: o?.title,
+						slot: s.input?.name,
 						value: r
 					});
 					return;
@@ -4035,15 +4115,15 @@ function Xs() {
 				O(`Staged to input: ${r}`, "success", 4e3);
 				return;
 			}
-			if (s && !c && !u && s._timelineEditor && !r) {
-				e.preventDefault(), e.stopImmediatePropagation?.(), e.stopPropagation(), sa(t, Sa), await i(s._timelineEditor, n, l);
+			if (o && !s && !u && o._timelineEditor && !r) {
+				e.preventDefault(), e.stopImmediatePropagation?.(), e.stopPropagation(), sa(t, Sa), await c(o._timelineEditor, n, l);
 				return;
 			}
-			if (!s || !u) {
+			if (!o || !u) {
 				if (sa(t, Sa), e.preventDefault(), e.stopImmediatePropagation?.(), e.stopPropagation(), r) {
 					let r = Aa({
 						app: t,
-						items: await Os(o),
+						items: await Os(i),
 						event: e
 					});
 					if (r > 0) {
@@ -4061,12 +4141,12 @@ function Xs() {
 					O(`Failed to load workflow: "${n?.filename}".`, "error");
 					return;
 				}
-				let i = !s && !r, c = Pa({
+				let s = !o && !r, c = Pa({
 					post: a,
 					endpoint: I.STAGE_TO_INPUT,
 					payload: n,
 					index: !1
-				}), u = i ? Gs(n) : Promise.resolve(!1), [d, f] = await Promise.all([u, c]);
+				}), u = s ? Gs(n) : Promise.resolve(!1), [d, f] = await Promise.all([u, c]);
 				if (d) {
 					qo("drop canvas loaded workflow", { file: n?.filename });
 					return;
@@ -4099,7 +4179,7 @@ function Xs() {
 				index: !1
 			});
 			d && (ja(u, d), Sa(t), qo("drop inject", {
-				node: s?.title,
+				node: o?.title,
 				widget: u?.name,
 				value: d
 			}));
@@ -7919,10 +7999,10 @@ var fd = {
 		X(!0);
 		let a = X(0), o = X(0), s = /* @__PURE__ */ new WeakMap(), c = 0, l = 0, u = 0, d = 0, f = 0, p = /* @__PURE__ */ new Map(), m = null, h = null;
 		function g() {
-			return m ||= import("./chunks/viewerOpenRequest-BEbR2X7A.js"), m;
+			return m ||= import("./chunks/viewerOpenRequest-C1Gmk1Eb.js"), m;
 		}
 		function _() {
-			return h ||= import("./chunks/floatingViewerManager-DcCl0apN.js").then((e) => e.n), h;
+			return h ||= import("./chunks/floatingViewerManager-BSPxKA3H.js").then((e) => e.n), h;
 		}
 		function v(e) {
 			return (Array.isArray(e) ? e : []).slice().sort((e, t) => {
@@ -9190,10 +9270,10 @@ var fd = {
 	}
 }, Dd = 240, Od = 120, kd = 80, Ad = null, jd = null;
 function Md() {
-	return Ad ||= import("./chunks/viewerOpenRequest-BEbR2X7A.js"), Ad;
+	return Ad ||= import("./chunks/viewerOpenRequest-C1Gmk1Eb.js"), Ad;
 }
 function Nd() {
-	return jd ||= import("./chunks/floatingViewerManager-DcCl0apN.js").then((e) => e.n), jd;
+	return jd ||= import("./chunks/floatingViewerManager-BSPxKA3H.js").then((e) => e.n), jd;
 }
 function Pd(e) {
 	let t = document.createElement("button");
@@ -11437,7 +11517,7 @@ function lm() {
 var um = {
 	__name: "GlobalRuntime",
 	setup(e) {
-		let t = xn(() => import("./chunks/ViewerPortal-DWOd8ljg.js")), n = X(!1), r = [
+		let t = xn(() => import("./chunks/ViewerPortal-D8I6TYD4.js")), n = X(!1), r = [
 			z.OPEN_VIEWER,
 			z.MFV_OPEN,
 			z.MFV_TOGGLE,
@@ -13214,14 +13294,14 @@ var Vh = "mjr_panel_messages_v1", Hh = "mjr_panel_messages_last_read_v1", Uh = "
 	},
 	{
 		id: "whats-new-2026-05-17-dnd-graph-map-settings",
-		title: "New Version 2.4.8 - DnD, Graph Map & Settings",
+		title: "New Version 2.4.9 - DnD, Graph Map & Settings",
 		titleKey: "msg.whatsNew.title.dndGraphMapSettings",
 		emoji: "Info",
 		category: "Release",
 		categoryKey: "msg.category.release",
 		level: "success",
 		createdAt: Date.parse("2026-05-17T21:30:00Z"),
-		body: "Version 2.4.8 released: Drag and Drop has been fixed and clarified, including canvas/node drops, staging behavior, visual feedback, and ComfyUI workflow-drop interactions. Graph Map in the Floating Viewer now lets you inspect embedded workflows without opening them on the canvas, copy nodes or attributes, and transfer node attributes to a similar selected node in the canvas. Settings access and explanations were also improved, with easier access from the panel gear icon and the Floating Viewer.",
+		body: "Version 2.4.9 released: Drag and Drop has been fixed and clarified, including canvas/node drops, staging behavior, visual feedback, and ComfyUI workflow-drop interactions. Graph Map in the Floating Viewer now lets you inspect embedded workflows without opening them on the canvas, copy nodes or attributes, and transfer node attributes to a similar selected node in the canvas. Settings access and explanations were also improved, with easier access from the panel gear icon and the Floating Viewer.",
 		bodyKey: "msg.whatsNew.body.dndGraphMapSettings",
 		actionLabel: "Changelog",
 		actionLabelKey: "label.changelog",
@@ -24248,7 +24328,7 @@ function FC() {
 			icon: "pi pi-folder"
 		},
 		{
-			label: "v2.4.8",
+			label: "v2.4.9",
 			icon: "pi pi-tag"
 		},
 		{
@@ -24491,7 +24571,7 @@ function nw({ cleanupEntryRuntimeFn: e = ew, teardownLiveStreamTracker: t, teard
 //#region ui/entry.ts
 var rw = null, iw = null, aw = null;
 function ow() {
-	return aw ||= import("./chunks/floatingViewerManager-DcCl0apN.js").then((e) => e.n), aw;
+	return aw ||= import("./chunks/floatingViewerManager-BSPxKA3H.js").then((e) => e.n), aw;
 }
 function sw() {
 	aw && aw.then((e) => e?.teardownFloatingViewerManager?.()).catch((e) => console.debug?.("[Majoor] MFV teardown skipped", e));
@@ -24611,7 +24691,7 @@ function Ew(e = 1200) {
 	}, Math.max(250, Number(e) || 0));
 }
 function Dw(e) {
-	import("./chunks/LiveStreamTracker-D1AaWtWJ.js").then((t) => {
+	import("./chunks/LiveStreamTracker-BuUWjEcJ.js").then((t) => {
 		rw = t;
 		try {
 			t.initLiveStreamTracker(e);

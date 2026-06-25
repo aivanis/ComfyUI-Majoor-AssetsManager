@@ -473,7 +473,7 @@ export function buildAboutPageBadges(): unknown[] {
             icon: "pi pi-folder",
         },
         {
-            label: "v2.4.8",
+            label: "v2.4.9",
             icon: "pi pi-tag",
         },
         {
