@@ -345,8 +345,8 @@ class MetadataExtractorPlugin(ABC):
 
     @property
     def min_compatibility_version(self) -> str:
-        """Minimum Majoor version required (default: "2.4.5")."""
-        return "2.4.5"
+        """Minimum Majoor version required (default: "2.4.9")."""
+        return "2.4.9"
 
     # ─── Required Methods ──────────────────────────────────────────
 

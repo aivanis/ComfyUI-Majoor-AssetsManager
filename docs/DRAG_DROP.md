@@ -1,6 +1,6 @@
 # Majoor Assets Manager - Drag & Drop Guide
 
-**Version**: 2.4.8
+**Version**: 2.4.9
 **Last Updated**: May 18, 2026
 
 ## Overview

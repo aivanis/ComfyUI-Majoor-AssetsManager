@@ -1,7 +1,7 @@
 # Majoor API Reference
 
 **Base Path**: `/mjr/am`
-**Version**: 2.4.5
+**Version**: 2.4.9
 **Last Updated**: April 7, 2026
 
 ---
@@ -57,7 +57,7 @@ GET /mjr/am/health
 {
   "ok": true,
   "data": {
-    "version": "2.4.5",
+    "version": "2.4.9",
     "status": "healthy",
     "indexed_count": 1234,
     "scopes_available": ["output", "input", "custom", "collections"]
@@ -145,7 +145,7 @@ GET /mjr/am/version
 {
   "ok": true,
   "data": {
-    "version": "2.4.5",
+    "version": "2.4.9",
     "branch": "main",
     "build_date": "2026-03-29",
     "python_version": "3.11.0",
@@ -1252,15 +1252,15 @@ GET /mjr/am/releases
 {
   "ok": true,
   "data": {
-    "current_version": "2.4.5",
+    "current_version": "2.4.9",
     "branch": "main",
     "latest_release": {
-      "version": "2.4.5",
+      "version": "2.4.9",
       "date": "2026-04-10",
-      "download_url": "https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/releases/tag/v2.4.5"
+      "download_url": "https://github.com/MajoorWaldi/ComfyUI-Majoor-AssetsManager/releases/tag/v2.4.9"
     },
     "branches_available": ["main", "dev"],
-    "tags_available": ["v2.4.5", "v2.4.4", "v2.4.3", "v2.4.2"]
+    "tags_available": ["v2.4.9", "v2.4.4", "v2.4.3", "v2.4.2"]
   }
 }
 ```

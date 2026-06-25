@@ -8,7 +8,7 @@ Majoor is best understood as one workflow:
 2. **Inspect** prompts, metadata, workflows, and visual details.
 3. **Reuse** useful assets and workflow context back in ComfyUI.
 
-**Current Version**: 2.4.8
+**Current Version**: 2.4.9
 **Last Updated**: June 11, 2026
 
 ## Start Here

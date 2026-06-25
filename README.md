@@ -95,12 +95,14 @@ Move useful assets and workflow context back into ComfyUI:
 
 ## Latest Release
 
-### v2.4.8 Highlights
-- **Grid performance improvements**: Better responsiveness, scrolling stability, and asset loading for large libraries.
-- **Floating Viewer is now a richer workflow surface**: Inspect, compare, stream, and control generation assets from MFV.
-- **Node Stream**: Follow supported selected-node previews directly inside the Floating Viewer.
-- **Node Parameters**: Inspect and edit node widgets from the viewer without switching back to the canvas.
-- **Toolbox updates**: Faster access to common asset and workflow operations.
+### v2.4.9 Highlights
+- **Graph Map UI and parsing**: Clearer node inspection with more reliable widget and node details.
+- **Workflow tab library**: Save, import, load, inspect, categorize, tag, and thumbnail ComfyUI workflow JSON files.
+- **Configurable workflow roots**: Choose Workflow tab roots from Settings or directly from the Workflow tab toolbar.
+- **Majoor GenInfo Override node**: Inject custom/manual GenInfo data through Majoor Save nodes.
+- **Quick media filters**: Jump directly to Images, Videos, Audio, or 3D assets.
+- **Drag-and-drop refinements**: Better node compatibility handling and clean export workflow.
+- **Frontend and integration cleanup**: Continued TypeScript refactor, easier AI settings access, and ComfyUI frontend compatibility improvements.
 
 See [CHANGELOG.md](CHANGELOG.md) for the complete release notes.
 
@@ -723,4 +725,4 @@ Optional attribution request: See [`NOTICE`](NOTICE) file for details.
 ---
 
 *Last updated: May 18, 2026*
-*Version: 2.4.8*
+*Version: 2.4.9*

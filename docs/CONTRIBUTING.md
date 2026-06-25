@@ -282,7 +282,7 @@ Mainters will review your PR and may:
 
 - **`main`**: Stable release branch (always deployable)
 - **Feature branches**: `feat/feature-name` or `fix/bug-name`
-- **Release tags**: `v2.4.5`, `v2.5.0`, etc. (semantic versioning)
+- **Release tags**: `v2.4.9`, `v2.5.0`, etc. (semantic versioning)
 
 ### Release Cadence
 

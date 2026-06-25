@@ -296,6 +296,70 @@ describe("canvas drag/drop loader creation", () => {
         expect(createdNode.widgets[0].value).toBe("assets/one.png");
     });
 
+    it("drops video assets into LTX Director as real video segments", async () => {
+        class MockHTMLVideoElement {
+            crossOrigin = "";
+            preload = "";
+            muted = false;
+            playsInline = false;
+            src = "";
+            addEventListener = vi.fn();
+        }
+        vi.stubGlobal("HTMLVideoElement", MockHTMLVideoElement);
+        vi.stubGlobal("document", {
+            createElement: vi.fn((tag) => {
+                if (tag === "video") return new MockHTMLVideoElement();
+                if (tag === "canvas") {
+                    return {
+                        width: 0,
+                        height: 0,
+                        getContext: vi.fn(() => ({ drawImage: vi.fn() })),
+                        toDataURL: vi.fn(() => "data:image/jpeg;base64,thumb"),
+                    };
+                }
+                return {};
+            }),
+            querySelector: vi.fn(() => null),
+        });
+        const timelineEditor = {
+            timeline: { segments: [], audioSegments: [] },
+            getFrameRate: vi.fn(() => 24),
+            updateUIFromSelection: vi.fn(),
+            commitChanges: vi.fn(),
+            render: vi.fn(),
+            growTimelineIfNeeded: vi.fn(),
+            _ensureThumbnails: vi.fn(),
+        };
+        const ltxNode = {
+            type: "LTXDirector",
+            title: "LTX Director",
+            widgets: [],
+            inputs: [],
+            _timelineEditor: timelineEditor,
+        };
+        const { getComfyApp } = await import("../app/comfyApiBridge.js");
+        const app = getComfyApp();
+        app.graph.getNodeOnPos.mockReturnValue(ltxNode);
+
+        const { createDragDropRuntimeHandlers } = await import("../features/dnd/DragDrop.js");
+        const handlers = createDragDropRuntimeHandlers();
+        await handlers.onDrop(makeDropEvent({ filename: "clip.mp4", type: "output", kind: "video" }));
+
+        expect(timelineEditor.timeline.segments).toHaveLength(1);
+        expect(timelineEditor.timeline.segments[0]).toMatchObject({
+            type: "video",
+            imageFile: "assets/clip.mp4",
+            fileName: "clip.mp4",
+            videoDurationFrames: 24,
+            length: 24,
+        });
+        expect(timelineEditor.timeline.segments[0].videoEl).toBeInstanceOf(HTMLVideoElement);
+        expect(timelineEditor.timeline.segments[0].imageB64).toBeUndefined();
+        expect(timelineEditor.updateUIFromSelection).toHaveBeenCalled();
+        expect(timelineEditor.commitChanges).toHaveBeenCalledWith(true);
+        expect(timelineEditor._ensureThumbnails).toHaveBeenCalledWith(timelineEditor.timeline.segments[0]);
+    });
+
     it("loads a dragged workflow JSON card on empty canvas without staging it", async () => {
         const { createAssetDragStartHandler, createDragDropRuntimeHandlers } = await import("../features/dnd/DragDrop.js");
         const { getComfyApp } = await import("../app/comfyApiBridge.js");
