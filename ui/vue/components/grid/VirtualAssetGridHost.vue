@@ -567,19 +567,36 @@ function openKeyboardDetails() {
     }
 }
 
-function onAssetTagsChanged(event) {
+function focusCardSoon(assetId, attempts = 6) {
+    const el = state.cardElements.get(assetId);
+    if (el) {
+        try {
+            el.focus?.({ preventScroll: true });
+        } catch (e) {
+            console.debug?.(e);
+        }
+        return;
+    }
+    if (attempts <= 0) return;
+    requestAnimationFrame(() => focusCardSoon(assetId, attempts - 1));
+}
+
+function onViewerActiveAssetChanged(event) {
     const detail = event?.detail || {};
     const assetId = String(detail.assetId ?? detail.id ?? "").trim();
     if (!assetId) return;
-    const list = Array.isArray(state.assets) ? state.assets : [];
-    const idx = list.findIndex((entry) => String(entry?.id || "") === assetId);
-    if (idx === -1) return;
-    const nextTags = Array.isArray(detail.tags) ? [...detail.tags] : [];
-    // Replace the array (and the changed entry) so the shallowReactive grid state
-    // detects the update — mutating asset.tags in place is invisible to it.
-    const next = list.slice();
-    next[idx] = { ...next[idx], tags: nextTags };
-    state.assets = next;
+    const list = Array.isArray(renderableAssets.value) ? renderableAssets.value : [];
+    if (!list.some((entry) => String(entry?.id || "") === assetId)) return;
+
+    setSelection([assetId], assetId);
+    updateSelectionDatasets();
+    emitSelectionChanged();
+    scrollToAssetId(assetId, { align: "center" });
+
+    // Deferred: ViewerRuntime.closeViewer() restores focus to the element that
+    // was focused before the viewer opened *after* this listener returns, which
+    // would otherwise stomp the focus move below. Run after that finishes.
+    setTimeout(() => focusCardSoon(assetId), 0);
 }
 
 function installGridApi(container) {
@@ -976,7 +993,7 @@ function scheduleInitialHostMeasurements() {
 
 onMounted(() => {
     scheduleInitialHostMeasurements();
-    window.addEventListener(EVENTS.ASSET_TAGS_CHANGED, onAssetTagsChanged);
+    window.addEventListener(EVENTS.VIEWER_ACTIVE_ASSET_CHANGED, onViewerActiveAssetChanged);
 });
 
 watch(
@@ -1696,7 +1713,7 @@ watch(
 
 onBeforeUnmount(() => {
     try {
-        window.removeEventListener(EVENTS.ASSET_TAGS_CHANGED, onAssetTagsChanged);
+        window.removeEventListener(EVENTS.VIEWER_ACTIVE_ASSET_CHANGED, onViewerActiveAssetChanged);
     } catch (e) {
         console.debug?.(e);
     }
